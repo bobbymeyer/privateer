@@ -7,12 +7,12 @@
  */
 
 import type { RngState } from '../rng.ts';
-import { buildMap, type NodeId, ports } from './map.ts';
-import type { Roller } from './random.ts';
-import { pick } from './random.ts';
+import { buildMap, type NodeId, portNamed } from './map.ts';
+import { PORTS } from './ports.ts';
 import { type Rumor, FADED, makeRumor, markerStrength } from './rumors.ts';
 import { buildPattern, type SeaKnowledge } from './sea.ts';
 import { type FleetEntry, type Sea, type Ship, moveShip, spawnShips } from './ships.ts';
+import type { Roller } from './random.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -24,14 +24,21 @@ export interface WorldState {
   nextRumor: number;
 }
 
+/** Where the powers keep guard ships that will come after you. */
+export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Cádiz', 'Lisbon', 'Goa', 'Batavia', 'Manila', 'Algiers'];
+
+/** A merchant out of every port, a guard ship at every station, and the great courses. */
 export const DEFAULT_FLEET: FleetEntry[] = [
-  ...Array.from({ length: 10 }, (): FleetEntry => ({ kind: 'merchant' })),
-  { kind: 'hunter' },
-  { kind: 'hunter' },
-  { kind: 'treasure-ship', route: 'register' },
-  { kind: 'treasure-fleet', route: 'galeones' },
+  ...PORTS.map((p): FleetEntry => ({ kind: 'merchant', home: p.name })),
+  ...HUNTER_STATIONS.map((home): FleetEntry => ({ kind: 'hunter', home })),
   { kind: 'treasure-fleet', route: 'flota' },
+  { kind: 'treasure-fleet', route: 'galeones' },
+  { kind: 'treasure-fleet', route: 'south sea fleet' },
+  { kind: 'treasure-ship', route: 'manila galleon' },
+  { kind: 'treasure-ship', route: 'carreira' },
+  { kind: 'treasure-ship', route: 'retourvloot' },
   { kind: 'armada', route: 'barlovento' },
+  { kind: 'armada', route: 'mar océano' },
 ];
 
 let built: Sea | null = null;
@@ -45,14 +52,15 @@ export function createSea(): Sea {
   return built;
 }
 
+/** Drake fitted out at Plymouth. */
+export const START = 'Plymouth';
+
 export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): WorldState {
-  const r: Roller = { rng: (seed ^ 0x0ce4) >>> 0 };
-  const ships = spawnShips(sea, r, fleet);
   return {
-    rng: r.rng,
+    rng: (seed ^ 0x0ce4) >>> 0,
     turn: 0,
-    player: pick(r, ports(sea.map)),
-    ships,
+    player: portNamed(sea.map, START),
+    ships: spawnShips(sea, fleet),
     rumors: [],
     know: { currents: false, winds: false },
     nextRumor: 0,
@@ -85,7 +93,6 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
 export function hearRumor(sea: Sea, s: WorldState, shipId: number, reliability: number): WorldState {
   const ship = s.ships.find((x) => x.id === shipId);
   if (!ship) throw new Error(`no ship ${shipId}`);
-  if (ship.away) throw new Error(`ship ${shipId} is across the Atlantic`);
   const r: Roller = { rng: s.rng };
   const rumor = makeRumor(sea, r, s.nextRumor, ship, s.turn, reliability);
   return { ...s, rng: r.rng, rumors: [...s.rumors, rumor], nextRumor: s.nextRumor + 1 };

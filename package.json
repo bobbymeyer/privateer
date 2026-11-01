@@ -12,10 +12,8 @@
     "play": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/play.ts",
     "sim": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/sim.ts",
     "rumors": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/rumors.ts",
-    "coast": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/build-coast.ts",
     "chart": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/chart.ts",
-    "world": "node --max-old-space-size=4096 --experimental-strip-types --disable-warning=ExperimentalWarning scripts/build-world.ts",
-    "world-chart": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/world-chart.ts"
+    "world": "node --max-old-space-size=4096 --experimental-strip-types --disable-warning=ExperimentalWarning scripts/build-world.ts"
   },
   "engines": {
     "node": ">=22.12.0"

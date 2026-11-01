@@ -40,14 +40,14 @@ for (const reliability of [0.9, 0.5]) {
     let w = createWorld(sea, seed);
     for (let i = 0; i < 6; i++) w = advance(sea, w, w.player);
     const r: Roller = { rng: seed * 7919 + 1 };
-    const target = pick(r, w.ships.filter((s) => !s.away));
+    const target = pick(r, w.ships);
     w = hearRumor(sea, w, target.id, reliability);
     const rumor = w.rumors.at(-1)!;
     for (let age = 0; age <= AGES.at(-1)!; age++) {
       const col = AGES.indexOf(age);
       if (col >= 0) {
-        const truth = w.ships[target.id].away ? -1 : w.ships[target.id].node;
-        if (truth >= 0) KNOW.forEach(([, know], row) => {
+        const truth = w.ships[target.id].node;
+        KNOW.forEach(([, know], row) => {
           const p = predict(sea, rumor, w.turn, know, w.player);
           const area = searchArea(p);
           const cell = rows[row][col];

@@ -48,19 +48,22 @@ year. Ports, flags and fleets are drawn from across the century, so
 nothing pins the calendar.
 
 The ultimate win is re-enacting Drake's raid round the world, so the sea
-is the whole world: `src/world/data/world.json`, built by `npm run world` from
-Natural Earth's 1:10m land.
+is the whole world.
 
-**Coastline first, because the coast is where the action is.** Every coast
-and island gets a node offshore every 60 nautical miles, about a day's
-coasting. Then the open ocean is filled in, sparser the farther it is from
-land, up to 300 miles apart mid-ocean. Then everything is triangulated on
-the sphere, and any edge that crosses more than a spit of land, or runs far
-longer than its neighbours, is dropped. Water cut off from the ocean (the
-Caspian, the Great Lakes) is dropped too. The ice beyond 62°S and 72°N is
-left out.
+**Coastline first, because the coast is where the action is.**
+`src/world/data/world.json` is built by `npm run world` from Natural
+Earth's 1:10m land (public domain):
 
-The result is 6,954 nodes (3,213 on the coast) and 17,236 edges.
+1. Every coast and island gets a node offshore every 60 nautical miles,
+   about a day's coasting.
+2. The open ocean is filled in, sparser the farther it is from land, up to
+   300 miles apart mid-ocean.
+3. Everything is triangulated on the sphere. Any edge that crosses more
+   than a spit of land, or runs far longer than its neighbours, is dropped.
+4. Water cut off from the ocean (the Caspian, the Great Lakes) is dropped,
+   and so is the ice beyond 62°S and 72°N.
+
+That gives 6,954 nodes (3,213 on the coast).
 
 Straits narrower than the coastal spacing would be missed, since coastal
 nodes sit offshore. Ten are traced by hand in `src/world/passages.ts` and
@@ -68,105 +71,91 @@ threaded through as chains: Magellan above all, plus Gibraltar, Dover, the
 Øresund, the Dardanelles and Bosporus, Messina, Bab-el-Mandeb, Hormuz,
 Malacca and Sunda.
 
-`src/world/drake.ts` is Drake's voyage as the places he touched. The tests
-check that the graph can sail it, Plymouth to Plymouth by Magellan, the
-Moluccas and the Cape, and `npm run world-chart -- out.svg land.geojson`
-draws it (259 legs).
+**A turn is a day.** Every leg longer than a day's sail is split into days
+(`src/world/map.ts`), so one step is one turn everywhere. A coastal leg is a
+day; a 300-mile ocean leg is five, and a ship on it is somewhere along it.
+Ocean crossings take as long as they did, and most turns are spent near
+land. That makes 24,331 steps in all.
 
-What follows is still the Caribbean-only sea that the rest of the game
-runs on. It moves onto the world graph next.
+**111 ports** (`src/world/ports.ts`), from across the century and twenty
+flags: Spain and Portugal's empires, the English, French, Dutch, Danes and
+Swedes, the Hanse, Venice and Malta, the Ottomans and the Barbary states,
+Oman, Persia, the Mughals, China, Japan, and independent harbours like
+Aceh, Bantam and Calicut. Forts put the water a step out under their guns.
 
-## the sea and its rumors
+**The grain of the sea** (`src/world/ocean.ts`):
 
-Between fights is the Caribbean and the Gulf of Mexico in 16XX.
+- **Currents** are streams with a course, a strength and a width: the
+  Atlantic and Pacific gyres, the Gulf Stream, Kuroshio and Agulhas, the
+  Humboldt, the equatorial currents and countercurrent, the West Wind Drift
+  round the south.
+- **Wind** is a model of the global circulation. The trades blow toward the
+  west and the equator, hardest about 14°, slack in the doldrums. The
+  westerlies blow toward the east and the pole, hardest about 48°, and 40%
+  harder in the south (the Roaring Forties). The belts follow the sun four
+  degrees north and south through the year. The monsoon overrides them over
+  the Arabian Sea, the Bay of Bengal and the South China Sea: south-west in
+  summer, north-east in winter.
+- **Rivers** push water out to sea: the Amazon, Congo, Ganges, Yangtze and
+  others.
+- **Banks** keep deep keels off: the Bahamas, Campeche, the Grand Banks,
+  the Dogger, the Great Barrier Reef.
+- **Seasons** are 91 days.
 
-**The open sea is a triangular grid.** Every node has six neighbours, about
-sixty nautical miles apart: 687 nodes of water. Land is masked from Natural
-Earth's coastline (public domain, built into `src/world/data/land.json` by
-`npm run coast`). The Pacific is cut out: at this scale the isthmus is
-thinner than the grid.
-
-**The coast is history**, all in `src/world/caribbean.ts`:
-
-- **22 ports**, Spanish, English, French and Dutch, each on the node
-  nearest where it really was. Forts put the water a leg out under their
-  guns.
-- **Straits**: Florida, Yucatán, the Windward, Mona and Anegada passages,
-  the Old Bahama Channel, the Dragon's Mouth.
-- **Rivers** push water out to sea: the Mississippi, Magdalena, Chagres,
-  Orinoco, Grijalva.
-- **Banks**: the Bahama, Campeche and Mosquito banks. Deep keels
-  (treasure ships, fleets, the armada) keep off them; merchants and hunters
-  don't have to.
-
-**Currents** are streams with a course, a strength and a width. The
-Caribbean Current runs west through the sea, north through the Yucatán
-Channel, round the Loop, and out the Florida Straits as the Gulf Stream.
-The Antilles Current runs outside the islands, and an eddy runs back east
-along Panama. **Wind** is the north-east trades, swinging through four
-seasons of ten turns, with northers over the Gulf in the dry season.
-
-**Ships** sail one leg a turn and favour running with both:
+**Ships** sail a step a turn and favour running with the sea:
 
 | kind | habit |
 | --- | --- |
-| merchant | port to port, three times likelier to trade under its own flag; a turn in each port |
-| treasure fleet | the galeones (in to Cartagena, Portobelo, back, Havana) and the flota (in by San Juan to Veracruz, Havana), then out the Florida Straits for Spain, gone 20 turns, back in through the islands; half speed |
-| treasure ship | a register ship on the same pattern |
-| armada | the Armada de Barlovento, round the Spanish ports; half speed |
-| hunter | guarda costas out of Spanish forts, closing on you |
+| merchant | one out of every port, trading with ports within 30 days, three times likelier under its own flag; a day in each port |
+| treasure fleet | the flota and galeones (Cádiz, the Canaries, in through the islands, silver at Veracruz or Cartagena and Portobelo, Havana); the South Sea fleet (Arica, Callao, Panama); half speed |
+| treasure ship | the Manila galleon, the Portuguese carreira to Goa, the Dutch return fleet to Batavia |
+| armada | the Armada de Barlovento round the Caribbean, the Mar Océano off Iberia; half speed |
+| hunter | guard ships at ten stations (Havana, Cartagena, San Juan, Callao, Cádiz, Lisbon, Goa, Batavia, Manila, Algiers), chasing you while you're within 25 days of their station |
 
 Square-riggers let the sea pick their heading: they go round rather than
-beat. Hunters are small, weatherly sloops and can work to windward. With
-the same pull as everyone else, they took 30 turns to cover a quarter of
-the way to you. Now they cover two thirds.
-
-`npm run chart -- out.svg` draws it all: coastline, currents (or one
-season's wind), and where ships actually went over a long run. Lanes
-show: the flota coming in by the islands and leaving up the Gulf Stream,
-the galeones in the south-west.
+beat. Hunters are weatherly and can work to windward.
 
 **Rumors.** A rumor says a ship was at a node, on a turn, from a source of
 some reliability. It is exactly right with that probability; otherwise it
-is off by up to one node (good sources), two or three (bad ones). Rumors
+is off by up to one step (good sources), two or three (bad ones). Rumors
 come from prisoners (`interrogate`, on boarding party and strike colours,
-lost if you sink) and, later, from ports. A fleet across the Atlantic can't
-be rumored.
+lost if you sink) and, later, from ports.
 
 Each rumor gives two things:
 
-- **a marker**, which loses a fifth of its strength each turn and is gone
-  below a tenth. A 90% rumor lasts ten turns.
+- **a marker**, which loses a fifth of its strength each day and is gone
+  below a tenth. A 90% rumor lasts ten days.
 - **a prediction**, a cloud of where the ship could be now. It starts at
   the report and sails forward the way that kind sails:
-  - a merchant is bound for some port, nobody knows which;
-  - a treasure fleet keeps its known route, and while it's probably across
-    the Atlantic, the cloud adds up to less than one;
-  - a hunter is bound for you.
+  - a merchant is bound for one of the ports it trades with, nobody knows
+    which;
+  - a treasure fleet keeps its known course;
+  - a hunter is bound for you if you're in its range, else for its station.
 
   It weighs each leg by what you know of the sea. The **search area** is
   the fewest nodes holding 70% of the cloud.
 
-`npm run rumors` measures it. For a 90% rumor, over 200 rumors:
+`npm run rumors` measures it. For a 90% rumor, about a random ship, over 80
+rumors:
 
-| you know | age 2: best guess right | age 8: best guess right | age 8: search area | ship inside it |
+| you know | 2 days old: best guess right | 8 days: best guess right | 8 days: search area | ship inside it |
 | --- | --- | --- | --- | --- |
-| nothing | 18% | 3% | 32 nodes | 38% |
-| currents | 33% | 9% | 25 | 71% |
-| wind | 32% | 11% | 23 | 73% |
-| both | 37% | 15% | 18 | 79% |
+| nothing | 28% | 9% | 24 steps | 63% |
+| currents | 33% | 10% | 22 | 69% |
+| wind | 35% | 15% | 20 | 75% |
+| both | 34% | 14% | 18 | 76% |
 
-Knowing nothing, a week-old rumor is close to worthless. The area is a
-fifth of the sea, and the ship has usually left it, because blind guesses
-spread evenly while real ships run with the sea. Knowing currents and
-wind, the area is about half the size and right four times in five.
+Knowing the sea still helps: a tighter search, and one you can trust. It
+helps less than on the Caribbean-only map, though, where an eight-day
+search shrank from 32 nodes to 18. Most ships are merchants working coasts,
+where the currents are slack and any of a dozen ports is plausible. The sea
+earns its keep on the long runs: treasure courses, ocean crossings,
+monsoon passages.
 
-Two things it took. The first prediction treated every ship as drifting,
-when ships head somewhere, so the cloud fell behind the ship it was
-tracking. Ships also have to go round to run with the sea; while they only
-chose among legs that closed the distance, knowing the sea barely helped.
-Treasure routes were common knowledge, so a fleet's prediction only weighs
-its route's ports.
+`npm run chart -- out.svg land.geojson` draws the world. Add `--turns 2000`
+for where ships actually went, `--flow current` or `--flow wind:2` for the
+sea's grain, and `--box w,s,e,n --scale 30` to zoom. Drake's route is traced
+through the graph on every chart.
 
 ## running it
 
@@ -183,10 +172,8 @@ npm run play                 # one encounter in the terminal, random seed
 npm run play -- --seed 42    # that encounter again
 npm run sim                  # bots × 2000 seeds
 npm run rumors               # how good a rumor is, by age and knowledge
-npm run chart -- out.svg     # the sea, its currents, and where ships went
-npm run coast -- ne.geojson  # rebuild the land mask from Natural Earth
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth
-npm run world-chart -- out.svg land.geojson [--box w,s,e,n --scale 30]
+npm run chart -- out.svg land.geojson [--turns 2000 --flow current --box w,s,e,n --scale 30]
 ```
 
 In the browser, `?seed=42` replays an encounter too. Keys: 1 2 3 pick,
@@ -204,10 +191,13 @@ src/
   rules.test.ts
   ui/            Svelte: App, CardView, Gauge
   world/
-    grid.ts      the triangular grid over longitude and latitude
-    caribbean.ts ports, straits, rivers, banks, currents, winds, routes
-    data/        the land mask and coastline, from Natural Earth
-    map.ts       the sea graph: water nodes and what the coast makes of them
+    data/        world.json: the world graph, from Natural Earth
+    passages.ts  the narrow straits, traced by hand
+    ports.ts     the ports of 16XX and their flags
+    ocean.ts     currents, rivers, banks, the wind model, the great courses
+    drake.ts     Drake's raid round the world, as the places he touched
+    geo.ts       the sphere: distances, great circles, headings
+    map.ts       the world graph split into days, with ports and features
     sea.ts       currents and wind per node, and how they weigh a leg
     ships.ts     the kinds of ship and how each moves
     rumors.ts    making a rumor, its fading marker, its prediction
