@@ -37,7 +37,12 @@ export type Effect =
    */
   | { kind: 'flee' }
   /** Cancels the other side's next flee. Stacks; lasts until used. */
-  | { kind: 'hold'; amount: number };
+  | { kind: 'hold'; amount: number }
+  /**
+   * Prisoners talk: a rumor of this reliability, carried out of the fight
+   * and turned into a sighting on the map. Lost if you are sunk.
+   */
+  | { kind: 'interrogate'; reliability: number };
 
 export interface Card {
   /** Unique within an encounter: `broadside#2`. */
@@ -86,7 +91,7 @@ export const SHIP_CARDS: readonly CardDef[] = [
   { key: 'broadside', name: 'broadside', text: 'hit 4', effects: [{ kind: 'hit', amount: 4 }], copies: 2 },
   { key: 'raking-fire', name: 'raking fire', text: 'hit 2', effects: [{ kind: 'hit', amount: 2 }], copies: 2 },
   { key: 'sweep', name: 'sweep the hold', text: 'plunder 3', effects: [{ kind: 'plunder', amount: 3 }], copies: 2 },
-  { key: 'boarding', name: 'boarding party', text: 'plunder 4, hurt 1', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'hurt', amount: 1 }], copies: 1 },
+  { key: 'boarding', name: 'boarding party', text: 'plunder 4, hurt 1, interrogate', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'hurt', amount: 1 }, { kind: 'interrogate', reliability: 0.7 }], copies: 1 },
   { key: 'chain-shot', name: 'chain shot', text: 'hit 1, hold 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'hold', amount: 1 }], copies: 1 },
   { key: 'swivel', name: 'swivel guns', text: 'hit 1, plunder 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'plunder', amount: 1 }], copies: 1 },
   { key: 'patch', name: 'patch the hull', text: 'repair 2', effects: [{ kind: 'repair', amount: 2 }], copies: 1 },
@@ -100,6 +105,6 @@ export const MERCHANT_CARDS: readonly CardDef[] = [
   { key: 'grapeshot', name: 'grapeshot', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 1 },
   { key: 'jettison', name: 'jettison cargo', text: 'jettison 3', effects: [{ kind: 'jettison', amount: 3 }], copies: 2 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 1 },
-  { key: 'strike', name: 'strike colours', text: 'plunder 3', effects: [{ kind: 'plunder', amount: 3 }], copies: 1 },
+  { key: 'strike', name: 'strike colours', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.9 }], copies: 1 },
   { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
 ];

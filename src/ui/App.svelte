@@ -94,7 +94,7 @@
   {#if game.outcome}
     <section class="outcome">
       <h2>{OUTCOME_TEXT[game.outcome]}</h2>
-      <p class="payout">you walk away with {game.payout}</p>
+      <p class="payout">you walk away with {game.payout}{#if game.intel.length} and {game.intel.length} {game.intel.length === 1 ? 'rumor' : 'rumors'} from prisoners{/if}</p>
       <button onclick={newEncounter}>new encounter</button>
     </section>
   {:else}

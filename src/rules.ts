@@ -86,6 +86,8 @@ export interface EncounterState {
   payout: number;
   /** Damage cards made so far, for unique ids. */
   minted: number;
+  /** Reliability of each rumor got from prisoners. Emptied if you are sunk. */
+  intel: number[];
   events: GameEvent[];
 }
 
@@ -113,6 +115,7 @@ export function createEncounter(setup: EncounterSetup): EncounterState {
     outcome: null,
     payout: 0,
     minted: 0,
+    intel: [],
     events: [],
   };
   return deal(state);
@@ -218,6 +221,10 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterS
       }
       break;
     }
+    case 'interrogate':
+      applied = 1;
+      s.intel.push(effect.reliability);
+      break;
     case 'hold':
       applied = effect.amount;
       (mine ? s.target : s.ship).held += applied;
@@ -261,6 +268,7 @@ function deal(s: EncounterState): EncounterState {
 
 function end(s: EncounterState, outcome: Outcome): EncounterState {
   s.outcome = outcome;
+  if (outcome === 'sunk') s.intel = [];
   s.payout =
     outcome === 'sunk' ? 0 : outcome === 'destroyed' ? s.plunder + s.target.bounty : s.plunder;
   s.events.push({ type: 'ended', round: s.round, outcome, payout: s.payout });
@@ -276,5 +284,6 @@ function clone(s: EncounterState): EncounterState {
     ship: { ...s.ship },
     target: { ...s.target },
     events: s.events.slice(),
+    intel: s.intel.slice(),
   };
 }

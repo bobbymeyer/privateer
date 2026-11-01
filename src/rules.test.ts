@@ -176,6 +176,15 @@ test('their hold stops your flee', () => {
   assert.equal(s2.outcome, null);
 });
 
+test('prisoners give up rumors, which go down with you if you sink', () => {
+  const talk = card('talk', 'ship', [{ kind: 'interrogate', reliability: 0.7 }]);
+  const s1 = act(stacked([talk, ...blank(2)]), { type: 'keep', picks: [0, 1] });
+  assert.deepEqual(s1.intel, [0.7]);
+  const s2 = act(stacked([talk, hurt(9), ...blank(1)]), { type: 'keep', picks: [0, 1] });
+  assert.equal(s2.outcome, 'sunk');
+  assert.deepEqual(s2.intel, []);
+});
+
 const damageIn = (cards: Card[], side: Card['side']) =>
   cards.filter((c) => c.damage && c.side === side).length;
 
