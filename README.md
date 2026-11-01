@@ -1,7 +1,8 @@
 # privateer
 
-The first slice of a card game, headless. No art, no renderer: a rules
-module, a terminal harness to play it, and a simulator to tune it.
+A card game in progress. So far: one encounter, a rules module that knows
+nothing about drawing, a plain browser front end in Svelte, a terminal
+harness, and a simulator to tune the numbers.
 
 It will go up on bobbymeyer.com once it has something to look at.
 
@@ -19,15 +20,22 @@ You see the hand before you choose, so you can stop on a hand that would sink yo
 
 ## running it
 
-No dependencies to run, only Node 22.12+.
+Node 22.12+.
 
 ```bash
-npm test                     # the rules
-npm run play                 # one encounter, random seed
+npm install
+npm run dev                  # the browser version, http://localhost:5173
+npm run build                # static build in dist/, relative paths
+npm run check                # svelte-check and TypeScript
+
+npm test                     # the rules (no install needed)
+npm run play                 # one encounter in the terminal, random seed
 npm run play -- --seed 42    # that encounter again
 npm run sim                  # bots × 2000 seeds
-npm run check                # type-check (needs npm install)
 ```
+
+In the browser, `?seed=42` replays an encounter too. Keys: 1 2 3 pick,
+enter resolve, s break off.
 
 ## layout
 
@@ -37,7 +45,9 @@ src/
   cards.ts       the effect vocabulary and the placeholder decks
   rules.ts       createEncounter, act, legalActions — pure, no I/O
   setup.ts       the one encounter so far: you and a merchant
+  describe.ts    words for events, shared by terminal and browser
   rules.test.ts
+  ui/            Svelte: App, CardView, Gauge
 cli/
   play.ts        the interactive harness
   sim.ts         bots and their outcome tables
