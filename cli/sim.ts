@@ -12,7 +12,8 @@
  */
 
 import { type Action, type EncounterState, type Outcome, act, legalActions } from '../src/rules.ts';
-import { merchantEncounter } from '../src/setup.ts';
+import { TARGETS, encounterWith } from '../src/setup.ts';
+import type { ShipKind } from '../src/world/ships.ts';
 
 interface Weights {
   /** Per point of your hull still standing. */
@@ -56,6 +57,8 @@ const bots: Bot[] = [
   { name: 'careful (hull dear)', choose: lookahead({ hull: 1.5, damage: 0.4, fled: 2 }) },
   { name: 'reckless (hull cheap)', choose: lookahead({ hull: 0.2, damage: 0.6, fled: -5 }) },
   { name: 'never flees', choose: lookahead({ hull: 0.6, damage: 0.4, fled: -100 }) },
+  // Runs the moment a flee card will work: what to do in front of an armada.
+  { name: 'runs when it can', choose: lookahead({ hull: 0.6, damage: 0.4, fled: 100 }) },
   {
     name: 'random keeps',
     choose: (s) => {
@@ -65,11 +68,14 @@ const bots: Bot[] = [
   },
 ];
 
+const targetFlag = process.argv.indexOf('--target');
+const target = (targetFlag >= 0 ? process.argv[targetFlag + 1] : 'merchant') as ShipKind;
+if (!TARGETS[target]) throw new Error(`no target ${target}; try ${Object.keys(TARGETS).join(', ')}`);
 const flag = process.argv.indexOf('--runs');
 const runs = flag >= 0 ? Number(process.argv[flag + 1]) : 2000;
 const outcomes: Outcome[] = ['fled', 'escaped', 'destroyed', 'sunk', 'parted'];
 
-console.log(`${runs} encounters per bot, seeds 0..${runs - 1}\n`);
+console.log(`${runs} encounters per bot against a ${TARGETS[target].name}, seeds 0..${runs - 1}\n`);
 console.log(['bot'.padEnd(22), 'payout', 'rounds', ...outcomes.map((o) => o.padStart(9))].join(' '));
 
 for (const bot of bots) {
@@ -77,7 +83,7 @@ for (const bot of bots) {
   let rounds = 0;
   const counts = Object.fromEntries(outcomes.map((o) => [o, 0])) as Record<Outcome, number>;
   for (let seed = 0; seed < runs; seed++) {
-    let s = merchantEncounter(seed);
+    let s = encounterWith(target, seed);
     while (!s.outcome) s = act(s, bot.choose(s));
     payout += s.payout;
     rounds += s.round;

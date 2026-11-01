@@ -13,6 +13,8 @@ import { type Rumor, FADED, makeRumor, markerStrength } from './rumors.ts';
 import { buildPattern, type Chart, CURRENT_SEEN, chartKnowledge, type SeaKnowledge, seasonOf, windSeen } from './sea.ts';
 import { type FleetEntry, type Sea, type Ship, moveShip, spawnShips } from './ships.ts';
 import type { Roller } from './random.ts';
+import { SHIP } from '../setup.ts';
+import { type Meeting, type Reckoning, meeting } from './meet.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -31,6 +33,17 @@ export interface WorldState {
   trail: NodeId[][];
   /** Rounds bought in this port tonight. Each one finds the drinkers less sober. */
   rounds: number;
+  /** Your hull, carried from fight to fight; mended in port. */
+  hull: number;
+  maxHull: number;
+  /** The fight at hand. While there is one, the world waits. */
+  encounter: Meeting | null;
+  /** How the last fight ended. */
+  reckoning: Reckoning | null;
+  /** Ships you've parted from, and the turn until which they leave you be. */
+  parted: Record<number, number>;
+  /** You went down. The run is over. */
+  sunk: boolean;
 }
 
 /** Days of each ship's wake that are remembered. */
@@ -101,18 +114,26 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     chart: observe(sea, new Uint8Array(sea.map.nodes.length), player, 1, 0),
     trail: ships.map(() => []),
     rounds: 0,
+    hull: SHIP.hull,
+    maxHull: SHIP.maxHull,
+    encounter: null,
+    reckoning: null,
+    parted: {},
+    sunk: false,
   };
 }
 
 /** You sail to `to` (a neighbour, or where you are), then everyone else moves. */
 export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
+  if (s.sunk) throw new Error('you went down; the run is over');
+  if (s.encounter) throw new Error('there is a fight to finish first');
   if (to !== s.player && !sea.map.adj[s.player].includes(to)) {
     throw new Error(`node ${to} is not next to ${s.player}`);
   }
   const r: Roller = { rng: s.rng };
   const ships = s.ships.map((ship) => ({ ...ship }));
   for (const ship of ships) moveShip(sea, r, ship, s.turn, to);
-  return {
+  return meeting(sea, {
     ...s,
     rng: r.rng,
     turn: s.turn + 1,
@@ -123,7 +144,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     chart: observe(sea, s.chart, to, s.sight, s.turn + 1),
     trail: s.ships.map((ship, i) => [ship.node, ...s.trail[i]].slice(0, TRAIL)),
     rounds: 0,
-  };
+  });
 }
 
 /**

@@ -56,10 +56,16 @@ export interface TargetState {
   held: number;
 }
 
-/** Hull at half or less. The only state in which a flee card works. */
-export function threatened(side: { hull: number; maxHull: number }): boolean {
-  return side.hull * 2 <= side.maxHull;
+/**
+ * Credibly threatened: hull at half or less, or outgunned three to one. The
+ * only state in which a flee card works — a ship that is not in danger does
+ * not run, and one facing a squadron of the line runs from the first shot.
+ */
+export function threatened(side: { hull: number; maxHull: number }, other: { hull: number }): boolean {
+  return side.hull * 2 <= side.maxHull || other.hull >= OUTGUNNED * side.hull;
 }
+
+export const OUTGUNNED = 3;
 
 /** Why an effect did less than its face value, when that is worth saying. */
 export type EffectNote = 'held' | 'unthreatened';
@@ -211,7 +217,7 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterS
       break;
     case 'flee': {
       const runner = mine ? s.ship : s.target;
-      if (!threatened(runner)) note = 'unthreatened';
+      if (!threatened(runner, mine ? s.target : s.ship)) note = 'unthreatened';
       else if (runner.held > 0) {
         runner.held -= 1;
         note = 'held';

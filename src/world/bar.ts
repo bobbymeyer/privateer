@@ -12,7 +12,7 @@
  *   when it does. The room turns over overnight.
  */
 
-import { portNamed } from './map.ts';
+import { type NodeId, portNamed } from './map.ts';
 import { type Roller, roll, weighted } from './random.ts';
 import { type Rumor, makeRumor } from './rumors.ts';
 import type { Sea, ShipKind } from './ships.ts';
@@ -47,18 +47,27 @@ export function buyRound(sea: Sea, s: WorldState): Round {
   // Anybody here know anything?
   if (roll(r) >= 0.85 * 0.8 ** s.rounds) return { world: { ...paid, rng: r.rng }, heard: null };
 
-  // When they saw it: up to the length of the wake, recent likelier.
-  const toPort = sea.map.distTo(portNamed(sea.map, port.name));
-  const sightings = s.ships.flatMap((ship, i) => {
-    const age = Math.min(s.trail[i].length, 1 + Math.floor(roll(r) ** 2 * 12));
-    const at = age === 0 ? ship.node : s.trail[i][age - 1];
-    const far = toPort[at];
-    return far <= BAR_REACH ? [{ ship, at, age, far }] : [];
-  });
-  if (!sightings.length) return { world: { ...paid, rng: r.rng }, heard: null };
-
-  const seen = sightings[weighted(r, sightings.map((x) => NOTABLE[x.ship.kind] / (1 + x.far / 5)))];
+  const seen = sighting(sea, s, r, portNamed(sea.map, port.name), 12, -1, 1);
+  if (!seen) return { world: { ...paid, rng: r.rng }, heard: null };
   const reliability = Math.max(0.2, Math.min(0.95, 0.92 - 0.012 * seen.far - 0.07 * s.rounds + (roll(r) - 0.5) * 0.16));
   const heard = makeRumor(sea, r, s.nextRumor, { ...seen.ship, node: seen.at }, s.turn - seen.age, reliability);
   return { world: { ...paid, rng: r.rng, rumors: [...s.rumors, heard], nextRumor: s.nextRumor + 1 }, heard };
+}
+
+/**
+ * A ship somebody at `from` could have seen: where it was, `minAge` to
+ * `maxAge` days back (recent likelier), within reach of `from`. Treasure is talked
+ * about more than merchants, near ships more than far ones. Ships laid up
+ * and the ship in `except` aren't.
+ */
+export function sighting(sea: Sea, s: WorldState, r: Roller, from: NodeId, maxAge: number, except = -1, minAge = 0) {
+  const toHere = sea.map.distTo(from);
+  const seen = s.ships.flatMap((ship, i) => {
+    if (ship.id === except || ship.laidUp > s.turn) return [];
+    const age = Math.min(s.trail[i].length, minAge + Math.floor(roll(r) ** 2 * (maxAge - minAge + 1)));
+    const at = age === 0 ? ship.node : s.trail[i][age - 1];
+    const far = toHere[at];
+    return far <= BAR_REACH ? [{ ship, at, age, far }] : [];
+  });
+  return seen.length ? seen[weighted(r, seen.map((x) => NOTABLE[x.ship.kind] / (1 + x.far / 5)))] : null;
 }

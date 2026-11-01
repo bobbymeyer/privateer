@@ -134,6 +134,35 @@ exactly right with that probability; otherwise it is off by up to one step
 (good sources), two or three (bad ones). Prisoners talk too
 (`interrogate`, on boarding party and strike colours, lost if you sink).
 
+**Meeting a ship.** When you share a node with a ship, outside a port, the
+encounter starts (`src/world/meet.ts`). The world waits until it is fought.
+If several ships are there, you meet the one that matters most (by the
+bar's notability). Every kind has a deck (`src/setup.ts`):
+
+| target | hull | hold | deck |
+| --- | --- | --- | --- |
+| merchant | 12 | 12 | return fire, jettisons cargo, runs |
+| guard ship | 12 | 3 | hits hard, grapples so you can't run, bounty 10 |
+| galleon | 13 | 30 | heavy guns, runs, strikes for the silver |
+| treasure fleet | 24 | 60 | escorts' broadsides, cuts off your retreat, a straggler to snatch |
+| armada | 30 | 4 | broadsides of 4, holds the weather gauge. Run. |
+
+A ship is **credibly threatened**, and its flee cards work, at half hull or
+less, *or outgunned three to one*. That's what makes a fleet or an armada
+survivable: against them your flee cards work from the first hand, unless
+they hold you. A captain who runs whenever a flee card works gets away from
+a treasure fleet 77% of the time (often with a straggler's plunder) and
+from an armada 66%. One who stays sinks. `npm run sim -- --target armada`.
+
+Afterwards it is settled:
+- the payout goes in the purse;
+- your hull is kept as it came out (mend it in port at 3 gold a point);
+- each prisoner questioned (`interrogate`) gives a rumor about a ship seen
+  in the last few days;
+- a ship destroyed is laid up at home for 60 days;
+- a ship parted from leaves you be for 5;
+- if you're sunk, the run is over.
+
 **You see the next node.** The water a step out from you, its current and
 this season's wind, goes on your chart (`WorldState.chart`). Currents never
 change, so a current once seen is charted for good. Winds change with the
@@ -223,6 +252,7 @@ src/
     ships.ts     the kinds of ship and how each moves
     rumors.ts    making a rumor, its fading marker, its prediction
     bar.ts       buying rounds, and what the room tells you
+    meet.ts      meeting a ship at sea, fighting it, settling up, repairs
     world.ts     createWorld, advance, observe, hearRumor — pure, like rules.ts
 cli/
   play.ts        the interactive harness

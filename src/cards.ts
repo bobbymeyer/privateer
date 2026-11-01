@@ -108,3 +108,42 @@ export const MERCHANT_CARDS: readonly CardDef[] = [
   { key: 'strike', name: 'strike colours', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.9 }], copies: 1 },
   { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
 ];
+
+// First decks for the rest of the sea. Placeholders, like the merchant's
+// were; `npm run sim -- --target <kind>` is how they get tuned.
+
+/** A guard ship: hard to shake (it grapples), little to take, a price on its head. */
+export const HUNTER_CARDS: readonly CardDef[] = [
+  { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 5 },
+  { key: 'grapeshot', name: 'grapeshot', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 3 },
+  { key: 'grapnels', name: 'grapnels', text: 'hurt 1, hold 1', effects: [{ kind: 'hurt', amount: 1 }, { kind: 'hold', amount: 1 }], copies: 2 },
+  { key: 'boarders', name: 'boarders away', text: 'hurt 2, hold 1', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'hold', amount: 1 }], copies: 1 },
+  { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 1 },
+  { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 1 },
+];
+
+/** A lone galleon: heavy guns, slow to answer, a hold full of silver, and she runs. */
+export const TREASURE_SHIP_CARDS: readonly CardDef[] = [
+  { key: 'great-guns', name: 'great guns', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 2 },
+  { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 3 },
+  { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 2 },
+  { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
+  { key: 'strike', name: 'strike colours', text: 'plunder 4, interrogate', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'interrogate', reliability: 0.9 }], copies: 1 },
+];
+
+/** A convoy under escort: it doesn't run, it closes ranks, and a straggler is the chance. */
+export const TREASURE_FLEET_CARDS: readonly CardDef[] = [
+  { key: 'escort-broadside', name: "escort's broadside", text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 4 },
+  { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 4 },
+  { key: 'cut-off', name: 'cut off', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 2 },
+  { key: 'carpenters', name: 'carpenters below', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
+  { key: 'straggler', name: 'a straggler', text: 'plunder 5, interrogate', effects: [{ kind: 'plunder', amount: 5 }, { kind: 'interrogate', reliability: 0.8 }], copies: 2 },
+];
+
+/** A squadron of the line: nothing to take, everything to lose. Run. */
+export const ARMADA_CARDS: readonly CardDef[] = [
+  { key: 'broadside', name: 'broadside', text: 'hurt 4', effects: [{ kind: 'hurt', amount: 4 }], copies: 4 },
+  { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 4 },
+  { key: 'weather-gauge', name: 'the weather gauge', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 3 },
+  { key: 'carpenters', name: 'carpenters below', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
+];

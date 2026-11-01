@@ -80,14 +80,14 @@
       <Gauge label="hull" value={game.ship.hull} max={game.ship.maxHull} />
       <p>plunder {game.plunder}{#if game.ship.brace} · brace {game.ship.brace}{/if}</p>
       {#if !game.outcome}<p class="status">{waiting('ship')} damage waiting in the deck</p>{/if}
-      {#if !game.outcome}<p class="status">{@render state(threatened(game.ship), game.ship.held)}</p>{/if}
+      {#if !game.outcome}<p class="status">{@render state(threatened(game.ship, game.target), game.ship.held)}</p>{/if}
     </div>
     <div class="ship theirs">
       <h2>{game.target.name}</h2>
       <Gauge label="hull" value={game.target.hull} max={game.target.maxHull} color="var(--theirs)" />
       <p>cargo {game.target.cargo} · bounty {game.target.bounty}</p>
       {#if !game.outcome}<p class="status">{waiting('target')} damage waiting in the deck</p>{/if}
-      {#if !game.outcome}<p class="status">{@render state(threatened(game.target), game.target.held)}</p>{/if}
+      {#if !game.outcome}<p class="status">{@render state(threatened(game.target, game.ship), game.target.held)}</p>{/if}
     </div>
   </section>
 
@@ -99,7 +99,7 @@
     </section>
   {:else}
     <section>
-      <p class="prompt">keep two. they resolve in the order you pick them; the third goes to the bottom. shot puts damage cards on top of the deck; hull only drops when one is kept. a flee card only works for a ship at half hull or less.</p>
+      <p class="prompt">keep two. they resolve in the order you pick them; the third goes to the bottom. shot puts damage cards on top of the deck; hull only drops when one is kept. a flee card only works for a ship at half hull or less, or outgunned three to one.</p>
       <div class="hand">
         {#each game.hand as card, i (card.id)}
           <CardView {card} order={picks.includes(i) ? picks.indexOf(i) + 1 : null} disabled={picks.length === 2 && !picks.includes(i)} onpick={() => toggle(i)} />

@@ -9,7 +9,7 @@ import { FADE, FADED, makeRumor, markerStrength, maxOff, predict, searchArea } f
 import { KNOW_ALL, KNOW_NOTHING, currentAt, seasonOf, windAt } from './sea.ts';
 import { HUNT_RANGE, movesOn } from './ships.ts';
 import { ROUND_COST, buyRound } from './bar.ts';
-import { advance, createSea, createWorld, earn, hearRumor, knowledge } from './world.ts';
+import { type WorldState, advance, createSea, createWorld, earn, hearRumor, knowledge } from './world.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -154,7 +154,8 @@ test('you see the next node’s current and wind, and no farther', () => {
 });
 
 test('a current once seen stays charted; wind is charted season by season', () => {
-  let w = createWorld(sea, 1);
+  // An empty sea, so nothing comes alongside to fight.
+  let w: WorldState = { ...createWorld(sea, 1), ships: [], trail: [] };
   const start = w.player;
   const away = map.adj[start][0];
   w = advance(sea, w, away);

@@ -24,6 +24,8 @@ export interface Ship {
   leg: number;
   /** Where it fits out, and where a hunter keeps station. */
   home: NodeId;
+  /** Sunk or taken: laid up at home, refitting, until this turn. */
+  laidUp: number;
 }
 
 export interface KindHabits {
@@ -98,6 +100,7 @@ export function onward(g: Graph, from: NodeId, dest: NodeId): [NodeId, number][]
  */
 export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: NodeId): void {
   const { map, pattern } = sea;
+  if (ship.laidUp > turn) return;
   if (!movesOn(ship.kind, turn)) return;
   const g = graphFor(map, ship.kind);
 
@@ -142,6 +145,6 @@ export function spawnShips(sea: Sea, fleet: FleetEntry[]): Ship[] {
   return fleet.map((entry, id) => {
     const route = entry.route ? ROUTES[entry.route].map((name) => portNamed(map, name)) : null;
     const home = route ? route[0] : portNamed(map, entry.home ?? 'Havana');
-    return { id, kind: entry.kind, node: home, dest: route ? route[1] : null, route, routeName: entry.route ?? null, leg: route ? 1 : 0, home };
+    return { id, kind: entry.kind, node: home, dest: route ? route[1] : null, route, routeName: entry.route ?? null, leg: route ? 1 : 0, home, laidUp: 0 };
   });
 }
