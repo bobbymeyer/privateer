@@ -14,17 +14,17 @@
 
 import { type Roller, pick } from '../src/world/random.ts';
 import { predict, searchArea } from '../src/world/rumors.ts';
-import type { SeaKnowledge } from '../src/world/sea.ts';
+import { KNOW_ALL, KNOW_NOTHING, type SeaKnowledge } from '../src/world/sea.ts';
 import { advance, createSea, createWorld, hearRumor } from '../src/world/world.ts';
 
 const flag = process.argv.indexOf('--runs');
 const runs = flag >= 0 ? Number(process.argv[flag + 1]) : 600;
 
 const KNOW: [string, SeaKnowledge][] = [
-  ['nothing', { currents: false, winds: false }],
-  ['currents', { currents: true, winds: false }],
-  ['winds', { currents: false, winds: true }],
-  ['both', { currents: true, winds: true }],
+  ['nothing', KNOW_NOTHING],
+  ['currents', { current: () => true, wind: () => false }],
+  ['winds', { current: () => false, wind: () => true }],
+  ['both', KNOW_ALL],
 ];
 const AGES = [0, 2, 4, 6, 8];
 

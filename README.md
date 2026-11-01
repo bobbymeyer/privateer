@@ -115,11 +115,32 @@ Aceh, Bantam and Calicut. Forts put the water a step out under their guns.
 Square-riggers let the sea pick their heading: they go round rather than
 beat. Hunters are weatherly and can work to windward.
 
-**Rumors.** A rumor says a ship was at a node, on a turn, from a source of
-some reliability. It is exactly right with that probability; otherwise it
-is off by up to one step (good sources), two or three (bad ones). Rumors
-come from prisoners (`interrogate`, on boarding party and strike colours,
-lost if you sink) and, later, from ports.
+**Rumors are bought by the round** (`src/world/bar.ts`). In port, stand
+the house a drink (2 gold) and somebody may tell you about a ship: where it
+was when they saw it, a few days back.
+
+- **What's talked about:** ships whose wake came within 30 days of the
+  port. Treasure fleets are talked about five times as much as a merchant,
+  and nearer ships more than farther.
+- **How stale:** a sighting is up to twelve days old, mostly recent; about
+  five on average.
+- **How true:** news from far off is garbled, and each round finds the room
+  drunker. The first round of the night hears something nearly nine times
+  in ten, at about 0.75 reliable; the fifth, under four in ten, at about
+  0.5. The room turns over overnight.
+
+A rumor says a ship was at a node, on a turn, with some reliability. It is
+exactly right with that probability; otherwise it is off by up to one step
+(good sources), two or three (bad ones). Prisoners talk too
+(`interrogate`, on boarding party and strike colours, lost if you sink).
+
+**You see the next node.** The water a step out from you, its current and
+this season's wind, goes on your chart (`WorldState.chart`). Currents never
+change, so a current once seen is charted for good. Winds change with the
+season, but the seasons come round, so wind seen in summer is charted for
+every summer. Predictions only use what's on your chart: in water you've
+never sailed, every leg looks the same. `sight` is one step for now; the
+crew will extend it.
 
 Each rumor gives two things:
 
@@ -132,11 +153,11 @@ Each rumor gives two things:
   - a treasure fleet keeps its known course;
   - a hunter is bound for you if you're in its range, else for its station.
 
-  It weighs each leg by what you know of the sea. The **search area** is
-  the fewest nodes holding 70% of the cloud.
+  It weighs each leg by what's on your chart. The **search area** is the
+  fewest nodes holding 70% of the cloud.
 
-`npm run rumors` measures it. For a 90% rumor, about a random ship, over 80
-rumors:
+`npm run rumors` measures what a chart is worth, from a blank one to the
+whole sea known. For a 90% rumor, about a random ship, over 80 rumors:
 
 | you know | 2 days old: best guess right | 8 days: best guess right | 8 days: search area | ship inside it |
 | --- | --- | --- | --- | --- |
@@ -201,7 +222,8 @@ src/
     sea.ts       currents and wind per node, and how they weigh a leg
     ships.ts     the kinds of ship and how each moves
     rumors.ts    making a rumor, its fading marker, its prediction
-    world.ts     createWorld, advance, hearRumor, learn — pure, like rules.ts
+    bar.ts       buying rounds, and what the room tells you
+    world.ts     createWorld, advance, observe, hearRumor — pure, like rules.ts
 cli/
   play.ts        the interactive harness
   sim.ts         bots and their outcome tables

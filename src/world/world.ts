@@ -10,7 +10,7 @@ import type { RngState } from '../rng.ts';
 import { buildMap, type NodeId, portNamed } from './map.ts';
 import { PORTS } from './ports.ts';
 import { type Rumor, FADED, makeRumor, markerStrength } from './rumors.ts';
-import { buildPattern, type SeaKnowledge } from './sea.ts';
+import { buildPattern, type Chart, CURRENT_SEEN, chartKnowledge, type SeaKnowledge, seasonOf, windSeen } from './sea.ts';
 import { type FleetEntry, type Sea, type Ship, moveShip, spawnShips } from './ships.ts';
 import type { Roller } from './random.ts';
 
@@ -20,9 +20,40 @@ export interface WorldState {
   player: NodeId;
   ships: Ship[];
   rumors: Rumor[];
-  know: SeaKnowledge;
   nextRumor: number;
+  /** In the purse. */
+  gold: number;
+  /** How many steps out you can see the water. The crew will extend it. */
+  sight: number;
+  /** What you have seen of the sea, node by node. See `chartKnowledge`. */
+  chart: Chart;
+  /** Where each ship has been, the day before first: what the bar's news is made of. */
+  trail: NodeId[][];
+  /** Rounds bought in this port tonight. Each one finds the drinkers less sober. */
+  rounds: number;
 }
+
+/** Days of each ship's wake that are remembered. */
+export const TRAIL = 12;
+export const START_GOLD = 20;
+
+/** What you can see from where you are: the water `sight` steps out, its current and this season's wind. */
+export function observe(sea: Sea, chart: Chart, from: NodeId, sight: number, turn: number): Chart {
+  const out = chart.slice();
+  const bits = CURRENT_SEEN | windSeen(seasonOf(sea.pattern, turn));
+  const depth = new Map<NodeId, number>([[from, 0]]);
+  const queue = [from];
+  for (let i = 0; i < queue.length; i++) {
+    const n = queue[i];
+    out[n] |= bits;
+    if (depth.get(n)! >= sight) continue;
+    for (const m of sea.map.adj[n]) if (!depth.has(m)) (depth.set(m, depth.get(n)! + 1), queue.push(m));
+  }
+  return out;
+}
+
+/** The player's knowledge of the sea, for predictions. */
+export const knowledge = (s: WorldState): SeaKnowledge => chartKnowledge(s.chart);
 
 /** Where the powers keep guard ships that will come after you. */
 export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Cádiz', 'Lisbon', 'Goa', 'Batavia', 'Manila', 'Algiers'];
@@ -56,14 +87,20 @@ export function createSea(): Sea {
 export const START = 'Plymouth';
 
 export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): WorldState {
+  const player = portNamed(sea.map, START);
+  const ships = spawnShips(sea, fleet);
   return {
     rng: (seed ^ 0x0ce4) >>> 0,
     turn: 0,
-    player: portNamed(sea.map, START),
-    ships: spawnShips(sea, fleet),
+    player,
+    ships,
     rumors: [],
-    know: { currents: false, winds: false },
     nextRumor: 0,
+    gold: START_GOLD,
+    sight: 1,
+    chart: observe(sea, new Uint8Array(sea.map.nodes.length), player, 1, 0),
+    trail: ships.map(() => []),
+    rounds: 0,
   };
 }
 
@@ -83,6 +120,9 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     ships,
     // Faded markers are dropped; what they said is no longer worth acting on.
     rumors: s.rumors.filter((rumor) => markerStrength(rumor, s.turn + 1) >= FADED),
+    chart: observe(sea, s.chart, to, s.sight, s.turn + 1),
+    trail: s.ships.map((ship, i) => [ship.node, ...s.trail[i]].slice(0, TRAIL)),
+    rounds: 0,
   };
 }
 
@@ -98,7 +138,5 @@ export function hearRumor(sea: Sea, s: WorldState, shipId: number, reliability: 
   return { ...s, rng: r.rng, rumors: [...s.rumors, rumor], nextRumor: s.nextRumor + 1 };
 }
 
-/** Learning the sea, from charts or an almanac. */
-export function learn(s: WorldState, what: Partial<SeaKnowledge>): WorldState {
-  return { ...s, know: { ...s.know, ...what } };
-}
+/** Gold in, from a prize. */
+export const earn = (s: WorldState, amount: number): WorldState => ({ ...s, gold: s.gold + amount });

@@ -6,9 +6,10 @@ import { DAY_NM, FAR, portNamed, ports } from './map.ts';
 import { ROUTES } from './ocean.ts';
 import { PORTS } from './ports.ts';
 import { FADE, FADED, makeRumor, markerStrength, maxOff, predict, searchArea } from './rumors.ts';
-import { currentAt, windAt } from './sea.ts';
+import { KNOW_ALL, KNOW_NOTHING, currentAt, seasonOf, windAt } from './sea.ts';
 import { HUNT_RANGE, movesOn } from './ships.ts';
-import { advance, createSea, createWorld, hearRumor, learn } from './world.ts';
+import { ROUND_COST, buyRound } from './bar.ts';
+import { advance, createSea, createWorld, earn, hearRumor, knowledge } from './world.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -111,9 +112,9 @@ test('a prediction is a probability over the sea, starts at the report, and spre
   for (let i = 0; i < 5; i++) w = advance(sea, w, w.player);
   w = hearRumor(sea, w, flota.id, 1);
   const rumor = w.rumors[0];
-  assert.ok(Math.abs(predict(sea, rumor, w.turn, w.know, w.player)[rumor.reported] - 1) < 1e-9);
+  assert.ok(Math.abs(predict(sea, rumor, w.turn, knowledge(w), w.player)[rumor.reported] - 1) < 1e-9);
   for (let i = 0; i < 6; i++) w = advance(sea, w, w.player);
-  const later = predict(sea, rumor, w.turn, { currents: true, winds: true }, w.player);
+  const later = predict(sea, rumor, w.turn, KNOW_ALL, w.player);
   assert.ok(Math.abs(sum(later) - 1) < 1e-9);
   assert.ok(searchArea(later).length > 1);
 });
@@ -126,8 +127,8 @@ test('knowing the sea tightens the search', () => {
     for (let i = 0; i < 4; i++) w = advance(sea, w, w.player);
     w = hearRumor(sea, w, (seed * 7) % w.ships.length, 0.9);
     for (let i = 0; i < 4; i++) w = advance(sea, w, w.player);
-    blind += searchArea(predict(sea, w.rumors[0], w.turn, { currents: false, winds: false }, w.player)).length;
-    wise += searchArea(predict(sea, w.rumors[0], w.turn, { currents: true, winds: true }, w.player)).length;
+    blind += searchArea(predict(sea, w.rumors[0], w.turn, KNOW_NOTHING, w.player)).length;
+    wise += searchArea(predict(sea, w.rumors[0], w.turn, KNOW_ALL, w.player)).length;
   }
   assert.ok(wise < blind * 0.85, `${wise} vs ${blind}`);
 });
@@ -142,7 +143,75 @@ test('a hunter in range closes on you; one out of range keeps its station', () =
   assert.ok(map.distTo(far.home)[w.ships[far.id].node] <= 12, 'the far one stayed by Manila');
 });
 
-test('learning the sea is remembered', () => {
-  const w = learn(createWorld(sea, 1), { currents: true });
-  assert.deepEqual(w.know, { currents: true, winds: false });
+test('you see the next node’s current and wind, and no farther', () => {
+  const w = createWorld(sea, 1);
+  const know = knowledge(w);
+  assert.ok(know.current(w.player) && know.wind(w.player, 0));
+  for (const m of map.adj[w.player]) assert.ok(know.current(m) && know.wind(m, 0), 'next node seen');
+  const beyond = map.nodes.findIndex((n) => map.distTo(w.player)[n.id] === 2);
+  assert.ok(!know.current(beyond), 'two steps out is unseen');
+  assert.ok(!know.wind(w.player, 2), 'summer wind is not seen in winter');
 });
+
+test('a current once seen stays charted; wind is charted season by season', () => {
+  let w = createWorld(sea, 1);
+  const start = w.player;
+  const away = map.adj[start][0];
+  w = advance(sea, w, away);
+  w = advance(sea, w, map.adj[away].find((m) => map.distTo(start)[m] >= 2) ?? away);
+  assert.ok(knowledge(w).current(start), 'still charted');
+  // Lie at anchor into the next season: the wind here is charted for it too.
+  while (seasonOf(sea.pattern, w.turn) === 0) w = advance(sea, w, w.player);
+  assert.ok(knowledge(w).wind(w.player, 0) && knowledge(w).wind(w.player, 1));
+  assert.ok(!knowledge(w).wind(start, 1) || map.distTo(w.player)[start] <= 1, 'the start was not seen in spring');
+});
+
+test('a round in port costs gold and may buy a rumor; there is no bar at sea', () => {
+  let w = createWorld(sea, 7);
+  for (let i = 0; i < 12; i++) w = advance(sea, w, w.player);
+  const { world, heard } = buyRound(sea, w);
+  assert.equal(world.gold, w.gold - ROUND_COST);
+  if (heard) {
+    assert.ok(heard.turn < w.turn && heard.turn >= w.turn - 12, 'the news is a few days old');
+    assert.equal(world.rumors.at(-1), heard);
+  }
+  assert.throws(() => buyRound(sea, advance(sea, w, map.adj[w.player][0])), /no bar at sea/);
+  assert.throws(() => buyRound(sea, { ...w, gold: 0 }), /purse/);
+});
+
+test('the more rounds, the less the room knows and the less it is right', () => {
+  const firsts: number[] = [];
+  const thirds: number[] = [];
+  let firstHeard = 0;
+  let thirdHeard = 0;
+  for (let seed = 0; seed < 60; seed++) {
+    let w = earn(createWorld(sea, seed), 100);
+    for (let i = 0; i < 12; i++) w = advance(sea, w, w.player);
+    for (let round = 1; round <= 3; round++) {
+      const got = buyRound(sea, w);
+      w = got.world;
+      if (got.heard && round === 1) (firstHeard++, firsts.push(got.heard.reliability));
+      if (got.heard && round === 3) (thirdHeard++, thirds.push(got.heard.reliability));
+    }
+  }
+  const mean = (xs: number[]) => sum(xs) / xs.length;
+  assert.ok(thirdHeard < firstHeard, `heard ${firstHeard} then ${thirdHeard}`);
+  assert.ok(mean(thirds) < mean(firsts), `${mean(firsts).toFixed(2)} then ${mean(thirds).toFixed(2)}`);
+});
+
+test('the bar talks about treasure more than its share', () => {
+  let treasure = 0;
+  let heard = 0;
+  for (let seed = 0; seed < 80; seed++) {
+    let w = createWorld(sea, seed);
+    for (let i = 0; i < 12; i++) w = advance(sea, w, w.player);
+    const got = buyRound(sea, w);
+    if (!got.heard) continue;
+    heard++;
+    if (got.heard.kind !== 'merchant') treasure++;
+  }
+  const share = w0().ships.filter((s) => s.kind !== 'merchant').length / w0().ships.length;
+  assert.ok(treasure / heard > share, `${treasure}/${heard} against a share of ${share.toFixed(2)}`);
+});
+
+const w0 = () => createWorld(sea, 0);

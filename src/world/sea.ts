@@ -126,19 +126,42 @@ export function windAlong(map: SeaMap, p: SeaPattern, a: NodeId, b: NodeId, turn
 export const CURRENT_PULL = 2.8;
 export const WIND_PULL = 2.0;
 
-/** What the player has learned of the sea. */
+/**
+ * What an observer knows of the sea, node by node. Currents never change,
+ * so a current once seen is known for good. Wind changes with the season,
+ * but the seasons come round again, so wind seen at a node in summer is its
+ * summer wind every year.
+ */
 export interface SeaKnowledge {
-  currents: boolean;
-  winds: boolean;
+  current(node: NodeId): boolean;
+  wind(node: NodeId, season: number): boolean;
+}
+
+export const KNOW_ALL: SeaKnowledge = { current: () => true, wind: () => true };
+export const KNOW_NOTHING: SeaKnowledge = { current: () => false, wind: () => false };
+
+/**
+ * The player's chart: a byte per node. Bit 0, its current has been seen;
+ * bit 1 + season, its wind in that season has been seen.
+ */
+export type Chart = Uint8Array;
+export const CURRENT_SEEN = 1;
+export const windSeen = (season: number) => 2 << season;
+
+export function chartKnowledge(chart: Chart): SeaKnowledge {
+  return {
+    current: (n) => (chart[n] & CURRENT_SEEN) !== 0,
+    wind: (n, season) => (chart[n] & windSeen(season)) !== 0,
+  };
 }
 
 /**
  * The weight a ship gives sailing a→b, against the other ways it could go.
- * `know` limits it to what an observer has learned — the true weight is the
- * one with everything known.
+ * `know` limits it to what an observer has seen of the water at a — the
+ * true weight is the one with everything known.
  */
-export function legWeight(map: SeaMap, p: SeaPattern, a: NodeId, b: NodeId, turn: number, know: SeaKnowledge = { currents: true, winds: true }): number {
-  const c = know.currents ? CURRENT_PULL * currentAlong(map, p, a, b) : 0;
-  const w = know.winds ? WIND_PULL * windAlong(map, p, a, b, turn) : 0;
+export function legWeight(map: SeaMap, p: SeaPattern, a: NodeId, b: NodeId, turn: number, know: SeaKnowledge = KNOW_ALL): number {
+  const c = know.current(a) ? CURRENT_PULL * currentAlong(map, p, a, b) : 0;
+  const w = know.wind(a, seasonOf(p, turn)) ? WIND_PULL * windAlong(map, p, a, b, turn) : 0;
   return Math.exp(c + w);
 }
