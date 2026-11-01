@@ -1,77 +1,75 @@
 /**
  * Run bots through thousands of encounters and print how they come out. This
- * is the tool for tuning numbers: if no stopping rule beats "never stop", the
- * push-your-luck is not pushing back.
+ * is the tool for tuning numbers.
+ *
+ * Every decision is a pick, so every bot works the same way: try each of the
+ * six ordered keeps one step ahead, score the result, take the best. Bots
+ * differ only in what they value — how much hull is worth, and whether
+ * getting away counts as winning.
  *
  *   npm run sim                  2000 encounters per bot
  *   npm run sim -- --runs 10000
  */
 
-import type { Card, Effect } from '../src/cards.ts';
-import { type Action, type EncounterState, type Outcome, act } from '../src/rules.ts';
+import { type Action, type EncounterState, type Outcome, act, legalActions } from '../src/rules.ts';
 import { merchantEncounter } from '../src/setup.ts';
+
+interface Weights {
+  /** Per point of your hull still standing. */
+  hull: number;
+  /** Per point of damage on the target: progress toward the bounty. */
+  damage: number;
+  /** Added to the payout when you get away. Negative: would rather not. */
+  fled: number;
+}
 
 type Bot = { name: string; choose: (s: EncounterState) => Action };
 
-/** A rough value for one effect from where the bot is sitting. */
-function effectValue(e: Effect, s: EncounterState): number {
-  const danger = s.ship.hull <= 3 ? 3 : 1;
-  switch (e.kind) {
-    case 'hit': return e.amount * 0.8;
-    case 'hurt': return -Math.max(0, e.amount - s.ship.brace) * 1.5 * danger;
-    case 'plunder': return Math.min(e.amount, s.target.cargo);
-    case 'repair': return Math.min(e.amount, s.ship.maxHull - s.ship.hull) * danger;
-    case 'brace': return e.amount * 0.7;
-    case 'jettison': return -Math.min(e.amount, s.target.cargo) * 0.8;
-    case 'mend': return -e.amount * 0.8;
-  }
+function score(s: EncounterState, w: Weights): number {
+  if (s.outcome === 'sunk') return -20;
+  if (s.outcome === 'fled') return s.payout + w.fled;
+  if (s.outcome) return s.payout;
+  // Still fighting: what is aboard, plus what the position is worth.
+  return s.plunder + w.hull * s.ship.hull + w.damage * (s.target.maxHull - s.target.hull) + 0.2 * s.target.cargo;
 }
 
-const cardValue = (c: Card, s: EncounterState) => c.effects.reduce((v, e) => v + effectValue(e, s), 0);
-
-/** Keep the two best cards, better one first, ignoring the order subtleties. */
-function bestKeep(s: EncounterState): Action {
-  const ranked = s.hand.map((c, i) => ({ i, v: cardValue(c, s) })).sort((a, b) => b.v - a.v);
-  // Repair and brace want to go before hurt; otherwise the better card first.
-  const [a, b] = [ranked[0].i, ranked[1].i];
-  const defensive = (c: Card) => c.effects.some((e) => e.kind === 'repair' || e.kind === 'brace');
-  return defensive(s.hand[b]) && !defensive(s.hand[a])
-    ? { type: 'keep', picks: [b, a] }
-    : { type: 'keep', picks: [a, b] };
-}
-
-function worstForcedHurt(s: EncounterState): number {
-  // The least hurt you can take from this hand, given you must keep two.
-  const hurts = s.hand.map((c) => c.effects.reduce((h, e) => h + (e.kind === 'hurt' ? e.amount : 0), 0)).sort((a, b) => a - b);
-  return Math.max(0, hurts[0] + hurts[1] - s.ship.brace);
+function lookahead(w: Weights): Bot['choose'] {
+  return (s) => {
+    let best = legalActions(s)[0];
+    let bestScore = -Infinity;
+    for (const a of legalActions(s)) {
+      const v = score(act(s, a), w);
+      if (v > bestScore) [best, bestScore] = [a, v];
+    }
+    return best;
+  };
 }
 
 const bots: Bot[] = [
-  { name: 'never stops', choose: bestKeep },
-  { name: 'stops at hull ≤ 2', choose: (s) => (s.ship.hull <= 2 ? { type: 'stop' } : bestKeep(s)) },
-  { name: 'stops at hull ≤ 4', choose: (s) => (s.ship.hull <= 4 ? { type: 'stop' } : bestKeep(s)) },
-  { name: 'stops if hand could sink', choose: (s) => (worstForcedHurt(s) >= s.ship.hull ? { type: 'stop' } : bestKeep(s)) },
-  { name: 'stops at plunder ≥ 6', choose: (s) => (s.plunder >= 6 ? { type: 'stop' } : bestKeep(s)) },
+  { name: 'balanced', choose: lookahead({ hull: 0.6, damage: 0.4, fled: 0 }) },
+  { name: 'careful (hull dear)', choose: lookahead({ hull: 1.5, damage: 0.4, fled: 2 }) },
+  { name: 'reckless (hull cheap)', choose: lookahead({ hull: 0.2, damage: 0.6, fled: -5 }) },
+  { name: 'never flees', choose: lookahead({ hull: 0.6, damage: 0.4, fled: -100 }) },
   {
     name: 'random keeps',
     choose: (s) => {
-      const a = (s.round * 7 + s.deck.length) % 3;
-      return { type: 'keep', picks: [a, (a + 1) % 3] };
+      const all = legalActions(s);
+      return all[(s.round * 7 + s.deck.length) % all.length];
     },
   },
 ];
 
 const flag = process.argv.indexOf('--runs');
 const runs = flag >= 0 ? Number(process.argv[flag + 1]) : 2000;
-const outcomes: Outcome[] = ['stopped', 'destroyed', 'escaped', 'sunk'];
+const outcomes: Outcome[] = ['fled', 'escaped', 'destroyed', 'sunk', 'parted'];
 
 console.log(`${runs} encounters per bot, seeds 0..${runs - 1}\n`);
-console.log(['bot'.padEnd(26), 'payout', 'rounds', ...outcomes.map((o) => o.padStart(9))].join(' '));
+console.log(['bot'.padEnd(22), 'payout', 'rounds', ...outcomes.map((o) => o.padStart(9))].join(' '));
 
 for (const bot of bots) {
   let payout = 0;
   let rounds = 0;
-  const counts: Record<Outcome, number> = { stopped: 0, destroyed: 0, escaped: 0, sunk: 0 };
+  const counts = Object.fromEntries(outcomes.map((o) => [o, 0])) as Record<Outcome, number>;
   for (let seed = 0; seed < runs; seed++) {
     let s = merchantEncounter(seed);
     while (!s.outcome) s = act(s, bot.choose(s));
@@ -81,7 +79,7 @@ for (const bot of bots) {
   }
   const pct = (n: number) => `${((100 * n) / runs).toFixed(1)}%`.padStart(9);
   console.log([
-    bot.name.padEnd(26),
+    bot.name.padEnd(22),
     (payout / runs).toFixed(2).padStart(6),
     (rounds / runs).toFixed(1).padStart(6),
     ...outcomes.map((o) => pct(counts[o])),

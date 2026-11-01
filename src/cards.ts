@@ -21,7 +21,15 @@ export type Effect =
   /** The target throws cargo overboard: gone for both of you. */
   | { kind: 'jettison'; amount: number }
   /** Hull back on the target, up to its maximum. */
-  | { kind: 'mend'; amount: number };
+  | { kind: 'mend'; amount: number }
+  /**
+   * The card's own side breaks away and the encounter ends — but only when
+   * that side is threatened (hull at half or less) and not held. Otherwise it
+   * does nothing: a ship that is not in danger does not run.
+   */
+  | { kind: 'flee' }
+  /** Cancels the other side's next flee. Stacks; lasts until used. */
+  | { kind: 'hold'; amount: number };
 
 export interface Card {
   /** Unique within an encounter: `broadside#2`. */
@@ -56,11 +64,13 @@ export function buildDeck(side: Side, defs: readonly CardDef[]): Card[] {
 export const SHIP_CARDS: readonly CardDef[] = [
   { key: 'broadside', name: 'broadside', text: 'hit 3', effects: [{ kind: 'hit', amount: 3 }], copies: 2 },
   { key: 'raking-fire', name: 'raking fire', text: 'hit 2', effects: [{ kind: 'hit', amount: 2 }], copies: 2 },
-  { key: 'grapple', name: 'grapple and haul', text: 'plunder 3', effects: [{ kind: 'plunder', amount: 3 }], copies: 2 },
+  { key: 'sweep', name: 'sweep the hold', text: 'plunder 3', effects: [{ kind: 'plunder', amount: 3 }], copies: 2 },
   { key: 'boarding', name: 'boarding party', text: 'plunder 4, hurt 1', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'hurt', amount: 1 }], copies: 1 },
+  { key: 'chain-shot', name: 'chain shot', text: 'hit 1, hold 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'hold', amount: 1 }], copies: 1 },
   { key: 'swivel', name: 'swivel guns', text: 'hit 1, plunder 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'plunder', amount: 1 }], copies: 1 },
   { key: 'patch', name: 'patch the hull', text: 'repair 2', effects: [{ kind: 'repair', amount: 2 }], copies: 1 },
   { key: 'brace', name: 'brace', text: 'brace 2', effects: [{ kind: 'brace', amount: 2 }], copies: 1 },
+  { key: 'bear-away', name: 'bear away', text: 'flee', effects: [{ kind: 'flee' }], copies: 2 },
 ];
 
 export const MERCHANT_CARDS: readonly CardDef[] = [
@@ -70,5 +80,5 @@ export const MERCHANT_CARDS: readonly CardDef[] = [
   { key: 'jettison', name: 'jettison cargo', text: 'jettison 3', effects: [{ kind: 'jettison', amount: 3 }], copies: 2 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 1 },
   { key: 'strike', name: 'strike colours', text: 'plunder 3', effects: [{ kind: 'plunder', amount: 3 }], copies: 1 },
-  { key: 'crack-on', name: 'crack on sail', text: 'jettison 1, hurt 1', effects: [{ kind: 'jettison', amount: 1 }, { kind: 'hurt', amount: 1 }], copies: 1 },
+  { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
 ];

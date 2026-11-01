@@ -7,8 +7,11 @@
  *   1. Ship cards and target cards are shuffled into one deck.
  *   2. Three are dealt. You keep two, which resolve in the order you name
  *      them; the third goes to the bottom of the deck.
- *   3. It ends when you stop, when the target's hull reaches 0, when yours
- *      does, or when the deck can no longer deal a full hand.
+ *   3. It ends when either side flees, when either hull reaches 0, or when
+ *      the deck can no longer deal a full hand.
+ *
+ * Every decision in combat is a card. There is no stop button: you get away
+ * the same way the target does, by playing a flee card while threatened.
  */
 
 import type { Card, Effect } from './cards.ts';
@@ -18,19 +21,23 @@ export const HAND_SIZE = 3;
 export const KEEP = 2;
 
 export type Outcome =
-  /** You broke off. Plunder kept. */
-  | 'stopped'
+  /** You fled. Plunder kept. */
+  | 'fled'
+  /** The target fled. Plunder kept, the rest of its hold goes with it. */
+  | 'escaped'
   /** The target's hull reached 0. Plunder kept, bounty paid, its hold sinks. */
   | 'destroyed'
-  /** The deck ran short and the target slipped away. Plunder kept. */
-  | 'escaped'
   /** Your hull reached 0. This encounter's plunder is lost. */
-  | 'sunk';
+  | 'sunk'
+  /** The deck ran short before anything was settled. Plunder kept. */
+  | 'parted';
 
 export interface ShipState {
   hull: number;
   maxHull: number;
   brace: number;
+  /** Flee attempts of yours the target will cancel. */
+  held: number;
 }
 
 export interface TargetState {
@@ -41,12 +48,22 @@ export interface TargetState {
   cargo: number;
   /** Paid on `destroyed`. */
   bounty: number;
+  /** Flee attempts of the target's that you will cancel. */
+  held: number;
 }
+
+/** Hull at half or less. The only state in which a flee card works. */
+export function threatened(side: { hull: number; maxHull: number }): boolean {
+  return side.hull * 2 <= side.maxHull;
+}
+
+/** Why an effect did less than its face value, when that is worth saying. */
+export type EffectNote = 'held' | 'unthreatened';
 
 export type GameEvent =
   | { type: 'dealt'; round: number; cards: Card[] }
   | { type: 'played'; round: number; card: Card }
-  | { type: 'effect'; round: number; card: Card; effect: Effect; applied: number }
+  | { type: 'effect'; round: number; card: Card; effect: Effect; applied: number; note?: EffectNote }
   | { type: 'rejected'; round: number; card: Card }
   | { type: 'ended'; round: number; outcome: Outcome; payout: number };
 
@@ -66,17 +83,15 @@ export interface EncounterState {
   events: GameEvent[];
 }
 
-export type Action =
-  /** Indices into the hand, in the order the cards should resolve. */
-  | { type: 'keep'; picks: [number, number] }
-  | { type: 'stop' };
+/** Indices into the hand, in the order the cards should resolve. */
+export type Action = { type: 'keep'; picks: [number, number] };
 
 export interface EncounterSetup {
   seed: number;
   shipCards: Card[];
   targetCards: Card[];
-  ship: ShipState;
-  target: TargetState;
+  ship: Omit<ShipState, 'held'>;
+  target: Omit<TargetState, 'held'>;
 }
 
 export function createEncounter(setup: EncounterSetup): EncounterState {
@@ -85,8 +100,8 @@ export function createEncounter(setup: EncounterSetup): EncounterState {
     rng,
     deck,
     hand: [],
-    ship: { ...setup.ship },
-    target: { ...setup.target },
+    ship: { ...setup.ship, held: 0 },
+    target: { ...setup.target, held: 0 },
     plunder: 0,
     round: 0,
     outcome: null,
@@ -99,7 +114,7 @@ export function createEncounter(setup: EncounterSetup): EncounterState {
 /** Every legal action in this state. Handy for bots and for UIs. */
 export function legalActions(state: EncounterState): Action[] {
   if (state.outcome) return [];
-  const actions: Action[] = [{ type: 'stop' }];
+  const actions: Action[] = [];
   for (let a = 0; a < state.hand.length; a++) {
     for (let b = 0; b < state.hand.length; b++) {
       if (a !== b) actions.push({ type: 'keep', picks: [a, b] });
@@ -110,8 +125,6 @@ export function legalActions(state: EncounterState): Action[] {
 
 export function act(state: EncounterState, action: Action): EncounterState {
   if (state.outcome) throw new Error(`encounter is over (${state.outcome})`);
-
-  if (action.type === 'stop') return end(clone(state), 'stopped');
 
   const [a, b] = action.picks;
   const n = state.hand.length;
@@ -132,8 +145,9 @@ export function act(state: EncounterState, action: Action): EncounterState {
   for (const card of kept) {
     s.events.push({ type: 'played', round: s.round, card });
     for (const effect of card.effects) {
-      s = applyEffect(s, card, effect);
-      const outcome = settled(s);
+      let fled: Outcome | null;
+      [s, fled] = applyEffect(s, card, effect);
+      const outcome = fled ?? settled(s);
       if (outcome) return end(s, outcome);
     }
   }
@@ -141,8 +155,11 @@ export function act(state: EncounterState, action: Action): EncounterState {
   return deal(s);
 }
 
-function applyEffect(s: EncounterState, card: Card, effect: Effect): EncounterState {
+function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterState, Outcome | null] {
   let applied = 0;
+  let note: EffectNote | undefined;
+  let fled: Outcome | null = null;
+  const mine = card.side === 'ship';
   switch (effect.kind) {
     case 'hit':
       applied = Math.min(effect.amount, s.target.hull);
@@ -176,9 +193,25 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): EncounterSt
       applied = Math.min(effect.amount, s.target.maxHull - s.target.hull);
       s.target.hull += applied;
       break;
+    case 'flee': {
+      const runner = mine ? s.ship : s.target;
+      if (!threatened(runner)) note = 'unthreatened';
+      else if (runner.held > 0) {
+        runner.held -= 1;
+        note = 'held';
+      } else {
+        applied = 1;
+        fled = mine ? 'fled' : 'escaped';
+      }
+      break;
+    }
+    case 'hold':
+      applied = effect.amount;
+      (mine ? s.target : s.ship).held += applied;
+      break;
   }
-  s.events.push({ type: 'effect', round: s.round, card, effect, applied });
-  return s;
+  s.events.push({ type: 'effect', round: s.round, card, effect, applied, ...(note ? { note } : {}) });
+  return [s, fled];
 }
 
 /** Your hull is checked first: if both reach 0 on one effect, you went down. */
@@ -189,7 +222,7 @@ function settled(s: EncounterState): Outcome | null {
 }
 
 function deal(s: EncounterState): EncounterState {
-  if (s.deck.length < HAND_SIZE) return end(s, 'escaped');
+  if (s.deck.length < HAND_SIZE) return end(s, 'parted');
   s.round += 1;
   s.hand = s.deck.slice(0, HAND_SIZE);
   s.deck = s.deck.slice(HAND_SIZE);
@@ -198,10 +231,6 @@ function deal(s: EncounterState): EncounterState {
 }
 
 function end(s: EncounterState, outcome: Outcome): EncounterState {
-  // A hand still showing when you stop goes back under the deck, so the
-  // cards are all accounted for.
-  s.deck.push(...s.hand);
-  s.hand = [];
   s.outcome = outcome;
   s.payout =
     outcome === 'sunk' ? 0 : outcome === 'destroyed' ? s.plunder + s.target.bounty : s.plunder;

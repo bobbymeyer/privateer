@@ -11,12 +11,28 @@ It will go up on bobbymeyer.com once it has something to look at.
 1. Your ship's cards and the target's cards are shuffled into one deck.
 2. Three are dealt. Keep two, in the order they should resolve. The third
    goes to the bottom.
-3. It ends when you **stop** (keep your plunder), **destroy** the target
-   (plunder plus bounty, its hold goes down with it), get **sunk** (lose this
-   encounter's plunder), or the deck can't deal a full hand and the target
-   **escapes** (keep your plunder).
+3. It ends when either side **flees**, when either hull reaches 0, or when
+   the deck can't deal a full hand and the ships **part**.
 
-You see the hand before you choose, so you can stop on a hand that would sink you.
+Every action and decision in combat is a card. There is no stop button.
+
+- **flee** — the card's own side breaks away. It only works when that side
+  is *threatened*, meaning its hull is at half or less; otherwise the card does
+  nothing. A ship that isn't in danger doesn't run. You get away the same
+  way the merchant does.
+- **hold** — cancels the other side's next flee. Chain shot carries it.
+
+Threat is checked when the card resolves, so order matters. If you play a
+merchant's flee card before you hurt it, it does nothing. Play it after your
+broadside and the merchant gets away.
+
+| ending | payout |
+| --- | --- |
+| you flee | your plunder |
+| the target flees | your plunder; the rest of its hold goes with it |
+| the target is destroyed | plunder plus bounty; its hold sinks |
+| you are sunk | nothing |
+| the ships part | your plunder |
 
 ## running it
 
@@ -60,27 +76,31 @@ renderer can animate what happened, not just show the new state.
 
 ## what the simulator says so far
 
-With ship hull 6 and merchant hull 10, over 5,000 seeds:
+Every bot does the same thing each round: it tries all six ordered keeps one
+step ahead and takes the best result. The bots differ only in how much they
+value hull, and whether getting away counts as winning. Over 5,000 seeds:
 
-| bot | payout | sunk |
-| --- | --- | --- |
-| never stops | 7.8 | 40% |
-| stops at hull ≤ 2 | 9.4 | 11% |
-| stops if the hand could sink you | 11.7 | 0.3% |
-| random keeps | 0.6 | 94% |
+| bot | payout | you flee | target flees | destroyed | sunk |
+| --- | --- | --- | --- | --- | --- |
+| balanced | 10.6 | 13% | 21% | 54% | 12% |
+| never flees | 9.8 | 1% | 24% | 54% | 21% |
+| random keeps | 2.6 | 29% | 15% | 6% | 50% |
 
-The push-your-luck now pushes back. Reading the hand is worth about 50% more
-than never stopping, and choosing badly is fatal. With the first numbers
-(hull 8, fewer guns on the merchant), nobody sank and stopping never
-helped.
+All four real endings happen often. Fleeing when threatened nearly halves
+how often you sink. The merchant escapes about one time in five, which means
+pressing a hurt merchant without a hold card is a real gamble.
+
+What it took: three "crack on sail" cards for the merchant, and only one
+hold in your deck (chain shot). With holds on grapple too, you could pin the
+merchant every time and it escaped under 1% of the time.
 
 Open questions:
 
-- **Escape never happens.** Each deck is a fixed budget. The merchant deck
-  holds 14 hurt against your 6 hull, so riding the deck to the end sinks you
-  first. The ship deck holds 11 hit, so a merchant with 12 hull can't be
-  sunk at all. Escape needs either a target that runs (a card that shrinks
-  the deck) or a deck too thin to empty you.
-- **Destroying beats stopping when you can.** The bounty (4) is bigger than
-  the cargo it sinks in most runs. Destroying a target should probably cost
-  something, or its hold should be worth more.
+- **A forced flee.** Even "never flees" gets away 1% of the time. When a
+  threatened ship is dealt a flee card beside two worse cards, keeping it
+  can be the least bad option. That reads as the crew running whatever you
+  wanted, which may be fine.
+- **The ships never part.** Somebody always flees, sinks or goes down before
+  the deck runs out. The ending is a safety net for now.
+- **Destroying still pays best.** The bounty is usually worth more than the
+  cargo that sinks with the ship.
