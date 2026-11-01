@@ -9,6 +9,6 @@ export function merchantEncounter(seed: number): EncounterState {
     shipCards: buildDeck('ship', SHIP_CARDS),
     targetCards: buildDeck('target', MERCHANT_CARDS),
     ship: { hull: 6, maxHull: 6, brace: 0 },
-    target: { name: 'merchant', hull: 10, maxHull: 10, cargo: 12, bounty: 4 },
+    target: { name: 'merchant', hull: 12, maxHull: 12, cargo: 12, bounty: 4 },
   });
 }

@@ -3,9 +3,7 @@
 import type { Effect } from './cards.ts';
 import type { EffectNote, GameEvent, Outcome } from './rules.ts';
 
-const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold'>, string> = {
-  hit: 'hits the target for',
-  hurt: 'hurts you for',
+const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold' | 'hit' | 'hurt' | 'breach'>, string> = {
   plunder: 'hauls aboard',
   repair: 'repairs',
   brace: 'braces for',
@@ -20,11 +18,16 @@ export function describeEffect(e: Effect, applied: number, note?: EffectNote, mi
     if (note === 'held') return `${who} ${mine ? 'try' : 'tries'} to run, but ${mine ? 'are' : 'is'} held`;
     return `${who} break${mine ? '' : 's'} away`;
   }
+  if (e.kind === 'hit') return `puts ${applied} damage ${applied === 1 ? 'card' : 'cards'} against the target in the deck`;
+  if (e.kind === 'hurt') return `puts ${applied} damage ${applied === 1 ? 'card' : 'cards'} against you in the deck`;
+  if (e.kind === 'breach') {
+    if (!mine) return `the target loses ${applied} hull`;
+    return `you lose ${applied} hull${applied < e.amount ? ` (${e.amount - applied} braced)` : ''}`;
+  }
   if (e.kind === 'hold') return `${mine ? 'holds the target' : 'holds you'} for ${applied}`;
   const amount = e.amount;
-  const short = applied !== amount && e.kind !== 'hurt' ? ` (of ${amount})` : '';
-  const soaked = e.kind === 'hurt' && applied < amount ? ` (${amount - applied} braced)` : '';
-  return `${VERB[e.kind]} ${applied}${short}${soaked}`;
+  const short = applied !== amount ? ` (of ${amount})` : '';
+  return `${VERB[e.kind]} ${applied}${short}`;
 }
 
 export const OUTCOME_TEXT: Record<Outcome, string> = {

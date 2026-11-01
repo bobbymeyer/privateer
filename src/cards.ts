@@ -8,10 +8,18 @@
 export type Side = 'ship' | 'target';
 
 export type Effect =
-  /** Damage to the target's hull. */
+  /**
+   * Puts this many damage cards against the target on top of the deck. Shot
+   * does not touch the hull directly: it lands when a damage card is kept.
+   */
   | { kind: 'hit'; amount: number }
-  /** Damage to your hull, less any brace you are holding. */
+  /** Puts this many damage cards against you on top of the deck. */
   | { kind: 'hurt'; amount: number }
+  /**
+   * The card's own side loses this much hull — less any brace, for you. This
+   * is what a damage card does when it is kept.
+   */
+  | { kind: 'breach'; amount: number }
   /** Cargo moved from the target's hold to yours. Capped by what is left. */
   | { kind: 'plunder'; amount: number }
   /** Hull back on your ship, up to its maximum. */
@@ -38,6 +46,8 @@ export interface Card {
   name: string;
   text: string;
   effects: Effect[];
+  /** Set on the damage cards that shot makes. */
+  damage?: true;
 }
 
 export interface CardDef {
@@ -46,6 +56,17 @@ export interface CardDef {
   text: string;
   effects: Effect[];
   copies: number;
+}
+
+/**
+ * One point of damage, sitting in the deck against `side` until somebody
+ * keeps it. One can be rejected per hand; two in a hand and one has to be
+ * taken.
+ */
+export function damageCard(side: Side, id: string): Card {
+  const name = side === 'ship' ? 'damage to you' : 'damage to them';
+  const text = side === 'ship' ? 'you lose 1 hull' : 'they lose 1 hull';
+  return { id, side, name, text, effects: [{ kind: 'breach', amount: 1 }], damage: true };
 }
 
 /** Expand definitions into individual cards with unique ids. */
@@ -62,7 +83,7 @@ export function buildDeck(side: Side, defs: readonly CardDef[]): Card[] {
 // Placeholder content. The numbers are what the simulator is for.
 
 export const SHIP_CARDS: readonly CardDef[] = [
-  { key: 'broadside', name: 'broadside', text: 'hit 3', effects: [{ kind: 'hit', amount: 3 }], copies: 2 },
+  { key: 'broadside', name: 'broadside', text: 'hit 4', effects: [{ kind: 'hit', amount: 4 }], copies: 2 },
   { key: 'raking-fire', name: 'raking fire', text: 'hit 2', effects: [{ kind: 'hit', amount: 2 }], copies: 2 },
   { key: 'sweep', name: 'sweep the hold', text: 'plunder 3', effects: [{ kind: 'plunder', amount: 3 }], copies: 2 },
   { key: 'boarding', name: 'boarding party', text: 'plunder 4, hurt 1', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'hurt', amount: 1 }], copies: 1 },

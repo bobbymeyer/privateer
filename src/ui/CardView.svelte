@@ -10,8 +10,8 @@
   } = $props();
 </script>
 
-<button class="card" class:theirs={card.side === 'target'} class:picked={order !== null} {disabled} onclick={onpick} aria-pressed={order !== null}>
-  <span class="side">{card.side === 'ship' ? 'yours' : 'theirs'}</span>
+<button class="card" class:theirs={card.side === 'target'} class:damage={card.damage} class:picked={order !== null} {disabled} onclick={onpick} aria-pressed={order !== null}>
+  <span class="side">{card.damage ? 'shot' : card.side === 'ship' ? 'yours' : 'theirs'}</span>
   <span class="name">{card.name}</span>
   <span class="text">{card.text}</span>
   {#if order !== null}<span class="order" aria-label="resolves {order === 1 ? 'first' : 'second'}">{order}</span>{/if}
@@ -29,6 +29,7 @@
     border-width: 1.5px;
   }
   .card.theirs { border-color: var(--theirs); color: var(--theirs); }
+  .card.damage { border-style: dashed; }
   .card.picked { border-width: 4px; padding: calc(0.8rem - 2.5px); }
   .side { font-size: 0.75rem; letter-spacing: 0.08em; }
   .name { font-size: 1.15rem; }

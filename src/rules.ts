@@ -10,11 +10,15 @@
  *   3. It ends when either side flees, when either hull reaches 0, or when
  *      the deck can no longer deal a full hand.
  *
+ * Shot is a card too. A hit does not touch the hull: it puts damage cards
+ * on top of the deck, and the hull only drops when one is kept. One can be
+ * sent to the bottom each hand; once they pile up, you have to take them.
+ *
  * Every decision in combat is a card. There is no stop button: you get away
  * the same way the target does, by playing a flee card while threatened.
  */
 
-import type { Card, Effect } from './cards.ts';
+import { type Card, type Effect, type Side, damageCard } from './cards.ts';
 import { type RngState, shuffle } from './rng.ts';
 
 export const HAND_SIZE = 3;
@@ -80,6 +84,8 @@ export interface EncounterState {
   outcome: Outcome | null;
   /** What you walk away with, once there is an outcome. */
   payout: number;
+  /** Damage cards made so far, for unique ids. */
+  minted: number;
   events: GameEvent[];
 }
 
@@ -106,6 +112,7 @@ export function createEncounter(setup: EncounterSetup): EncounterState {
     round: 0,
     outcome: null,
     payout: 0,
+    minted: 0,
     events: [],
   };
   return deal(state);
@@ -162,16 +169,22 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterS
   const mine = card.side === 'ship';
   switch (effect.kind) {
     case 'hit':
-      applied = Math.min(effect.amount, s.target.hull);
-      s.target.hull -= applied;
+      applied = mintDamage(s, 'target', effect.amount);
       break;
-    case 'hurt': {
-      const soaked = Math.min(effect.amount, s.ship.brace);
-      s.ship.brace -= soaked;
-      applied = Math.min(effect.amount - soaked, s.ship.hull);
-      s.ship.hull -= applied;
+    case 'hurt':
+      applied = mintDamage(s, 'ship', effect.amount);
       break;
-    }
+    case 'breach':
+      if (mine) {
+        const soaked = Math.min(effect.amount, s.ship.brace);
+        s.ship.brace -= soaked;
+        applied = Math.min(effect.amount - soaked, s.ship.hull);
+        s.ship.hull -= applied;
+      } else {
+        applied = Math.min(effect.amount, s.target.hull);
+        s.target.hull -= applied;
+      }
+      break;
     case 'plunder':
       applied = Math.min(effect.amount, s.target.cargo);
       s.target.cargo -= applied;
@@ -212,6 +225,22 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterS
   }
   s.events.push({ type: 'effect', round: s.round, card, effect, applied, ...(note ? { note } : {}) });
   return [s, fled];
+}
+
+/**
+ * Puts `n` damage cards against `side` on top of the deck, so fire lands in
+ * the next hand. Random depths were tried first: spread out, damage cards
+ * almost never shared a hand, one per hand can be dodged, and so incoming
+ * fire almost never landed.
+ */
+function mintDamage(s: EncounterState, side: Side, n: number): number {
+  const made: Card[] = [];
+  for (let i = 0; i < n; i++) {
+    s.minted += 1;
+    made.push(damageCard(side, `damage-${side}#${s.minted}`));
+  }
+  s.deck.unshift(...made);
+  return n;
 }
 
 /** Your hull is checked first: if both reach 0 on one effect, you went down. */

@@ -1,7 +1,7 @@
 /** Run with `npm test`. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Card } from './cards.ts';
+import { type Card, damageCard } from './cards.ts';
 import { act, createEncounter, legalActions, type EncounterState } from './rules.ts';
 import { merchantEncounter } from './setup.ts';
 
@@ -41,7 +41,8 @@ test('a hand of three is dealt from the top', () => {
 });
 
 test('the rejected card goes to the bottom, and no card is lost', () => {
-  const s0 = merchantEncounter(3);
+  // Blanks, so nothing kept adds cards to the deck.
+  const s0 = stacked(blank(3).map((c, i) => ({ ...c, id: `hand${i}` })));
   const before = allIds(s0);
   const rejected = s0.hand[2];
   const s1 = act(s0, { type: 'keep', picks: [0, 1] });
@@ -53,30 +54,30 @@ test('the rejected card goes to the bottom, and no card is lost', () => {
 });
 
 test('kept cards resolve in the order named', () => {
-  const s0 = stacked([card('repair', 'ship', [{ kind: 'repair', amount: 3 }]), card('hurt', 'target', [{ kind: 'hurt', amount: 3 }]), ...blank(1)]);
-  // Repair first does nothing at full hull, then hurt lands: 2 left.
+  const s0 = stacked([card('repair', 'ship', [{ kind: 'repair', amount: 3 }]), card('dmg', 'ship', [{ kind: 'breach', amount: 3 }]), ...blank(1)]);
+  // Repair first does nothing at full hull, then the damage lands: 2 left.
   assert.equal(act(s0, { type: 'keep', picks: [0, 1] }).ship.hull, 2);
-  // Hurt first, then repair: back to 5.
+  // Damage first, then repair: back to 5.
   assert.equal(act(s0, { type: 'keep', picks: [1, 0] }).ship.hull, 5);
 });
 
 test('destroying the target pays plunder plus bounty', () => {
-  const s0 = stacked([card('kill', 'ship', [{ kind: 'plunder', amount: 2 }, { kind: 'hit', amount: 9 }]), ...blank(2)]);
+  const s0 = stacked([card('kill', 'target', [{ kind: 'plunder', amount: 2 }, { kind: 'breach', amount: 9 }]), ...blank(2)]);
   const s1 = act(s0, { type: 'keep', picks: [0, 1] });
   assert.equal(s1.outcome, 'destroyed');
   assert.equal(s1.payout, 2 + 10);
 });
 
 test('being sunk forfeits the plunder, and stops mid-card', () => {
-  const s0 = stacked([card('doom', 'target', [{ kind: 'plunder', amount: 3 }, { kind: 'hurt', amount: 9 }, { kind: 'hit', amount: 9 }]), ...blank(2)]);
+  const s0 = stacked([card('doom', 'ship', [{ kind: 'plunder', amount: 3 }, { kind: 'breach', amount: 9 }, { kind: 'repair', amount: 9 }]), ...blank(2)]);
   const s1 = act(s0, { type: 'keep', picks: [0, 1] });
   assert.equal(s1.outcome, 'sunk');
   assert.equal(s1.payout, 0);
-  assert.equal(s1.target.hull, 5, 'the hit after the sinking never lands');
+  assert.equal(s1.ship.hull, 0, 'the repair after the sinking never lands');
 });
 
-test('brace soaks hurt before the hull does', () => {
-  const s0 = stacked([card('brace', 'ship', [{ kind: 'brace', amount: 2 }]), card('hurt', 'target', [{ kind: 'hurt', amount: 3 }]), ...blank(1)]);
+test('brace soaks damage before the hull does', () => {
+  const s0 = stacked([card('brace', 'ship', [{ kind: 'brace', amount: 2 }]), card('dmg', 'ship', [{ kind: 'breach', amount: 3 }]), ...blank(1)]);
   const s1 = act(s0, { type: 'keep', picks: [0, 1] });
   assert.equal(s1.ship.hull, 4);
   assert.equal(s1.ship.brace, 0);
@@ -90,7 +91,7 @@ test('plunder is capped by what is left in the hold', () => {
 });
 
 test('a finished encounter takes no more actions', () => {
-  const s0 = stacked([card('kill', 'ship', [{ kind: 'hit', amount: 9 }]), ...blank(2)]);
+  const s0 = stacked([card('kill', 'target', [{ kind: 'breach', amount: 9 }]), ...blank(2)]);
   const s1 = act(s0, { type: 'keep', picks: [0, 1] });
   assert.equal(s1.outcome, 'destroyed');
   assert.deepEqual(legalActions(s1), []);
@@ -124,8 +125,9 @@ test('illegal picks are refused', () => {
 
 const flee = (side: Card['side']) => card(`flee-${side}`, side, [{ kind: 'flee' }]);
 const hold = (side: Card['side'], amount = 1) => card(`hold-${side}`, side, [{ kind: 'hold', amount }]);
-const hit = (n: number) => card(`hit${n}`, 'ship', [{ kind: 'hit', amount: n }]);
-const hurt = (n: number) => card(`hurt${n}`, 'target', [{ kind: 'hurt', amount: n }]);
+/** Damage landing now, as if a damage card of that size were kept. */
+const hit = (n: number) => card(`hit${n}`, 'target', [{ kind: 'breach', amount: n }]);
+const hurt = (n: number) => card(`hurt${n}`, 'ship', [{ kind: 'breach', amount: n }]);
 
 test('a ship that is not threatened does not run', () => {
   const s1 = act(stacked([flee('target'), ...blank(2)]), { type: 'keep', picks: [0, 1] });
@@ -136,7 +138,7 @@ test('a ship that is not threatened does not run', () => {
 
 test('a threatened target flees, and takes the rest of its hold with it', () => {
   // Hull 5 → 2 is at half or less.
-  const s1 = act(stacked([card('haul', 'ship', [{ kind: 'plunder', amount: 2 }, { kind: 'hit', amount: 3 }]), flee('target'), ...blank(1)]), { type: 'keep', picks: [0, 1] });
+  const s1 = act(stacked([card('haul', 'target', [{ kind: 'plunder', amount: 2 }, { kind: 'breach', amount: 3 }]), flee('target'), ...blank(1)]), { type: 'keep', picks: [0, 1] });
   assert.equal(s1.outcome, 'escaped');
   assert.equal(s1.payout, 2);
 });
@@ -172,4 +174,40 @@ test('their hold stops your flee', () => {
   assert.equal(s1.ship.held, 1);
   const s2 = act({ ...s1, hand: [flee('ship'), ...blank(2)] }, { type: 'keep', picks: [0, 1] });
   assert.equal(s2.outcome, null);
+});
+
+const damageIn = (cards: Card[], side: Card['side']) =>
+  cards.filter((c) => c.damage && c.side === side).length;
+
+test('a hit leaves the hull alone and puts damage cards in the deck', () => {
+  const s0 = stacked([card('broadside', 'ship', [{ kind: 'hit', amount: 3 }]), card('return', 'target', [{ kind: 'hurt', amount: 2 }]), ...blank(1)]);
+  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
+  assert.equal(s1.target.hull, 5);
+  assert.equal(s1.ship.hull, 5);
+  // The next hand came off the top, so count both.
+  const all = [...s1.deck, ...s1.hand];
+  assert.equal(damageIn(all, 'target'), 3);
+  assert.equal(damageIn(all, 'ship'), 2);
+  assert.equal(new Set(all.map((c) => c.id)).size, all.length, 'ids stay unique');
+});
+
+test('damage lands only when its card is kept', () => {
+  const s0 = stacked([damageCard('ship', 'd1'), damageCard('target', 'd2'), ...blank(1)]);
+  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
+  assert.equal(s1.ship.hull, 4);
+  assert.equal(s1.target.hull, 4);
+});
+
+test('one damage card can be sent to the bottom; two in a hand cannot both be', () => {
+  const s0 = stacked([damageCard('ship', 'd1'), damageCard('ship', 'd2'), ...blank(1)]);
+  for (const a of legalActions(s0)) assert.ok(act(s0, a).ship.hull <= 4, 'at least one lands, whatever is kept');
+});
+
+test('the same seed makes the same damage', () => {
+  const run = () => {
+    let s = merchantEncounter(9);
+    while (!s.outcome) s = act(s, legalActions(s)[0]);
+    return s.events;
+  };
+  assert.deepEqual(run(), run());
 });

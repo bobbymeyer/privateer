@@ -16,13 +16,20 @@ It will go up on bobbymeyer.com once it has something to look at.
 
 Every action and decision in combat is a card. There is no stop button.
 
+- **shot** — `hit` and `hurt` don't touch a hull. They put damage cards on
+  top of the deck, one per point, marked against the side they hit. A
+  damage card costs its side 1 hull when it's kept, and brace soaks it. You
+  can send one to the bottom each hand, but fire lands on top, so they
+  arrive together. Once two of yours share a hand, one gets through.
+
 - **flee** — the card's own side breaks away. It only works when that side
   is *threatened*, meaning its hull is at half or less; otherwise the card does
   nothing. A ship that isn't in danger doesn't run. You get away the same
   way the merchant does.
 - **hold** — cancels the other side's next flee. Chain shot carries it.
 
-Threat is checked when the card resolves, so order matters. If you play a
+Damage only lowers a hull when it's kept, and threat is checked when the
+card resolves, so order matters. If you play a
 merchant's flee card before you hurt it, it does nothing. Play it after your
 broadside and the merchant gets away.
 
@@ -78,24 +85,39 @@ renderer can animate what happened, not just show the new state.
 
 Every bot does the same thing each round: it tries all six ordered keeps one
 step ahead and takes the best result. The bots differ only in how much they
-value hull, and whether getting away counts as winning. Over 5,000 seeds:
+value hull, and whether getting away counts as winning. They count damage
+waiting in the deck at most of a point each. Ship hull 6, merchant hull 12,
+over 5,000 seeds:
 
-| bot | payout | you flee | target flees | destroyed | sunk |
-| --- | --- | --- | --- | --- | --- |
-| balanced | 10.6 | 13% | 21% | 54% | 12% |
-| never flees | 9.8 | 1% | 24% | 54% | 21% |
-| random keeps | 2.6 | 29% | 15% | 6% | 50% |
+| bot | payout | rounds | you flee | target flees | destroyed | sunk |
+| --- | --- | --- | --- | --- | --- | --- |
+| balanced | 10.3 | 21 | 3% | 12% | 61% | 25% |
+| careful | 10.7 | 21 | 4% | 10% | 66% | 20% |
+| never flees | 10.1 | 21 | 1% | 13% | 61% | 26% |
+| random keeps | 3.6 | 14 | 41% | 12% | 3% | 45% |
 
-All four real endings happen often. Fleeing when threatened nearly halves
-how often you sink. The merchant escapes about one time in five, which means
-pressing a hurt merchant without a hold card is a real gamble.
+How we got here, because the cliffs are the useful part:
 
-What it took: three "crack on sail" cards for the merchant, and only one
-hold in your deck (chain shot). With holds on grapple too, you could pin the
-merchant every time and it escaped under 1% of the time.
+- **Damage cards spread through the deck at random** made you nearly
+  untouchable: 92% destroyed, 4% sunk. Spread out, two of your damage cards
+  almost never shared a hand, and you could always dodge one. Making the
+  merchant hit harder barely changed that.
+- **Damage cards on top of the deck** fixed it. Fire lands in the next
+  hand, so a hurt of 2 forces at least one hit.
+- **Merchant hull 12 and broadside 4.** Damage against the merchant is a
+  good card for you, but it still takes one of your two keeps. Your deck
+  holds a fixed amount of shot, so when the merchant's hull is close to
+  that total, every keep spent on something else costs you. One point past
+  it and the merchant can't be sunk.
 
 Open questions:
 
+- **Fleeing hardly matters now.** Damage you're owed lands late, so by the
+  time you're threatened the merchant usually is too, and finishing it pays
+  better. Before damage cards, fleeing cut sinking nearly in half; now it
+  saves about one encounter in a hundred.
+- **Encounters run about 21 rounds,** double what they were. Every hit adds
+  cards to the deck.
 - **A forced flee.** Even "never flees" gets away 1% of the time. When a
   threatened ship is dealt a flee card beside two worse cards, keeping it
   can be the least bad option. That reads as the crew running whatever you

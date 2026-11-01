@@ -29,8 +29,14 @@ function score(s: EncounterState, w: Weights): number {
   if (s.outcome === 'sunk') return -20;
   if (s.outcome === 'fled') return s.payout + w.fled;
   if (s.outcome) return s.payout;
-  // Still fighting: what is aboard, plus what the position is worth.
-  return s.plunder + w.hull * s.ship.hull + w.damage * (s.target.maxHull - s.target.hull) + 0.2 * s.target.cargo;
+  // Still fighting: what is aboard, plus what the position is worth. Damage
+  // cards waiting in the deck count for most of a hull point each — they
+  // will mostly land, but one per hand can be dodged.
+  const pending = (side: 'ship' | 'target') =>
+    [...s.deck, ...s.hand].filter((c) => c.damage && c.side === side).length;
+  const hull = s.ship.hull - 0.7 * pending('ship');
+  const dealt = s.target.maxHull - s.target.hull + 0.7 * pending('target');
+  return s.plunder + w.hull * hull + w.damage * dealt + 0.2 * s.target.cargo;
 }
 
 function lookahead(w: Weights): Bot['choose'] {
