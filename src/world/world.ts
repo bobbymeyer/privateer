@@ -7,12 +7,12 @@
  */
 
 import type { RngState } from '../rng.ts';
-import { generateMap, type NodeId, ports } from './map.ts';
+import { buildMap, type NodeId, ports } from './map.ts';
 import type { Roller } from './random.ts';
 import { pick } from './random.ts';
 import { type Rumor, FADED, makeRumor, markerStrength } from './rumors.ts';
-import { generatePattern, type SeaKnowledge } from './sea.ts';
-import { type Sea, type Ship, type ShipKind, moveShip, spawnShips } from './ships.ts';
+import { buildPattern, type SeaKnowledge } from './sea.ts';
+import { type FleetEntry, type Sea, type Ship, moveShip, spawnShips } from './ships.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -24,16 +24,25 @@ export interface WorldState {
   nextRumor: number;
 }
 
-export const DEFAULT_FLEET: Record<ShipKind, number> = {
-  merchant: 4,
-  hunter: 2,
-  'treasure-ship': 1,
-  'treasure-fleet': 1,
-  armada: 1,
-};
+export const DEFAULT_FLEET: FleetEntry[] = [
+  ...Array.from({ length: 10 }, (): FleetEntry => ({ kind: 'merchant' })),
+  { kind: 'hunter' },
+  { kind: 'hunter' },
+  { kind: 'treasure-ship', route: 'register' },
+  { kind: 'treasure-fleet', route: 'galeones' },
+  { kind: 'treasure-fleet', route: 'flota' },
+  { kind: 'armada', route: 'barlovento' },
+];
 
-export function createSea(seed: number): Sea {
-  return { map: generateMap(seed), pattern: generatePattern(seed) };
+let built: Sea | null = null;
+
+/** The sea is the same every run — built once, then shared. */
+export function createSea(): Sea {
+  if (!built) {
+    const map = buildMap();
+    built = { map, pattern: buildPattern(map) };
+  }
+  return built;
 }
 
 export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): WorldState {
@@ -76,6 +85,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
 export function hearRumor(sea: Sea, s: WorldState, shipId: number, reliability: number): WorldState {
   const ship = s.ships.find((x) => x.id === shipId);
   if (!ship) throw new Error(`no ship ${shipId}`);
+  if (ship.away) throw new Error(`ship ${shipId} is across the Atlantic`);
   const r: Roller = { rng: s.rng };
   const rumor = makeRumor(sea, r, s.nextRumor, ship, s.turn, reliability);
   return { ...s, rng: r.rng, rumors: [...s.rumors, rumor], nextRumor: s.nextRumor + 1 };

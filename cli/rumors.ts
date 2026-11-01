@@ -33,23 +33,25 @@ for (const reliability of [0.9, 0.5]) {
   console.log(['knowing'.padEnd(10), ...AGES.map((a) => `age ${a}`.padEnd(20))].join(''));
   console.log(['', ...AGES.map(() => 'hit  area inside'.padEnd(20))].join('').padStart(10));
 
-  const rows = KNOW.map(() => AGES.map(() => ({ hit: 0, area: 0, inside: 0 })));
+  // `n`: samples where the ship was still on the map to be found.
+  const rows = KNOW.map(() => AGES.map(() => ({ n: 0, hit: 0, area: 0, inside: 0 })));
   for (let seed = 0; seed < runs; seed++) {
-    const sea = createSea(seed);
+    const sea = createSea();
     let w = createWorld(sea, seed);
     for (let i = 0; i < 6; i++) w = advance(sea, w, w.player);
     const r: Roller = { rng: seed * 7919 + 1 };
-    const target = pick(r, w.ships);
+    const target = pick(r, w.ships.filter((s) => !s.away));
     w = hearRumor(sea, w, target.id, reliability);
     const rumor = w.rumors.at(-1)!;
     for (let age = 0; age <= AGES.at(-1)!; age++) {
       const col = AGES.indexOf(age);
       if (col >= 0) {
-        const truth = w.ships[target.id].node;
-        KNOW.forEach(([, know], row) => {
+        const truth = w.ships[target.id].away ? -1 : w.ships[target.id].node;
+        if (truth >= 0) KNOW.forEach(([, know], row) => {
           const p = predict(sea, rumor, w.turn, know, w.player);
           const area = searchArea(p);
           const cell = rows[row][col];
+          cell.n++;
           if (p.indexOf(Math.max(...p)) === truth) cell.hit++;
           cell.area += area.length;
           if (area.includes(truth)) cell.inside++;
@@ -58,8 +60,8 @@ for (const reliability of [0.9, 0.5]) {
       w = advance(sea, w, w.player);
     }
   }
-  const pct = (n: number) => `${Math.round((100 * n) / runs)}%`.padStart(4);
+  const pct = (k: number, n: number) => `${Math.round((100 * k) / n)}%`.padStart(4);
   KNOW.forEach(([name], row) => {
-    console.log([name.padEnd(10), ...rows[row].map((c) => `${pct(c.hit)} ${(c.area / runs).toFixed(1).padStart(4)} ${pct(c.inside)}`.padEnd(20))].join(''));
+    console.log([name.padEnd(10), ...rows[row].map((c) => `${pct(c.hit, c.n)} ${(c.area / c.n).toFixed(1).padStart(4)} ${pct(c.inside, c.n)}`.padEnd(20))].join(''));
   });
 }

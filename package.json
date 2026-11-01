@@ -11,7 +11,9 @@
     "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning src/*.test.ts src/world/*.test.ts",
     "play": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/play.ts",
     "sim": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/sim.ts",
-    "rumors": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/rumors.ts"
+    "rumors": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/rumors.ts",
+    "coast": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/build-coast.ts",
+    "chart": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/chart.ts"
   },
   "engines": {
     "node": ">=22.12.0"

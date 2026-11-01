@@ -43,58 +43,95 @@ broadside and the merchant gets away.
 
 ## the sea and its rumors
 
-Between fights is a sea: a seeded graph of about thirty nodes, six of them
-ports. Ships sail one leg a turn, and each kind has habits:
+Between fights is the Caribbean and the Gulf of Mexico around 1680.
+
+**The open sea is a triangular grid.** Every node has six neighbours, about
+sixty nautical miles apart: 687 nodes of water. Land is masked from Natural
+Earth's coastline (public domain, built into `src/world/data/land.json` by
+`npm run coast`). The Pacific is cut out: at this scale the isthmus is
+thinner than the grid.
+
+**The coast is history**, all in `src/world/caribbean.ts`:
+
+- **22 ports**, Spanish, English, French and Dutch, each on the node
+  nearest where it really was. Forts put the water a leg out under their
+  guns.
+- **Straits**: Florida, Yucatán, the Windward, Mona and Anegada passages,
+  the Old Bahama Channel, the Dragon's Mouth.
+- **Rivers** push water out to sea: the Mississippi, Magdalena, Chagres,
+  Orinoco, Grijalva.
+- **Banks**: the Bahama, Campeche and Mosquito banks. Deep keels
+  (treasure ships, fleets, the armada) keep off them; merchants and hunters
+  don't have to.
+
+**Currents** are streams with a course, a strength and a width. The
+Caribbean Current runs west through the sea, north through the Yucatán
+Channel, round the Loop, and out the Florida Straits as the Gulf Stream.
+The Antilles Current runs outside the islands, and an eddy runs back east
+along Panama. **Wind** is the north-east trades, swinging through four
+seasons of ten turns, with northers over the Gulf in the dry season.
+
+**Ships** sail one leg a turn and favour running with both:
 
 | kind | habit |
 | --- | --- |
-| merchant | port to port, a turn in each to load |
-| treasure ship | shuttles between the two ports farthest apart |
-| treasure fleet | the same, on the next route, at half speed |
-| armada | goes where the sea takes it, at half speed |
-| hunter | closes on you, and stays on you once it finds you |
+| merchant | port to port, three times likelier to trade under its own flag; a turn in each port |
+| treasure fleet | the galeones (in to Cartagena, Portobelo, back, Havana) and the flota (in by San Juan to Veracruz, Havana), then out the Florida Straits for Spain, gone 20 turns, back in through the islands; half speed |
+| treasure ship | a register ship on the same pattern |
+| armada | the Armada de Barlovento, round the Spanish ports; half speed |
+| hunter | guarda costas out of Spanish forts, closing on you |
 
-Ports are targets too, but they don't move, so they are nodes, not ships.
+Square-riggers let the sea pick their heading: they go round rather than
+beat. Hunters are small, weatherly sloops and can work to windward. With
+the same pull as everyone else, they took 30 turns to cover a quarter of
+the way to you. Now they cover two thirds.
 
-The sea has a grain. **Currents** are a gyre turning around the middle
-and never change. **Wind** follows four seasons of five turns each, on
-repeat. Every ship favours running with both, enough that a leg straight
-down the current is about sixteen times likelier than one into it, and it
-will take a sideways leg to get there.
+`npm run chart -- out.svg` draws it all: coastline, currents (or one
+season's wind), and where ships actually went over a long run. Lanes
+show: the flota coming in by the islands and leaving up the Gulf Stream,
+the galeones in the south-west.
 
-A **rumor** says a ship was at a node, on a turn, from a source of some
-reliability. It is exactly right with that probability; otherwise it is
-off by up to one node (good sources), two or three (bad ones). Rumors come
-from prisoners (`interrogate`, on boarding party and strike colours, lost
-if you sink) and, later, from ports.
+**Rumors.** A rumor says a ship was at a node, on a turn, from a source of
+some reliability. It is exactly right with that probability; otherwise it
+is off by up to one node (good sources), two or three (bad ones). Rumors
+come from prisoners (`interrogate`, on boarding party and strike colours,
+lost if you sink) and, later, from ports. A fleet across the Atlantic can't
+be rumored.
 
 Each rumor gives two things:
 
 - **a marker**, which loses a fifth of its strength each turn and is gone
   below a tenth. A 90% rumor lasts ten turns.
 - **a prediction**, a cloud of where the ship could be now. It starts at
-  the report and sails forward the way that kind sails, bound for a port it
-  doesn't know, or for you. It weighs each leg by what you know of the
-  sea. The **search area** is the fewest nodes holding 70% of the cloud.
+  the report and sails forward the way that kind sails:
+  - a merchant is bound for some port, nobody knows which;
+  - a treasure fleet keeps its known route, and while it's probably across
+    the Atlantic, the cloud adds up to less than one;
+  - a hunter is bound for you.
 
-`npm run rumors` measures it. For a 90% rumor:
+  It weighs each leg by what you know of the sea. The **search area** is
+  the fewest nodes holding 70% of the cloud.
 
-| you know | age 2: likeliest node right | search area | ship inside it |
-| --- | --- | --- | --- |
-| nothing | 33% | 3.9 nodes | 80% |
-| currents | 44% | 2.6 | 74% |
-| wind | 38% | 3.0 | 72% |
-| both | 49% | 2.7 | 82% |
+`npm run rumors` measures it. For a 90% rumor, over 200 rumors:
 
-By age 8, knowing nothing, the area is 10.8 nodes, and the ship is only
-inside it 61% of the time: your guesses are wider *and* worse. Knowing
-both, it's 7.8 nodes and 77%.
+| you know | age 2: best guess right | age 8: best guess right | age 8: search area | ship inside it |
+| --- | --- | --- | --- | --- |
+| nothing | 18% | 3% | 32 nodes | 38% |
+| currents | 33% | 9% | 25 | 71% |
+| wind | 32% | 11% | 23 | 73% |
+| both | 37% | 15% | 18 | 79% |
+
+Knowing nothing, a week-old rumor is close to worthless. The area is a
+fifth of the sea, and the ship has usually left it, because blind guesses
+spread evenly while real ships run with the sea. Knowing currents and
+wind, the area is about half the size and right four times in five.
 
 Two things it took. The first prediction treated every ship as drifting,
 when ships head somewhere, so the cloud fell behind the ship it was
-tracking. And at first, ships only chose among legs that closed the
-distance, and there were rarely two of those. Knowing the sea barely helped
-until ships would go round to run with it.
+tracking. Ships also have to go round to run with the sea; while they only
+chose among legs that closed the distance, knowing the sea barely helped.
+Treasure routes were common knowledge, so a fleet's prediction only weighs
+its route's ports.
 
 ## running it
 
@@ -111,6 +148,8 @@ npm run play                 # one encounter in the terminal, random seed
 npm run play -- --seed 42    # that encounter again
 npm run sim                  # bots × 2000 seeds
 npm run rumors               # how good a rumor is, by age and knowledge
+npm run chart -- out.svg     # the sea, its currents, and where ships went
+npm run coast -- ne.geojson  # rebuild the land mask from Natural Earth
 ```
 
 In the browser, `?seed=42` replays an encounter too. Keys: 1 2 3 pick,
@@ -128,8 +167,11 @@ src/
   rules.test.ts
   ui/            Svelte: App, CardView, Gauge
   world/
-    map.ts       the seeded sea graph and its ports
-    sea.ts       currents, wind seasons, and how they weigh a leg
+    grid.ts      the triangular grid over longitude and latitude
+    caribbean.ts ports, straits, rivers, banks, currents, winds, routes
+    data/        the land mask and coastline, from Natural Earth
+    map.ts       the sea graph: water nodes and what the coast makes of them
+    sea.ts       currents and wind per node, and how they weigh a leg
     ships.ts     the kinds of ship and how each moves
     rumors.ts    making a rumor, its fading marker, its prediction
     world.ts     createWorld, advance, hearRumor, learn — pure, like rules.ts

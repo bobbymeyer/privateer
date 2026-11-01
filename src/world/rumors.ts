@@ -16,12 +16,14 @@
 import { type NodeId, ports, ring } from './map.ts';
 import { type Roller, pick, roll } from './random.ts';
 import { type SeaKnowledge, legWeight } from './sea.ts';
-import { HABITS, type Sea, type Ship, type ShipKind, movesOn, onward } from './ships.ts';
+import { HABITS, type Sea, type Ship, type ShipKind, graphFor, movesOn, onward, voyageFrom } from './ships.ts';
 
 export interface Rumor {
   id: number;
   shipId: number;
   kind: ShipKind;
+  /** The fixed course it keeps, if any. Treasure routes were common knowledge. */
+  route: NodeId[] | null;
   /** Where the ship was said to be. */
   reported: NodeId;
   /** When it was said to be there. */
@@ -56,7 +58,7 @@ export function makeRumor(sea: Sea, r: Roller, id: number, ship: Ship, turn: num
       }
     }
   }
-  return { id, shipId: ship.id, kind: ship.kind, reported, turn, reliability };
+  return { id, shipId: ship.id, kind: ship.kind, route: ship.route, reported, turn, reliability };
 }
 
 /**
@@ -66,21 +68,29 @@ export function makeRumor(sea: Sea, r: Roller, id: number, ship: Ship, turn: num
  * rest spread over the nodes it could be off by — then sails it forward a
  * turn at a time, the way its kind sails:
  *
- * - merchants and treasure runs are bound for a port, but which one is not
- *   known, so every port is weighed equally;
+ * - merchants are bound for a port, but which one is not known, so every
+ *   port is weighed equally;
+ * - treasure runs and the armada keep a known course, so only its ports
+ *   are weighed, each bound for the next;
+ * - either way, a ship spends a turn in each port it reaches;
+ * - a treasure run that reaches the Atlantic is gone, and comes back in
+ *   by the islands when the crossing is done — while it is away, the
+ *   prediction adds up to less than one;
  * - hunters are bound for you (`player`), and stay once they reach you;
- * - armadas go where the sea takes them;
- * - slow kinds only move on even turns.
+ * - slow kinds only move on even turns; deep keels keep off the banks.
  *
  * Within that, the observer can only weigh the legs out of a node by what it
  * knows of the sea (`know`). Knowing nothing, every leg looks the same.
  */
 export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge, player: NodeId): number[] {
   const { map, pattern } = sea;
+  const g = graphFor(map, rumor.kind);
   const N = map.nodes.length;
-  const harbours = ports(map);
-  const goals: (NodeId | null)[] =
-    rumor.kind === 'armada' ? [null] : rumor.kind === 'hunter' ? [player] : harbours;
+  const hunter = rumor.kind === 'hunter';
+  const goals: NodeId[] = hunter ? [player] : rumor.route ?? ports(map);
+  /** Where a ship bound for goals[i] goes next, once there. */
+  const after = (i: number): number[] =>
+    rumor.route ? [(i + 1) % goals.length] : goals.map((_, j) => j).filter((j) => j !== i);
 
   // p[g][n]: bound for goals[g], at node n.
   const start = map.nodes.map(() => 0);
@@ -94,22 +104,30 @@ export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge,
   let p = goals.map(() => start.map((v) => v / goals.length));
 
   const drift = HABITS[rumor.kind].drift;
-  const loads = rumor.kind === 'merchant';
+
+  // Mass that has sailed for Europe: when it comes back, where, bound for which stop.
+  const crossing: { back: number; node: NodeId; gi: number; mass: number }[] = [];
 
   for (let t = rumor.turn; t < now; t++) {
-    if (!movesOn(rumor.kind, t)) continue;
     const q = goals.map(() => new Array<number>(N).fill(0));
-    const spread = (gi: number, from: NodeId, to: NodeId[], mass: number, like: number[] = to.map(() => 1)) => {
-      const w = to.map((m, i) => like[i] * legWeight(map, pattern, from, m, t, know));
+    for (const c of crossing) if (c.back === t) q[c.gi][c.node] += c.mass;
+    if (!movesOn(rumor.kind, t)) {
+      p = p.map((row, gi) => row.map((v, n) => v + q[gi][n]));
+      continue;
+    }
+    // A leg's weight depends on the turn, not the goal: worked out once per turn.
+    const cache = new Map<number, number>();
+    const weigh = (from: NodeId, to: NodeId) => {
+      const k = from * N + to;
+      let v = cache.get(k);
+      if (v === undefined) cache.set(k, (v = legWeight(map, pattern, from, to, t, know)));
+      return v;
+    };
+    const spread = (gi: number, from: NodeId, to: NodeId[], mass: number, like: number[] = to.map(() => 1), pull = 1) => {
+      if (!to.length) return void (q[gi][from] += mass);
+      const w = to.map((m, i) => like[i] * weigh(from, m) ** pull);
       const total = w.reduce((x, y) => x + y, 0);
       to.forEach((m, i) => (q[gi][m] += (mass * w[i]) / total));
-    };
-
-    // Bound for a goal: the legs it would consider, as it weighs them.
-    const goTo = (gi: number, n: NodeId, goal: NodeId | null, mass: number) => {
-      const legs = goal === null ? [] : onward(map, n, goal);
-      if (!legs.length) return spread(gi, n, map.adj[n], mass);
-      spread(gi, n, legs.map(([m]) => m), mass, legs.map(([, f]) => f));
     };
 
     goals.forEach((goal, gi) => {
@@ -117,29 +135,21 @@ export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge,
         const mass = p[gi][n];
         if (mass === 0) continue;
 
-        // A hunter that has found you stays on you.
-        if (rumor.kind === 'hunter' && n === goal) {
-          q[gi][n] += mass;
+        if (n === goal) {
+          // A hunter that has found you stays on you; anyone else spends the
+          // turn in port and is bound for the next — or sails for Europe.
+          const voyage = rumor.route ? voyageFrom(map, n) : null;
+          if (hunter) q[gi][n] += mass;
+          else if (voyage) {
+            const inbound = (gi + 1) % goals.length;
+            crossing.push({ back: t + voyage.turns, node: goals[inbound], gi: (inbound + 1) % goals.length, mass });
+          } else for (const gj of after(gi)) q[gj][n] += mass / after(gi).length;
           continue;
         }
 
-        // Arrived: bound somewhere else now. Merchants spend the turn loading.
-        if (goal !== null && n === goal) {
-          const others = goals.map((g, i) => [g, i] as const).filter(([g]) => g !== n);
-          for (const [, gj] of others) {
-            if (loads) q[gj][n] += mass / others.length;
-            else goTo(gj, n, goals[gj], mass / others.length);
-          }
-          continue;
-        }
-
-        const out = map.adj[n];
-        if (goal === null) {
-          spread(gi, n, out, mass);
-          continue;
-        }
-        spread(gi, n, out, mass * drift);
-        goTo(gi, n, goal, mass * (1 - drift));
+        const legs = onward(g, n, goal);
+        spread(gi, n, g.adj[n], mass * (legs.length ? drift : 1));
+        if (legs.length) spread(gi, n, legs.map(([m]) => m), mass * (1 - drift), legs.map(([, f]) => f), HABITS[rumor.kind].pull);
       }
     });
     p = q;
