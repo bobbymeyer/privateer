@@ -13,7 +13,9 @@
     "sim": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/sim.ts",
     "rumors": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/rumors.ts",
     "coast": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/build-coast.ts",
-    "chart": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/chart.ts"
+    "chart": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/chart.ts",
+    "world": "node --max-old-space-size=4096 --experimental-strip-types --disable-warning=ExperimentalWarning scripts/build-world.ts",
+    "world-chart": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/world-chart.ts"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -21,6 +23,7 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/node": "^22.20.5",
+    "d3-geo-voronoi": "^2.1.0",
     "svelte": "^5.57.3",
     "svelte-check": "^4.7.7",
     "typescript": "~5.9.3",

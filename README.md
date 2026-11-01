@@ -41,6 +41,37 @@ broadside and the merchant gets away.
 | you are sunk | nothing |
 | the ships part | your plunder |
 
+## the world
+
+The game ends with Drake's circumnavigation, 1577–1580, so the sea is the
+whole world: `src/world/data/world.json`, built by `npm run world` from
+Natural Earth's 1:10m land.
+
+**Coastline first, because the coast is where the action is.** Every coast
+and island gets a node offshore every 60 nautical miles, about a day's
+coasting. Then the open ocean is filled in, sparser the farther it is from
+land, up to 300 miles apart mid-ocean. Then everything is triangulated on
+the sphere, and any edge that crosses more than a spit of land, or runs far
+longer than its neighbours, is dropped. Water cut off from the ocean (the
+Caspian, the Great Lakes) is dropped too. The ice beyond 62°S and 72°N is
+left out.
+
+The result is 6,954 nodes (3,213 on the coast) and 17,236 edges.
+
+Straits narrower than the coastal spacing would be missed, since coastal
+nodes sit offshore. Ten are traced by hand in `src/world/passages.ts` and
+threaded through as chains: Magellan above all, plus Gibraltar, Dover, the
+Øresund, the Dardanelles and Bosporus, Messina, Bab-el-Mandeb, Hormuz,
+Malacca and Sunda.
+
+`src/world/drake.ts` is Drake's voyage as the places he touched. The tests
+check that the graph can sail it, Plymouth to Plymouth by Magellan, the
+Moluccas and the Cape, and `npm run world-chart -- out.svg land.geojson`
+draws it (259 legs).
+
+What follows is still the Caribbean-only sea that the rest of the game
+runs on. It moves onto the world graph next.
+
 ## the sea and its rumors
 
 Between fights is the Caribbean and the Gulf of Mexico around 1680.
@@ -150,6 +181,8 @@ npm run sim                  # bots × 2000 seeds
 npm run rumors               # how good a rumor is, by age and knowledge
 npm run chart -- out.svg     # the sea, its currents, and where ships went
 npm run coast -- ne.geojson  # rebuild the land mask from Natural Earth
+npm run world -- ne.geojson  # rebuild the world graph from Natural Earth
+npm run world-chart -- out.svg land.geojson [--box w,s,e,n --scale 30]
 ```
 
 In the browser, `?seed=42` replays an encounter too. Keys: 1 2 3 pick,
