@@ -1,7 +1,8 @@
 /**
- * Drake's circumnavigation, 1577–1580, as the places the Golden Hind
- * touched or took a prize. The game's last campaign; for now, the check that
- * the world can be sailed round the way he went.
+ * Drake's raid round the world, as the places the Golden Hind touched or
+ * took a prize. Re-enacting it is the ultimate win, a legend a captain of
+ * 16XX sets out to match; for now, it also checks that the world can be
+ * sailed round the way he went.
  */
 export const DRAKE: { name: string; at: [number, number] }[] = [
   { name: 'Plymouth', at: [-4.15, 50.35] },

@@ -1,5 +1,6 @@
 /**
- * The Caribbean and the Gulf of Mexico, around 1680: the ports, the
+ * The Caribbean and the Gulf of Mexico in 16XX — the seventeenth century as
+ * a setting, not a year, so ports and flags come from across it: the ports, the
  * passages and rivers and banks that shape the coastal water, and the
  * currents and winds that shape the open sea. Hand-written; positions are
  * longitude, latitude.

@@ -43,8 +43,12 @@ broadside and the merchant gets away.
 
 ## the world
 
-The game ends with Drake's circumnavigation, 1577–1580, so the sea is the
-whole world: `src/world/data/world.json`, built by `npm run world` from
+The year is 16XX: the seventeenth century as a setting, never a stated
+year. Ports, flags and fleets are drawn from across the century, so
+nothing pins the calendar.
+
+The ultimate win is re-enacting Drake's raid round the world, so the sea
+is the whole world: `src/world/data/world.json`, built by `npm run world` from
 Natural Earth's 1:10m land.
 
 **Coastline first, because the coast is where the action is.** Every coast
@@ -74,7 +78,7 @@ runs on. It moves onto the world graph next.
 
 ## the sea and its rumors
 
-Between fights is the Caribbean and the Gulf of Mexico around 1680.
+Between fights is the Caribbean and the Gulf of Mexico in 16XX.
 
 **The open sea is a triangular grid.** Every node has six neighbours, about
 sixty nautical miles apart: 687 nodes of water. Land is masked from Natural
