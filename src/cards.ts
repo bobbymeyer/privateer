@@ -110,7 +110,7 @@ export const MERCHANT_CARDS: readonly CardDef[] = [
   { key: 'stern-chasers', name: 'stern chasers', text: 'hurt 1', effects: [{ kind: 'hurt', amount: 1 }], copies: 2 },
   { key: 'grapeshot', name: 'grapeshot', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 1 },
   { key: 'jettison', name: 'jettison cargo', text: 'jettison 3', effects: [{ kind: 'jettison', amount: 3 }], copies: 2 },
-  { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 1 },
+  { key: 'carpenters', name: 'carpenters below', text: 'mend 2, recall 1', effects: [{ kind: 'mend', amount: 2 }, { kind: 'recall', amount: 1 }], copies: 1 },
   { key: 'strike', name: 'strike colours', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.9 }], copies: 1 },
   { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
 ];
@@ -126,6 +126,7 @@ export const HUNTER_CARDS: readonly CardDef[] = [
   { key: 'boarders', name: 'boarders away', text: 'hurt 2, hold 1', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'hold', amount: 1 }], copies: 1 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 1 },
   { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 1 },
+  { key: 'reload', name: 'the gun crews reload', text: 'recall 2', effects: [{ kind: 'recall', amount: 2 }], copies: 1 },
 ];
 
 /** A lone galleon: heavy guns, slow to answer, a hold full of silver, and she runs. */
@@ -135,6 +136,7 @@ export const TREASURE_SHIP_CARDS: readonly CardDef[] = [
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 2 },
   { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
   { key: 'strike', name: 'strike colours', text: 'plunder 4, interrogate', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'interrogate', reliability: 0.9 }], copies: 1 },
+  { key: 'reload', name: 'reload the great guns', text: 'recall 2', effects: [{ kind: 'recall', amount: 2 }], copies: 1 },
 ];
 
 /** A convoy under escort: it doesn't run, it closes ranks, and a straggler is the chance. */
@@ -144,6 +146,7 @@ export const TREASURE_FLEET_CARDS: readonly CardDef[] = [
   { key: 'cut-off', name: 'cut off', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 2 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
   { key: 'straggler', name: 'a straggler', text: 'plunder 5, interrogate', effects: [{ kind: 'plunder', amount: 5 }, { kind: 'interrogate', reliability: 0.8 }], copies: 2 },
+  { key: 'fresh-escort', name: 'a fresh escort comes up', text: 'hurt 2, recall 1', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'recall', amount: 1 }], copies: 1 },
 ];
 
 /** A squadron of the line: nothing to take, everything to lose. Run. */
@@ -165,6 +168,7 @@ export const TOWN_CARDS: readonly CardDef[] = [
   { key: 'inland', name: 'valuables carried inland', text: 'jettison 3', effects: [{ kind: 'jettison', amount: 3 }], copies: 2 },
   { key: 'barricades', name: 'barricades', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 2 },
   { key: 'ransom', name: 'the town treats', text: 'plunder 4, interrogate', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'interrogate', reliability: 0.8 }], copies: 1 },
+  { key: 'militia', name: 'the militia rallies', text: 'recall 2', effects: [{ kind: 'recall', amount: 2 }], copies: 1 },
 ];
 
 /** A fortified port: the fort's great guns, and walls to mend. Not for a pinnace. */

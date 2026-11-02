@@ -15,7 +15,9 @@ export const PLAYER_CARDS: Record<string, CardFace> = {
   marksmen: { key: 'marksmen', name: 'marksmen in the tops', text: 'hit 1, hold 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'hold', amount: 1 }] },
   'prize-crew': { key: 'prize-crew', name: 'prize crew', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.8 }] },
   'all-hands': { key: 'all-hands', name: 'all hands', text: 'brace 3, recall 1', effects: [{ kind: 'brace', amount: 3 }, { kind: 'recall', amount: 1 }] },
-  'surgeons-mate': { key: 'surgeons-mate', name: "surgeon's mate", text: 'repair 1, brace 1', effects: [{ kind: 'repair', amount: 1 }, { kind: 'brace', amount: 1 }] },
+  'surgeons-mate': { key: 'surgeons-mate', name: "surgeon's mate", text: 'repair 1, brace 1, recall 1', effects: [{ kind: 'repair', amount: 1 }, { kind: 'brace', amount: 1 }, { kind: 'recall', amount: 1 }] },
+  reload: { key: 'reload', name: 'run out the guns again', text: 'recall 2', effects: [{ kind: 'recall', amount: 2 }] },
+  drilled: { key: 'drilled', name: 'drilled crews', text: 'hit 1, recall 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'recall', amount: 1 }] },
 };
 
 /** Cards by key and count. */
@@ -50,7 +52,7 @@ export interface CrewRole {
 
 /** Hired in the bar: one of each. */
 export const CREW: Record<string, CrewRole> = {
-  gunner: { name: 'master gunner', cost: 12, cards: { 'double-shot': 1 } },
+  gunner: { name: 'master gunner', cost: 12, cards: { 'double-shot': 1, reload: 1 } },
   marksmen: { name: 'marksmen', cost: 10, cards: { marksmen: 2 } },
   quartermaster: { name: 'quartermaster', cost: 10, cards: { 'prize-crew': 1 } },
   boatswain: { name: 'boatswain', cost: 8, cards: { 'all-hands': 1 } },
@@ -74,6 +76,7 @@ export const UPGRADES: Record<string, Upgrade> = {
   sheathing: { name: 'sheathed hull', cost: 20, hull: 2, max: 1 },
   nets: { name: 'boarding nets', cost: 10, cards: { brace: 1 }, max: 1 },
   chasers: { name: 'chase guns', cost: 12, cards: { swivel: 1 }, max: 1 },
+  drill: { name: 'gun drill', cost: 15, cards: { drilled: 1 }, max: 1 },
 };
 
 export interface Outfit {
