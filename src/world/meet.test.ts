@@ -75,10 +75,12 @@ test('there are no encounters in port', () => {
 test('a fight is settled into the world', () => {
   for (let seed = 1; seed < 12; seed++) {
     const { w, step, fleet } = setUp(seed);
-    const after = fightOut(attack(advance(sea, w, step)));
+    const alongside = advance(sea, w, step);
+    const after = fightOut(attack(alongside));
     const r = after.reckoning!;
     assert.equal(r.shipId, fleet.id);
-    assert.equal(after.gold, w.gold + r.payout);
+    // From the gold you had alongside: a day at sea can cost some, in a storm.
+    assert.equal(after.gold, alongside.gold + r.payout);
     assert.equal(after.sunk, r.outcome === 'sunk');
     assert.equal(r.nation, 'spain');
     assert.ok(r.attacked);

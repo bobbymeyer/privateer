@@ -77,7 +77,7 @@ const OMENS = [
 export function aDay(sea: Sea, s: WorldState): WorldState {
   const r: Roller = { rng: s.rng };
   let w = s;
-  const log = (text: string) => (w = { ...w, log: [...w.log, { turn: w.turn, text }] });
+  const log = (text: string, stop = false) => (w = { ...w, log: [...w.log, { turn: w.turn, text, ...(stop ? { stop } : {}) }] });
   const atSea = !sea.map.nodes[s.player].port;
 
   // Fresh water and green stuff at an island you've charted.
@@ -89,11 +89,11 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
       if (throwOver) {
         const lost = Math.min(JETTISON_MAX, Math.max(1, Math.round(w.gold * (0.1 + 0.15 * roll(r)))));
         w = { ...w, gold: w.gold - lost };
-        log(`a storm: ${lost} in cargo thrown over the side to keep her afloat`);
+        log(`a storm: ${lost} in cargo thrown over the side to keep her afloat`, true);
       } else {
         const lost = Math.min(1 + Math.floor(roll(r) * 3), w.hull - 1);
         w = { ...w, hull: w.hull - lost };
-        log(lost > 0 ? `a storm: the ship takes ${lost} hull of damage` : 'a storm, ridden out with nothing left to lose');
+        log(lost > 0 ? `a storm: the ship takes ${lost} hull of damage` : 'a storm, ridden out with nothing left to lose', true);
       }
     } else if (roll(r) < OMEN_CHANCE) {
       w = cheer(w, OMEN_CHEER);
@@ -105,7 +105,7 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
   const idle = w.turn - w.lastSpoils;
   if (idle >= IDLE_DAYS && (idle - IDLE_DAYS) % SOUR_EVERY === 0) {
     w = { ...w, morale: w.morale - 1 };
-    if (w.morale > 0) log(`${idle} days without a prize, and the crew are grumbling`);
+    if (w.morale > 0) log(`${idle} days without a prize, and the crew are grumbling`, w.morale <= 2);
   }
   if (w.morale <= 0) w = mutiny({ ...w, rng: r.rng }, r);
   return { ...w, rng: r.rng };
@@ -125,5 +125,5 @@ function mutiny(s: WorldState, r: Roller): WorldState {
     w = { ...w, gold: w.gold - lost };
     text = `mutiny: the strongroom broken open, and ${lost} gone before order was restored`;
   }
-  return { ...w, log: [...w.log, { turn: w.turn, text }] };
+  return { ...w, log: [...w.log, { turn: w.turn, text, stop: true }] };
 }

@@ -50,6 +50,10 @@ export const PORTS: PortDef[] = [
   p('La Rochelle', -1.15, 46.16, 'france', true),
   p('Copenhagen', 12.57, 55.68, 'denmark', true),
   p('Bergen', 5.32, 60.39, 'denmark'),
+  // Iceland under the Danish trade monopoly; the Algerines came here in 1627.
+  p('Reykjavík', -21.94, 64.15, 'denmark'),
+  // A fishing town in west Cork, sacked by Algerine corsairs in 1631.
+  p('Baltimore', -9.37, 51.48, 'england'),
   p('Lübeck', 10.69, 53.95, 'hanse'),
   p('Danzig', 18.65, 54.4, 'hanse'),
   p('Stockholm', 18.07, 59.33, 'sweden', true),

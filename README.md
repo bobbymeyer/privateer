@@ -14,7 +14,9 @@ and it's over.
 
 - **Sail** by clicking the sea to set a course, then *set sail*. The ship
   goes a day at a time and stops when it arrives, when a ship comes
-  alongside, or when you sight uncharted land. Drag to pan, wheel or the
+  alongside, when you sight uncharted land, or for news worth heaving to
+  for: a storm, a mutiny, a war declared, the crew close to mutiny (a log
+  line with `stop` set; see `sailToward`). Drag to pan, wheel or the
   buttons to zoom.
 - **In port**, the bar sells rounds (rumors) and hires crew; the yard
   mends the hull (1 gold a point), fits upgrades and sells bigger ships. A
@@ -37,6 +39,17 @@ and it's over.
   war canoes instead.
 
 Each run has a seed in the URL; `?seed=42` plays the same world again.
+
+**The run saves as you go** (`src/save.ts`), to the browser's storage, after
+every day and every card. A reload picks it up where it was, mid-fight
+included, unless the address asks for a different seed. A finished run is
+forgotten. A save carries a version: when the shape of the state changes,
+`SAVE_VERSION` goes up and older saves are dropped rather than loaded
+half-understood.
+
+**How to play** opens on a first visit and from the header after. In a
+fight, hovering a card explains its words, and *what the cards say* under
+the hand lists them all (`GLOSSARY` in `src/describe.ts`).
 
 **Every nation has its colours**, a field and a border, like a flag at a
 distance (`src/world/colors.ts`). England is white edged red, the Dutch
@@ -511,7 +524,8 @@ src/
   cards.ts       the effect vocabulary and the placeholder decks
   rules.ts       createEncounter, act, legalActions — pure, no I/O
   setup.ts       the one encounter so far: you and a merchant
-  describe.ts    words for events, shared by terminal and browser
+  describe.ts    words for events and the cards' glossary, shared by terminal and browser
+  save.ts        saving a run to the browser, and loading it back
   rules.test.ts
   outfit.ts      ships, crew, upgrades: what your deck is made of
   ui/            Svelte: App (the game), SeaChart, Fight, CardView, Gauge
