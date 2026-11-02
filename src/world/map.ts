@@ -11,7 +11,7 @@
 import world from './data/world.json' with { type: 'json' };
 import { type LonLat, along, distanceNm } from './geo.ts';
 import { RIVERS, SHOALS, STRAITS } from './ocean.ts';
-import { type Nation, PORTS } from './ports.ts';
+import { type Nation, PORTS, WATERS_DAYS } from './ports.ts';
 
 export type NodeId = number;
 
@@ -39,6 +39,8 @@ export interface SeaNode {
   river: string | null;
   /** Under the guns of this port's fort. */
   guns: string | null;
+  /** Whose protected waters these are: within reach of their nearest fort. */
+  waters: Nation | null;
 }
 
 /** Unreachable. */
@@ -61,7 +63,7 @@ const at = (n: SeaNode): LonLat => [n.lon, n.lat];
 export function buildMap(): SeaMap {
   const raw = world.nodes as [number, number, number][];
   const kinds = ['coast', 'ocean', 'passage'] as const;
-  const nodes: SeaNode[] = raw.map(([lon, lat, k], id) => ({ id, lon, lat, kind: kinds[k], port: null, strait: null, shoal: null, river: null, guns: null }));
+  const nodes: SeaNode[] = raw.map(([lon, lat, k], id) => ({ id, lon, lat, kind: kinds[k], port: null, strait: null, shoal: null, river: null, guns: null, waters: null }));
   const adj: NodeId[][] = nodes.map(() => []);
   const link = (a: NodeId, b: NodeId) => (adj[a].push(b), adj[b].push(a));
 
@@ -73,7 +75,7 @@ export function buildMap(): SeaMap {
     for (let d = 1; d < days; d++) {
       const [lon, lat] = along(at(nodes[a]), at(nodes[b]), d / days);
       const id = nodes.length;
-      nodes.push({ id, lon, lat, kind: 'underway', port: null, strait: null, shoal: null, river: null, guns: null });
+      nodes.push({ id, lon, lat, kind: 'underway', port: null, strait: null, shoal: null, river: null, guns: null, waters: null });
       adj.push([]);
       link(prev, id);
       prev = id;
@@ -108,8 +110,23 @@ export function buildMap(): SeaMap {
     for (const m of [n.id, ...adj[n.id]]) nodes[m].guns ??= n.port.name;
   }
 
+  // Protected waters: each node belongs to the nation of its nearest fort,
+  // if that fort is within reach.
+  const distances_ = distances(adj);
+  const nearestFort = new Int32Array(nodes.length).fill(WATERS_DAYS + 1);
+  for (const n of nodes) {
+    if (!n.port?.fort) continue;
+    const d = distances_(n.id);
+    for (let i = 0; i < nodes.length; i++) {
+      if (d[i] < nearestFort[i]) {
+        nearestFort[i] = d[i];
+        nodes[i].waters = n.port.nation;
+      }
+    }
+  }
+
   const deepAdj = adj.map((out, i) => (nodes[i].shoal && !nodes[i].port ? [] : out.filter((m) => !nodes[m].shoal || nodes[m].port)));
-  return { nodes, adj, distTo: distances(adj), deep: { adj: deepAdj, distTo: distances(deepAdj) } };
+  return { nodes, adj, distTo: distances_, deep: { adj: deepAdj, distTo: distances(deepAdj) } };
 }
 
 /** Breadth-first distances to a node, cached; the oldest are let go past a few hundred. */

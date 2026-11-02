@@ -10,6 +10,7 @@ import { encounterWith } from '../setup.ts';
 import { NOTABLE, sighting } from './bar.ts';
 import { type Roller, roll } from './random.ts';
 import { makeRumor } from './rumors.ts';
+import type { Nation } from './ports.ts';
 import type { Sea, ShipKind } from './ships.ts';
 import type { WorldState } from './world.ts';
 
@@ -31,8 +32,11 @@ export interface Meeting {
 export interface Reckoning {
   shipId: number;
   kind: ShipKind;
+  nation: Nation;
   outcome: Outcome;
   payout: number;
+  /** You damaged it or took from it, and its nation will remember. */
+  attacked: boolean;
   /** Rumors got from prisoners. */
   heard: number;
 }
@@ -81,6 +85,12 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   });
   const parted = outcome === 'destroyed' || outcome === 'sunk' ? s.parted : { ...s.parted, [m.shipId]: s.turn + PARTED_DAYS };
 
+  // An attack is remembered by the ship's nation: any damage landed or
+  // plunder taken, and a sinking twice over.
+  const nation = s.ships[m.shipId].nation;
+  const attacked = outcome === 'destroyed' || f.plunder > 0 || f.target.hull < f.target.maxHull;
+  const standing = attacked ? { ...s.standing, [nation]: (s.standing[nation] ?? 0) - (outcome === 'destroyed' ? 2 : 1) } : s.standing;
+
   return {
     ...s,
     rng: r.rng,
@@ -91,8 +101,9 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     parted,
     rumors,
     nextRumor: next,
+    standing,
     encounter: null,
-    reckoning: { shipId: m.shipId, kind: m.kind, outcome, payout: f.payout, heard: next - s.nextRumor },
+    reckoning: { shipId: m.shipId, kind: m.kind, nation, outcome, payout: f.payout, attacked, heard: next - s.nextRumor },
   };
 }
 

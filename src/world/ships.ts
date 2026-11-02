@@ -5,6 +5,7 @@
 
 import { type Graph, type NodeId, type SeaMap, portNamed, ports } from './map.ts';
 import { ROUTES } from './ocean.ts';
+import type { Nation } from './ports.ts';
 import { type Roller, roll, weighted } from './random.ts';
 import { type SeaPattern, legWeight } from './sea.ts';
 
@@ -26,7 +27,13 @@ export interface Ship {
   home: NodeId;
   /** Sunk or taken: laid up at home, refitting, until this turn. */
   laidUp: number;
+  /** Whose flag it flies: its home port's. */
+  nation: Nation;
 }
+
+/** How each nation regards you. Below zero, its guard ships hunt you. */
+export type Standing = Partial<Record<Nation, number>>;
+export const wantedBy = (standing: Standing, nation: Nation) => (standing[nation] ?? 0) < 0;
 
 export interface KindHabits {
   /** Moves only on even turns. Everybody who knows the sea knows this. */
@@ -75,8 +82,23 @@ export function tradingPorts(map: SeaMap, node: NodeId): NodeId[] {
   return ports(map).filter((p) => p !== node && map.distTo(p)[node] <= TRADE_RANGE);
 }
 
-/** Where a hunter stationed at `home` is bound, given where you are. */
-export const hunterGoal = (map: SeaMap, home: NodeId, player: NodeId) => (map.distTo(home)[player] <= HUNT_RANGE ? player : home);
+/**
+ * Where a hunter is bound. It keeps station unless its nation wants you,
+ * you're within its range, and you're not in another nation's protected
+ * waters — which a guard ship won't enter.
+ */
+export function hunterGoal(map: SeaMap, hunter: { home: NodeId; nation: Nation }, player: NodeId, standing: Standing): NodeId {
+  if (!wantedBy(standing, hunter.nation)) return hunter.home;
+  if (!mayEnter(map, { kind: 'hunter', nation: hunter.nation }, player)) return hunter.home;
+  return map.distTo(hunter.home)[player] <= HUNT_RANGE ? player : hunter.home;
+}
+
+/**
+ * Countries protect their waters: a guard ship stays out of any other
+ * nation's. Everyone else may go where they like.
+ */
+export const mayEnter = (map: SeaMap, ship: { kind: ShipKind; nation: Nation }, node: NodeId) =>
+  ship.kind !== 'hunter' || map.nodes[node].waters === null || map.nodes[node].waters === ship.nation;
 
 /**
  * How much a ship likes a leg that keeps its distance, against one that
@@ -86,26 +108,28 @@ export const hunterGoal = (map: SeaMap, home: NodeId, player: NodeId) => (map.di
 export const SIDESTEP = 0.5;
 
 /** The legs a ship bound for `dest` will consider, with how much it likes each. */
-export function onward(g: Graph, from: NodeId, dest: NodeId): [NodeId, number][] {
+export function onward(g: Graph, from: NodeId, dest: NodeId, allowed: (n: NodeId) => boolean = () => true): [NodeId, number][] {
   const d = g.distTo(dest);
   const here = d[from];
   return g.adj[from]
+    .filter(allowed)
     .map((m): [NodeId, number] => [m, d[m] < here ? 1 : d[m] === here ? SIDESTEP : 0])
     .filter(([, f]) => f > 0);
 }
 
 /**
- * One turn of movement. `hunted` is where you are.
+ * One turn of movement. `hunted` is where you are; `standing`, who wants you.
  * Mutates `ship`; the caller has already copied it.
  */
-export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: NodeId): void {
+export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: NodeId, standing: Standing = {}): void {
   const { map, pattern } = sea;
   if (ship.laidUp > turn) return;
   if (!movesOn(ship.kind, turn)) return;
   const g = graphFor(map, ship.kind);
 
+  const allowed = (n: NodeId) => mayEnter(map, ship, n);
   if (ship.kind === 'hunter') {
-    ship.dest = hunterGoal(map, ship.home, hunted);
+    ship.dest = hunterGoal(map, ship, hunted, standing);
     if (ship.node === hunted && ship.dest === hunted) return; // found you
   } else if (ship.dest === null || ship.node === ship.dest) {
     // In port: a turn to load, and the next port picked.
@@ -122,13 +146,13 @@ export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: 
 
   const weightOf = (m: NodeId) => legWeight(map, pattern, ship.node, m, turn);
   if (ship.dest !== ship.node && roll(r) >= HABITS[ship.kind].drift) {
-    const legs = onward(g, ship.node, ship.dest);
+    const legs = onward(g, ship.node, ship.dest, allowed);
     if (legs.length) {
       ship.node = legs[weighted(r, legs.map(([m, f]) => f * weightOf(m) ** HABITS[ship.kind].pull))][0];
       return;
     }
   }
-  const out = g.adj[ship.node];
+  const out = g.adj[ship.node].filter(allowed);
   if (out.length) ship.node = out[weighted(r, out.map(weightOf))];
 }
 
@@ -145,6 +169,7 @@ export function spawnShips(sea: Sea, fleet: FleetEntry[]): Ship[] {
   return fleet.map((entry, id) => {
     const route = entry.route ? ROUTES[entry.route].map((name) => portNamed(map, name)) : null;
     const home = route ? route[0] : portNamed(map, entry.home ?? 'Havana');
-    return { id, kind: entry.kind, node: home, dest: route ? route[1] : null, route, routeName: entry.route ?? null, leg: route ? 1 : 0, home, laidUp: 0 };
+    const nation = map.nodes[home].port!.nation;
+    return { id, kind: entry.kind, node: home, dest: route ? route[1] : null, route, routeName: entry.route ?? null, leg: route ? 1 : 0, home, laidUp: 0, nation };
   });
 }

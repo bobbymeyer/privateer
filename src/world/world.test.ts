@@ -7,7 +7,7 @@ import { ROUTES } from './ocean.ts';
 import { PORTS } from './ports.ts';
 import { FADE, FADED, makeRumor, markerStrength, maxOff, predict, searchArea } from './rumors.ts';
 import { KNOW_ALL, KNOW_NOTHING, currentAt, seasonOf, windAt } from './sea.ts';
-import { HUNT_RANGE, movesOn } from './ships.ts';
+import { movesOn } from './ships.ts';
 import { ROUND_COST, buyRound } from './bar.ts';
 import { type WorldState, advance, createSea, createWorld, earn, hearRumor, knowledge } from './world.ts';
 
@@ -133,15 +133,6 @@ test('knowing the sea tightens the search', () => {
   assert.ok(wise < blind * 0.85, `${wise} vs ${blind}`);
 });
 
-test('a hunter in range closes on you; one out of range keeps its station', () => {
-  let w = createWorld(sea, 5);
-  const near = w.ships.find((s) => s.kind === 'hunter' && map.distTo(s.home)[w.player] <= HUNT_RANGE)!;
-  const far = w.ships.find((s) => s.kind === 'hunter' && map.nodes[s.home].port!.name === 'Manila')!;
-  const before = map.distTo(w.player)[near.node];
-  for (let i = 0; i < 20; i++) w = advance(sea, w, w.player);
-  assert.ok(map.distTo(w.player)[w.ships[near.id].node] < before / 2, 'the near one closed');
-  assert.ok(map.distTo(far.home)[w.ships[far.id].node] <= 12, 'the far one stayed by Manila');
-});
 
 test('you see the next node’s current and wind, and no farther', () => {
   const w = createWorld(sea, 1);

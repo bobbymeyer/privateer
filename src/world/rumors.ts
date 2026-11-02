@@ -16,7 +16,8 @@
 import { type NodeId, ring } from './map.ts';
 import { type Roller, pick, roll } from './random.ts';
 import { type SeaKnowledge, legWeight } from './sea.ts';
-import { HABITS, type Sea, type Ship, type ShipKind, graphFor, hunterGoal, movesOn, onward, tradingPorts } from './ships.ts';
+import type { Nation } from './ports.ts';
+import { HABITS, type Sea, type Ship, type ShipKind, type Standing, graphFor, hunterGoal, mayEnter, movesOn, onward, tradingPorts } from './ships.ts';
 
 export interface Rumor {
   id: number;
@@ -26,6 +27,8 @@ export interface Rumor {
   route: NodeId[] | null;
   /** Its home port: where a hunter keeps station. */
   home: NodeId;
+  /** Its flag. */
+  nation: Nation;
   /** Where the ship was said to be. */
   reported: NodeId;
   /** When it was said to be there. */
@@ -60,7 +63,7 @@ export function makeRumor(sea: Sea, r: Roller, id: number, ship: Ship, turn: num
       }
     }
   }
-  return { id, shipId: ship.id, kind: ship.kind, route: ship.route, home: ship.home, reported, turn, reliability };
+  return { id, shipId: ship.id, kind: ship.kind, route: ship.route, home: ship.home, nation: ship.nation, reported, turn, reliability };
 }
 
 /**
@@ -75,18 +78,21 @@ export function makeRumor(sea: Sea, r: Roller, id: number, ship: Ship, turn: num
  * - treasure fleets and armadas keep a known course, so only its ports are
  *   weighed, each bound for the next;
  * - either way, a ship spends a turn in each port it reaches;
- * - a hunter is bound for you if you are in its range, else for its station;
+ * - a hunter is bound for you if its nation wants you and you're in its
+ *   range and not in foreign waters, else for its station; it never enters
+ *   another nation's waters;
  * - slow kinds only move on even turns; deep keels keep off the banks.
  *
  * Within that, the observer can only weigh the legs out of a node by what it
  * knows of the sea (`know`). Knowing nothing, every leg looks the same.
  */
-export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge, player: NodeId): number[] {
+export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge, player: NodeId, standing: Standing = {}): number[] {
   const { map, pattern } = sea;
   const g = graphFor(map, rumor.kind);
   const N = map.nodes.length;
   const hunter = rumor.kind === 'hunter';
-  const huntGoal = hunterGoal(map, rumor.home, player);
+  const huntGoal = hunterGoal(map, rumor, player, standing);
+  const allowed = (n: NodeId) => mayEnter(map, rumor, n);
 
   // The ports it could be bound for, and from each, the ones it could go on to.
   let goals: NodeId[];
@@ -149,7 +155,7 @@ export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge,
           if (hunter) {
             // On you: stays. At its station with you out of range: drifts.
             if (goal === player) q[gi][n] += mass;
-            else spread(gi, n, g.adj[n], mass);
+            else spread(gi, n, g.adj[n].filter(allowed), mass);
           } else {
             const next = after(gi);
             if (!next.length) q[gi][n] += mass;
@@ -158,8 +164,8 @@ export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge,
           continue;
         }
 
-        const legs = onward(g, n, goal);
-        spread(gi, n, g.adj[n], mass * (legs.length ? drift : 1));
+        const legs = onward(g, n, goal, allowed);
+        spread(gi, n, g.adj[n].filter(allowed), mass * (legs.length ? drift : 1));
         if (legs.length) spread(gi, n, legs.map(([m]) => m), mass * (1 - drift), legs.map(([, f]) => f), HABITS[rumor.kind].pull);
       }
     });

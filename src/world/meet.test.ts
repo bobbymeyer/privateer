@@ -55,6 +55,8 @@ test('a fight is settled into the world', () => {
     assert.equal(r.shipId, fleet.id);
     assert.equal(after.gold, w.gold + r.payout);
     assert.equal(after.sunk, r.outcome === 'sunk');
+    assert.equal(r.nation, 'spain');
+    assert.equal((after.standing.spain ?? 0) < 0, r.attacked, 'Spain remembers an attack, and only an attack');
     if (r.outcome === 'destroyed') {
       const gone = after.ships[fleet.id];
       assert.equal(gone.node, gone.home);

@@ -8,13 +8,13 @@
 
 import type { RngState } from '../rng.ts';
 import { buildMap, type NodeId, portNamed } from './map.ts';
-import { PORTS } from './ports.ts';
+import { PORTS, adjective, navyOf } from './ports.ts';
 import { type Rumor, FADED, makeRumor, markerStrength } from './rumors.ts';
 import { buildPattern, type Chart, CURRENT_SEEN, chartKnowledge, type SeaKnowledge, seasonOf, windSeen } from './sea.ts';
-import { type FleetEntry, type Sea, type Ship, moveShip, spawnShips } from './ships.ts';
+import { type FleetEntry, type Sea, type Ship, type Standing, mayEnter, moveShip, spawnShips } from './ships.ts';
 import type { Roller } from './random.ts';
 import { SHIP } from '../setup.ts';
-import { type Meeting, type Reckoning, meeting } from './meet.ts';
+import { type Meeting, REFIT_DAYS, type Reckoning, meeting } from './meet.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -44,6 +44,10 @@ export interface WorldState {
   parted: Record<number, number>;
   /** You went down. The run is over. */
   sunk: boolean;
+  /** How each nation regards you. Attack its ships and it falls; below zero, its guard ships hunt you. */
+  standing: Standing;
+  /** What happened that you'd hear about: navies driving off intruders, and the like. */
+  log: { turn: number; text: string }[];
 }
 
 /** Days of each ship's wake that are remembered. */
@@ -68,8 +72,11 @@ export function observe(sea: Sea, chart: Chart, from: NodeId, sight: number, tur
 /** The player's knowledge of the sea, for predictions. */
 export const knowledge = (s: WorldState): SeaKnowledge => chartKnowledge(s.chart);
 
-/** Where the powers keep guard ships that will come after you. */
-export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Cádiz', 'Lisbon', 'Goa', 'Batavia', 'Manila', 'Algiers'];
+/**
+ * Where the powers keep guard ships that will come after you. Out where
+ * control is weak — not in Europe, whose home waters their navies keep.
+ */
+export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Goa', 'Batavia', 'Manila', 'Algiers'];
 
 /** A merchant out of every port, a guard ship at every station, and the great courses. */
 export const DEFAULT_FLEET: FleetEntry[] = [
@@ -120,6 +127,8 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     reckoning: null,
     parted: {},
     sunk: false,
+    standing: {},
+    log: [],
   };
 }
 
@@ -132,7 +141,17 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   }
   const r: Roller = { rng: s.rng };
   const ships = s.ships.map((ship) => ({ ...ship }));
-  for (const ship of ships) moveShip(sea, r, ship, s.turn, to);
+  for (const ship of ships) moveShip(sea, r, ship, s.turn, to, s.standing);
+
+  // Countries protect their waters: a foreign guard ship found inside them
+  // is driven off by the navy and laid up at home.
+  const log = [...s.log];
+  for (const ship of ships) {
+    const owner = sea.map.nodes[ship.node].waters;
+    if (ship.laidUp > s.turn || mayEnter(sea.map, ship, ship.node) || !owner) continue;
+    log.push({ turn: s.turn + 1, text: `${navyOf(owner)} drove off a ${adjective(ship.nation)} guard ship` });
+    Object.assign(ship, { node: ship.home, laidUp: s.turn + 1 + REFIT_DAYS, dest: null });
+  }
   return meeting(sea, {
     ...s,
     rng: r.rng,
@@ -144,6 +163,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     chart: observe(sea, s.chart, to, s.sight, s.turn + 1),
     trail: s.ships.map((ship, i) => [ship.node, ...s.trail[i]].slice(0, TRAIL)),
     rounds: 0,
+    log,
   });
 }
 

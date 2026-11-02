@@ -159,3 +159,29 @@ export const PORTS: PortDef[] = [
   p('Panama', -79.53, 8.98, 'spain', true),
   p('Acapulco', -99.91, 16.85, 'spain', true),
 ];
+
+/** How far a nation's protected waters reach from each of its forts, in days. */
+export const WATERS_DAYS = 4;
+
+/** Who comes out when a foreign warship nears a nation's forts. */
+export const NAVIES: Partial<Record<Nation, string>> = {
+  england: 'the Royal Navy',
+  france: 'the Marine royale',
+  netherlands: 'the Dutch admiralties',
+  spain: 'the Spanish guard',
+  portugal: 'the Portuguese guard',
+  denmark: 'the Danish navy',
+  sweden: 'the Swedish navy',
+  venice: 'the Venetian galleys',
+  ottoman: 'the Ottoman fleet',
+};
+export const navyOf = (n: Nation) => NAVIES[n] ?? `${n} guard ships`;
+
+const ADJECTIVES: Record<Nation, string> = {
+  spain: 'Spanish', portugal: 'Portuguese', england: 'English', france: 'French', netherlands: 'Dutch',
+  denmark: 'Danish', sweden: 'Swedish', hanse: 'Hanseatic', italy: 'Italian', venice: 'Venetian',
+  malta: 'Maltese', ottoman: 'Ottoman', barbary: 'Barbary', morocco: 'Moroccan', persia: 'Persian',
+  oman: 'Omani', mughal: 'Mughal', china: 'Chinese', japan: 'Japanese', local: 'local',
+};
+/** `Spanish`, `Dutch`: for saying whose a ship is. */
+export const adjective = (n: Nation) => ADJECTIVES[n];

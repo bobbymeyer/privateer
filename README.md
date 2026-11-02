@@ -110,7 +110,7 @@ Aceh, Bantam and Calicut. Forts put the water a step out under their guns.
 | treasure fleet | the flota and galeones (Cádiz, the Canaries, in through the islands, silver at Veracruz or Cartagena and Portobelo, Havana); the South Sea fleet (Arica, Callao, Panama); half speed |
 | treasure ship | the Manila galleon, the Portuguese carreira to Goa, the Dutch return fleet to Batavia |
 | armada | the Armada de Barlovento round the Caribbean, the Mar Océano off Iberia; half speed |
-| hunter | guard ships at ten stations (Havana, Cartagena, San Juan, Callao, Cádiz, Lisbon, Goa, Batavia, Manila, Algiers), chasing you while you're within 25 days of their station |
+| hunter | guard ships at eight stations out where control is weak (Havana, Cartagena, San Juan, Callao, Goa, Batavia, Manila, Algiers); they keep station until their nation wants you, then chase you within 25 days of it |
 
 Square-riggers let the sea pick their heading: they go round rather than
 beat. Hunters are weatherly and can work to windward.
@@ -133,6 +133,22 @@ A rumor says a ship was at a node, on a turn, with some reliability. It is
 exactly right with that probability; otherwise it is off by up to one step
 (good sources), two or three (bad ones). Prisoners talk too
 (`interrogate`, on boarding party and strike colours, lost if you sink).
+
+**Flags, standing and protected waters.** Every ship flies its home port's
+flag; a route ship flies its first port's. Every nation keeps a **standing**
+with you. Attack one of its ships and the standing falls: one for landing
+damage or taking plunder, two for a sinking. Below zero, its guard ships
+hunt you. Until then they keep station.
+
+**Countries protect their waters.** The sea within 4 days of a nation's
+forts is its protected water; where two overlap, the nearer fort decides.
+A guard ship never enters another nation's waters, so a chase breaks off
+at the edge and a friendly fort is a refuge. Any foreign guard ship found
+inside is driven off by that nation's navy (Spanish ships off Plymouth
+bring out the Royal Navy) and laid up at home; it goes in the world's log.
+That's why the guard stations are out in the colonies: Europe's home
+waters are its navies' business. The armadas are exempt, keeping their
+patrols round their own empire's ports.
 
 **Meeting a ship.** When you share a node with a ship, outside a port, the
 encounter starts (`src/world/meet.ts`). The world waits until it is fought.
