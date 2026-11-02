@@ -23,6 +23,7 @@ const portHere = (sea: Sea, s: WorldState) => {
 export const serves = (sea: Sea, s: WorldState): boolean => {
   const port = sea.map.nodes[s.player].port;
   if (!port) return false;
+  if ((s.sacked[s.player] ?? -1) > s.turn) return false;
   if (s.pirate && port.nation === YOUR_NATION) return false;
   return port.nation === 'local' || !wantedBy(s.standing, port.nation);
 };

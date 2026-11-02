@@ -54,6 +54,8 @@ export interface TargetState {
   bounty: number;
   /** Flee attempts of the target's that you will cancel. */
   held: number;
+  /** Taken rather than sunk — a town — so what's left in the hold is yours too. */
+  takenWhole?: boolean;
 }
 
 /**
@@ -92,6 +94,8 @@ export interface EncounterState {
   payout: number;
   /** Damage cards made so far, for unique ids. */
   minted: number;
+  /** Help that comes to the target if the fight drags on. */
+  reinforce: Reinforcement | null;
   /** Reliability of each rumor got from prisoners. Emptied if you are sunk. */
   intel: number[];
   events: GameEvent[];
@@ -100,12 +104,19 @@ export interface EncounterState {
 /** Indices into the hand, in the order the cards should resolve. */
 export type Action = { type: 'keep'; picks: [number, number] };
 
+/** Help for the target that comes if the fight goes on: from round `from`, a card on top of the deck every round. */
+export interface Reinforcement {
+  from: number;
+  card: Omit<Card, 'id'>;
+}
+
 export interface EncounterSetup {
   seed: number;
   shipCards: Card[];
   targetCards: Card[];
   ship: Omit<ShipState, 'held'>;
   target: Omit<TargetState, 'held'>;
+  reinforce?: Reinforcement;
 }
 
 export function createEncounter(setup: EncounterSetup): EncounterState {
@@ -121,6 +132,7 @@ export function createEncounter(setup: EncounterSetup): EncounterState {
     outcome: null,
     payout: 0,
     minted: 0,
+    reinforce: setup.reinforce ?? null,
     intel: [],
     events: [],
   };
@@ -264,6 +276,11 @@ function settled(s: EncounterState): Outcome | null {
 }
 
 function deal(s: EncounterState): EncounterState {
+  // Fight too long and help comes: on top, so it's in the next hand.
+  if (s.reinforce && s.round + 1 >= s.reinforce.from) {
+    s.minted += 1;
+    s.deck.unshift({ ...s.reinforce.card, id: `reinforce#${s.minted}` });
+  }
   if (s.deck.length < HAND_SIZE) return end(s, 'parted');
   s.round += 1;
   s.hand = s.deck.slice(0, HAND_SIZE);
@@ -275,8 +292,9 @@ function deal(s: EncounterState): EncounterState {
 function end(s: EncounterState, outcome: Outcome): EncounterState {
   s.outcome = outcome;
   if (outcome === 'sunk') s.intel = [];
+  const taken = s.target.takenWhole ? s.target.cargo : 0;
   s.payout =
-    outcome === 'sunk' ? 0 : outcome === 'destroyed' ? s.plunder + s.target.bounty : s.plunder;
+    outcome === 'sunk' ? 0 : outcome === 'destroyed' ? s.plunder + s.target.bounty + taken : s.plunder;
   s.events.push({ type: 'ended', round: s.round, outcome, payout: s.payout });
   return s;
 }

@@ -31,6 +31,15 @@ export function describeEffect(e: Effect, applied: number, note?: EffectNote, mi
   return `${VERB[e.kind]} ${applied}${short}`;
 }
 
+/** How a raid ends: a town can't run or go down, so the words differ. */
+export const RAID_OUTCOME_TEXT: Record<Outcome, string> = {
+  fled: 'you fall back to the boats',
+  escaped: 'the town holds',
+  destroyed: 'the town is sacked',
+  sunk: 'you were sunk under the guns',
+  parted: 'the raid peters out, and you withdraw',
+};
+
 export const OUTCOME_TEXT: Record<Outcome, string> = {
   fled: 'you got away',
   escaped: 'the target got away',

@@ -24,8 +24,11 @@ and it's over.
   cloud of where its ship could be by now. The cloud is tighter where
   you've seen the current and wind (blue and dashed grey arrows a step out).
 - **Meeting a ship** at sea: a guard ship or armada of a nation that wants
-  you attacks on sight. Anyone else comes alongside and you choose: attack,
-  or let her pass. Fire on an English ship and you're a pirate.
+  you, or that's at war with England, attacks on sight. Anyone else comes
+  alongside and you choose: attack, or let her pass. Spain and the Barbary
+  corsairs are fair game; anyone else's ships, the Crown hears of; an
+  English ship makes you a pirate.
+- **Raiding a port**: in port, you can raid it instead of trading.
 
 Each run has a seed in the URL; `?seed=42` plays the same world again.
 
@@ -209,18 +212,63 @@ there, and the hull mends a point a day.
 that brings you nearest, and where steps tie, the one that runs best with
 the current and wind you've charted.
 
+**Who's at war with whom** (`src/world/wars.ts`). A century of wars in one
+table: England against Spain and the Barbary corsairs; Spain against the
+Dutch and the French; the Dutch against Portugal; the Ottomans against
+Venice and Malta; the Barbary states against nearly everyone. For you,
+sailing for England, it decides what's fair game:
+
+| her flag | firing on her | taking her, or sacking the town |
+| --- | --- | --- |
+| at war with England (Spain, Barbary) | her nation −1 | her nation −1 more; England +1 (+2 for a town) |
+| at peace with England | her nation −1, England −1 | her nation −1 more, England −1 more |
+| English | piracy | piracy |
+
+A raid costs three times a ship: −3 to the town's nation when you go in,
+−2 more if you sack it.
+
 **Meeting a ship** (`src/world/meet.ts`), when you share a node with one
 outside a port. The world waits until you've dealt with it. If several are
 there, one that means you harm comes first, then the one that matters most
 by the bar's notability.
 
 - **She attacks you** if she's hostile: a guard ship or an armada of a
-  nation that wants you. The fight is on.
+  nation that wants you, or of one at war with England. The fight is on.
+  Enemy guard ships still only go out of their way to hunt you once their
+  nation wants you.
 - **Anyone else comes alongside, and attacking is your choice.** Let her
   pass and she goes her way, and won't come alongside again for 5 days.
   Fire on her and her nation remembers it, a point off your standing,
   however the fight goes, since you fired first; sinking her costs a point
   more.
+
+**Raiding a port.** In port, raid it instead of trading. The fight is the
+same game against the town's defences, from `src/setup.ts`:
+
+- **A town can't run**: no flee cards. Its people carry valuables inland
+  while you fight, so the longer the raid, the less there is to take.
+- **An open town** has a battery, musketry, barricades. **A fortified
+  port** has great guns and walls to mend, and is too much for a pinnace.
+- **If the raid goes on, help comes**: from the seventh round, the
+  garrison is reinforced, a card on top of the town's deck every round.
+- **A raiding party can fall back to the boats**: two extra flee cards in
+  your deck for a raid. They work when you're threatened, as always.
+- **Sacking it takes everything left in its treasury**, and the town has
+  nothing for anybody (no trade, no raid) for 120 days.
+- **The alarm**: the town's nation's guard ships hunt twice as far, 50 days
+  out, for the next 30 days.
+
+`npm run sim -- --target town --ship brigantine` measures a raid:
+
+| raiding with | open town | fortified port |
+| --- | --- | --- |
+| pinnace | sacked 63%, sunk 18% | never sacked, sunk 36% |
+| brigantine | sacked nearly always | sacked 45%, sunk 8% |
+| frigate | sacked nearly always | sacked 86%, sunk 0% |
+
+The relief was first a card that hurt *and* mended the walls, which made a
+town nearly impossible to sack; mending only from the barricades, and
+relief that only fires, is what gives the table its shape.
 
 **You sail for England, and attacking an English ship is piracy.**
 - England wants you, at least -3, and while you're a pirate that grudge
@@ -308,10 +356,12 @@ through the graph on every chart.
 buys rounds, hires crew and buys a bigger ship when it can spare the gold.
 At sea it chases the best rumor, sheers off from armadas and from guard
 ships that want it, fights by lookahead, runs when outgunned, and goes
-home with the score. It attacks foreign merchants and galleons on a sound
-hull, never an English ship, and lets the rest pass. Over 40 runs it **wins
-28%**, home around day 440; most of the rest sink (merchants 15, armadas
-6), and seven run out of time.
+home with the score. It attacks only enemies (Spanish and Barbary
+merchants and galleons) on a sound hull, lets the rest pass, and raids
+enemy towns, and fortified ports only from a brigantine up. Over 40 runs it
+**wins 33%**, home around day 460, after about eight raids a run. Most of
+the rest sink: 15 in about 260 raids, 11 to armadas, which attack on sight
+now that Spain is at war with you.
 
 Getting there took three changes:
 
@@ -374,6 +424,7 @@ src/
     bar.ts       buying rounds, and what the room tells you
     meet.ts      meeting a ship at sea, fighting it, settling up, repairs
     port.ts      hiring, the yard, bribes, and who will deal with you
+    wars.ts      who's at war with whom, and so what's fair game
     course.ts    setting a course and sailing it a day at a time
     world.ts     createWorld, advance, observe, hearRumor — pure, like rules.ts
 cli/
