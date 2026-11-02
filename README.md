@@ -29,6 +29,12 @@ and it's over.
   corsairs are fair game; anyone else's ships, the Crown hears of; an
   English ship makes you a pirate.
 - **Raiding a port**: in port, you can raid it instead of trading.
+- **Keep the crew in heart.** Morale runs out of ten. A long stretch with
+  no prize sours them, and at nothing it's mutiny. A prize, a round in the
+  bar, fresh water at an island and a good omen all put it up.
+- **Islanders** in Guam, Hawaii, Tahiti, Tonga, the Marquesas and Rapa Nui
+  trade water, fruit and timber, not drink or ships. Sometimes they put out
+  war canoes instead.
 
 Each run has a seed in the URL; `?seed=42` plays the same world again.
 
@@ -300,6 +306,36 @@ by the bar's notability.
   however the fight goes, since you fired first; sinking her costs a point
   more.
 
+**Events at sea** (`src/world/events.ts`), once a day while nobody is
+fighting:
+
+- **Morale** starts at 7 of 10. From 30 days after the last prize, the crew
+  lose a point every 10 days. At nothing it's **mutiny**: a hand of note is
+  hanged as a ringleader or deserts at the next landfall, taking his cards
+  out of your deck with him. With nobody of note aboard, the strongroom is
+  broken open and 30% of the gold goes. Afterwards morale is 4 and the
+  clock starts again.
+- **What puts it up**: a prize with a payout, +3 (+4 for a sacked town); the
+  first round bought in a port, +1; trading with islanders, +3; each day at
+  anchor off a charted island, +1; a good omen, +2.
+- **Good omens**, about one day in 45 at sea: birds over the bow, a spring on
+  an island, Saint Elmo's fire, porpoises under the bow.
+- **Storms**, about one day in 80 at sea. Three times as often in the
+  Antilles in autumn and in the Indian seas in the summer monsoon, and
+  twice as often past forty degrees. A storm costs 1 to 3 hull, never the
+  last point, or a fifth to two fifths of the gold, thrown over the side.
+- **Islanders**: Umatac on Guam (Spanish, the galleon's watering stop on
+  the way to Manila), and native harbours at Kealakekua, Matavai, Nuku'alofa,
+  Nuku Hiva and Rapa Nui. Native ports have no bar, yard or hands to hire,
+  but trade provisions, 3 gold for +3 morale and +2 hull, once a day. Coming
+  in, 30% of the time the canoes come out to fight instead (70% if you've
+  raided them). Beating them off costs you no standing; raiding their town
+  does.
+- **Sea monsters**: one in each named sea on the chart. A monster drifts
+  where the current takes it, turns for home once it's more than 12 days
+  out, and attacks whoever it meets. It's nobody's, so fighting it costs no
+  standing, and its bounty pays (ambergris, and a story for the bar).
+
 **Raiding a port.** In port, raid it instead of trading. The fight is the
 same game against the town's defences, from `src/setup.ts`:
 
@@ -490,6 +526,8 @@ src/
     meet.ts      meeting a ship at sea, fighting it, settling up, repairs
     port.ts      hiring, the yard, bribes, and who will deal with you
     wars.ts      who's at war with whom, and so what's fair game
+    events.ts    a day at sea: morale and mutiny, storms, omens
+    seas.ts      the named seas, where the chart letters them and the monsters keep
     course.ts    setting a course and sailing it a day at a time
     world.ts     createWorld, advance, observe, hearRumor — pure, like rules.ts
 cli/

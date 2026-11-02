@@ -9,8 +9,9 @@
   import { CASUS_BELLI, enemiesOf, isEnemy } from '../world/wars.ts';
   import { TARGETS } from '../setup.ts';
   import { SEASON_NAMES } from '../world/ocean.ts';
-  import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, isHaven, PARDON_COST, recruit, retire, serves } from '../world/port.ts';
-  import { adjective, article, nationName } from '../world/ports.ts';
+  import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, isHaven, PARDON_COST, PROVISION_CHEER, PROVISION_COST, PROVISION_HULL, provision, provisions, recruit, retire, serves } from '../world/port.ts';
+  import { IDLE_DAYS, MORALE_MAX } from '../world/events.ts';
+  import { adjective, article, nationName, sailName } from '../world/ports.ts';
   import { markerStrength, predict } from '../world/rumors.ts';
   import type { Sea } from '../world/ships.ts';
   import { atIsland, createSea, createWorld, GOAL, HOME, knowledge, pursuitOf, type WorldState } from '../world/world.ts';
@@ -100,9 +101,17 @@
       shown = world.encounter.fight;
       const m = world.encounter;
       const flagName = adjective(m.nation);
-      isRaid = m.port !== null;
+      isRaid = m.port !== null && m.kind !== 'canoes';
       nation = m.nation;
-      title = m.port !== null ? `the raid on ${sea!.map.nodes[m.port].port!.name}, ${flagName}` : `${article(flagName)} ${flagName} ${TARGETS[m.kind].name}`;
+      const place = m.port !== null ? sea!.map.nodes[m.port].port!.name : '';
+      title =
+        m.kind === 'canoes'
+          ? `war canoes off ${place}`
+          : m.kind === 'monster'
+            ? `the monster of the ${world.ships[m.shipId].routeName}`
+            : m.port !== null
+              ? `the raid on ${place}, ${flagName}`
+              : `${article(flagName)} ${flagName} ${TARGETS[m.kind].name}`;
       lastRound = [];
       reckoning = null;
     }
@@ -138,7 +147,7 @@
     try {
       const { world: w, heard } = buyRound(sea, world);
       world = w;
-      said = heard ? `somebody saw a ${adjective(heard.nation)} ${heard.kind.replace('-', ' ')}, ${ago(world.turn - heard.turn)}` : 'nobody knows anything worth the drink';
+      said = heard ? `somebody saw ${sailName(heard.kind, heard.nation)}, ${ago(world.turn - heard.turn)}` : 'nobody knows anything worth the drink';
       if (heard) focus = heard.id;
     } catch (e) {
       said = (e as Error).message;
@@ -218,6 +227,8 @@
         <section>
           <h2>{nodeName(world.player)}</h2>
           <Gauge label="hull" value={world.hull} max={world.maxHull} />
+          <Gauge label="morale" value={world.morale} max={MORALE_MAX} />
+          {#if world.morale <= 2}<p class="wanted">the crew are close to mutiny. a prize, a round ashore or fresh water would steady them.</p>{:else if world.turn - world.lastSpoils >= IDLE_DAYS}<p class="faint">{world.turn - world.lastSpoils} days since the last prize: the crew are souring.</p>{/if}
           <p>a {SHIP_CLASSES[world.outfit.ship].name}, {world.outfit.crew.length ? world.outfit.crew.map((c) => CREW[c].name).join(', ') : 'no hands of note'}</p>
           <p class="faint">sight {world.sight} · {world.outfit.upgrades.length ? world.outfit.upgrades.map((u) => UPGRADES[u].name).join(', ') : 'no refits'}</p>
           {#if atIsland(world)}<p>at anchor off an uncharted isle: taking on water, mending the hull.</p>{/if}
@@ -245,7 +256,15 @@
               <p>a pirate's haven: they'll deal with you here, whoever wants you, and you can retire here when you're rich.</p>
               <button onclick={() => attempt(() => retire(sea!, world!))} disabled={world.gold < GOAL}>retire here ({world.gold} of {GOAL})</button>
             {/if}
-            {#if world.pirate && port.nation === YOUR_NATION && !isHaven(sea, world)}
+            {#if port.nation === 'native'}
+              <p>islanders: no bar, no yard, no hands to hire, but water, fruit and timber in trade, for the crew and the ship.</p>
+              {#if (world.standing.native ?? 0) < 0}
+                <p class="wanted">they remember what you did here, and won't trade.</p>
+                <button onclick={() => attempt(() => bribe(sea!, world!), 'gifts accepted')}>make them gifts ({bribeCost(world, 'native')})</button>
+              {:else}
+                <button onclick={() => attempt(() => provision(sea!, world!))} disabled={!provisions(sea, world)}>trade for provisions ({PROVISION_COST}): morale +{PROVISION_CHEER}, hull +{PROVISION_HULL}</button>
+              {/if}
+            {:else if world.pirate && port.nation === YOUR_NATION && !isHaven(sea, world)}
               <p>they know you for a pirate here.</p>
               <button onclick={() => attempt(() => buyPardon(sea!, world!), 'pardoned, at a price')}>buy a royal pardon ({PARDON_COST})</button>
             {:else if !serves(sea, world)}
@@ -300,7 +319,7 @@
             {#each [...world.rumors].reverse() as r (r.id)}
               <li>
                 <button class:focused={focus === r.id} onclick={() => (focus = focus === r.id ? null : r.id)}>
-                  <Flag nation={r.nation} />{article(adjective(r.nation))} {adjective(r.nation)} {r.kind.replace('-', ' ')}, {ago(world.turn - r.turn)}
+                  <Flag nation={r.nation} />{sailName(r.kind, r.nation)}, {ago(world.turn - r.turn)}
                   <span class="faint">· {Math.round(markerStrength(r, world.turn) * 100)}%</span>
                 </button>
               </li>

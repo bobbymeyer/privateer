@@ -4,7 +4,7 @@
   import { COLORS } from '../world/colors.ts';
   import { adjective, type Nation } from '../world/ports.ts';
   import { markerStrength } from '../world/rumors.ts';
-  import { ROSES, SEA_NAMES, SHIP, TOWER, TOWN, fade, rhumbs, windRose } from './woodcut.ts';
+  import { ROSES, SEA_NAMES, SERPENT, SHIP, TOWER, TOWN, fade, rhumbs, windRose } from './woodcut.ts';
   import type { Sea } from '../world/ships.ts';
   import type { WorldState } from '../world/world.ts';
 
@@ -301,6 +301,16 @@
       {@const n = map.nodes[s.node]}
       {@const warship = s.kind === 'hunter' || s.kind === 'armada'}
       {@const c = COLORS[s.nation]}
+      {#if s.kind === 'monster'}
+      <!-- A monster: coils in the water, drawn in ink, on its own ground of paper. -->
+      <g transform={glyph(n.lon, n.lat, 1.3)} stroke-linejoin="round" stroke-linecap="round">
+        <title>the monster of the {s.routeName}</title>
+        <path d={SERPENT.coils} fill="none" stroke="var(--ink)" stroke-width="2.2" />
+        <path d={SERPENT.head} fill="var(--ink)" stroke="var(--ink)" stroke-width="0.8" />
+        <path d={SERPENT.eye} stroke="var(--paper)" stroke-width="1.4" />
+        <path d={SERPENT.waves} fill="none" stroke="var(--water)" stroke-width="0.9" />
+      </g>
+      {:else}
       <!-- A ship under sail: her flag's field on the sails and pennant, its border on the hull. Warships larger. -->
       <g transform={glyph(n.lon, n.lat, warship ? 1.4 : 1)} stroke-linejoin="round">
         <title>{adjective(s.nation)} {s.kind === 'hunter' ? 'guard ship' : s.kind.replace('-', ' ')}</title>
@@ -309,6 +319,7 @@
         <path d={SHIP.pennant} fill={c.border} stroke="var(--sepia)" stroke-width="0.5" />
         <path d={SHIP.hull} fill={c.border} stroke="var(--sepia)" stroke-width="1" />
       </g>
+      {/if}
     {/each}
 
     <!-- You. -->

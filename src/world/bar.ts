@@ -12,6 +12,7 @@
  *   when it does. The room turns over overnight.
  */
 
+import { MORALE_MAX } from './events.ts';
 import { type NodeId, portNamed } from './map.ts';
 import { type Roller, roll, weighted } from './random.ts';
 import { serves } from './port.ts';
@@ -30,6 +31,7 @@ export const NOTABLE: Record<ShipKind, number> = {
   armada: 3,
   hunter: 2,
   privateer: 2,
+  monster: 3,
   merchant: 1,
 };
 
@@ -45,7 +47,8 @@ export function buyRound(sea: Sea, s: WorldState): Round {
   if (s.gold < ROUND_COST) throw new Error('not enough in the purse for a round');
   if (!serves(sea, s)) throw new Error("the house won't serve you");
   const r: Roller = { rng: s.rng };
-  const paid: WorldState = { ...s, gold: s.gold - ROUND_COST, rounds: s.rounds + 1 };
+  // A round for the house does the crew's spirits good, the first one anyway.
+  const paid: WorldState = { ...s, gold: s.gold - ROUND_COST, rounds: s.rounds + 1, morale: s.rounds === 0 ? Math.min(MORALE_MAX, s.morale + 1) : s.morale };
 
   // Anybody here know anything?
   if (roll(r) >= 0.85 * 0.8 ** s.rounds) return { world: { ...paid, rng: r.rng }, heard: null };

@@ -25,6 +25,7 @@ export type Nation =
   | 'mughal'
   | 'china'
   | 'japan'
+  | 'native'
   | 'local';
 
 export interface PortDef {
@@ -158,6 +159,13 @@ export const PORTS: PortDef[] = [
   p('Guayaquil', -79.9, -2.2, 'spain'),
   p('Panama', -79.53, 8.98, 'spain', true),
   p('Acapulco', -99.91, 16.85, 'spain', true),
+  // The Pacific islands: water, food and timber — or war canoes.
+  p('Umatac', 144.66, 13.29, 'spain'),
+  p('Kealakekua', -155.93, 19.48, 'native'),
+  p('Matavai', -149.48, -17.5, 'native'),
+  p('Nuku’alofa', -175.2, -21.13, 'native'),
+  p('Nuku Hiva', -140.1, -8.91, 'native'),
+  p('Rapa Nui', -109.43, -27.15, 'native'),
 ];
 
 /** How far a nation's protected waters reach from each of its forts, in days. */
@@ -181,7 +189,7 @@ const ADJECTIVES: Record<Nation, string> = {
   spain: 'Spanish', portugal: 'Portuguese', england: 'English', france: 'French', netherlands: 'Dutch',
   denmark: 'Danish', sweden: 'Swedish', hanse: 'Hanseatic', italy: 'Italian', venice: 'Venetian',
   malta: 'Maltese', ottoman: 'Ottoman', barbary: 'Barbary', morocco: 'Moroccan', persia: 'Persian',
-  oman: 'Omani', mughal: 'Mughal', china: 'Chinese', japan: 'Japanese', local: 'local',
+  oman: 'Omani', mughal: 'Mughal', china: 'Chinese', japan: 'Japanese', native: 'islanders’', local: 'local',
 };
 /** `Spanish`, `Dutch`: for saying whose a ship is. */
 export const adjective = (n: Nation) => ADJECTIVES[n];
@@ -193,7 +201,14 @@ const NAMES: Record<Nation, string> = {
   spain: 'Spain', portugal: 'Portugal', england: 'England', france: 'France', netherlands: 'the Dutch Republic',
   denmark: 'Denmark', sweden: 'Sweden', hanse: 'the Hanse', italy: 'the Italian states', venice: 'Venice',
   malta: 'the Knights of Malta', ottoman: 'the Ottomans', barbary: 'the Barbary corsairs', morocco: 'Morocco',
-  persia: 'Persia', oman: 'Oman', mughal: 'the Mughals', china: 'China', japan: 'Japan', local: 'the independent harbours',
+  persia: 'Persia', oman: 'Oman', mughal: 'the Mughals', china: 'China', japan: 'Japan', native: 'the islanders', local: 'the independent harbours',
 };
 /** `Spain`, `the Dutch Republic`: a nation by name, for the news. */
 export const nationName = (n: Nation) => NAMES[n];
+
+/** What to call a ship you've seen or heard of, with its article: `a Dutch merchant`, `an English guard ship`, `a sea monster`. */
+export function sailName(kind: string, nation: Nation): string {
+  if (kind === 'monster') return 'a sea monster';
+  const flag = adjective(nation);
+  return `${article(flag)} ${flag} ${kind === 'hunter' ? 'guard ship' : kind.replace('-', ' ')}`;
+}

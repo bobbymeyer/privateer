@@ -6,6 +6,7 @@
  * built once by `createSea` and passed alongside rather than copied each turn.
  */
 
+import { SEA_NAMES } from './seas.ts';
 import type { RngState } from '../rng.ts';
 import { buildMap, type NodeId, portNamed, ports } from './map.ts';
 import { type Nation, PORTS, adjective, navyOf } from './ports.ts';
@@ -15,7 +16,8 @@ import { type FleetEntry, type Pursuit, type Sea, type Ship, type Standing, mayE
 import { type War, drift, isEnemy, openingWars } from './wars.ts';
 import { type Roller, roll } from './random.ts';
 import { type Outfit, START_OUTFIT, maxHullOf } from '../outfit.ts';
-import { type Hail, type Meeting, REFIT_DAYS, type Reckoning, YOUR_NATION, meeting } from './meet.ts';
+import { type Hail, type Meeting, REFIT_DAYS, type Reckoning, YOUR_NATION, landfall, meeting } from './meet.ts';
+import { MORALE_START, aDay } from './events.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -66,6 +68,10 @@ export interface WorldState {
   wars: War[];
   /** How close your attacks on a nation at peace with England have brought the two to war. At CASUS_BELLI, it's war. */
   tension: Partial<Record<Nation, number>>;
+  /** The crew's patience, out of ten. At nothing, mutiny. See events.ts. */
+  morale: number;
+  /** The day the last prize was taken: the crew count from it. */
+  lastSpoils: number;
   /** What happened that you'd hear about: navies driving off intruders, and the like. */
   log: { turn: number; text: string }[];
 }
@@ -116,7 +122,7 @@ export const PRIVATEER_PORTS = ['Dunkirk', 'Saint-Malo', 'Tortuga', 'Amsterdam',
 
 /** A merchant out of every port, a guard ship at every station, and the great courses. */
 export const DEFAULT_FLEET: FleetEntry[] = [
-  ...PORTS.map((p): FleetEntry => ({ kind: 'merchant', home: p.name })),
+  ...PORTS.filter((p) => p.nation !== 'native').map((p): FleetEntry => ({ kind: 'merchant', home: p.name })),
   ...HUNTER_STATIONS.map((home): FleetEntry => ({ kind: 'hunter', home })),
   ...PRIVATEER_PORTS.map((home): FleetEntry => ({ kind: 'privateer', home })),
   { kind: 'treasure-fleet', route: 'flota' },
@@ -127,6 +133,7 @@ export const DEFAULT_FLEET: FleetEntry[] = [
   { kind: 'treasure-ship', route: 'retourvloot' },
   { kind: 'armada', route: 'barlovento' },
   { kind: 'armada', route: 'mar océano' },
+  ...SEA_NAMES.map((sea): FleetEntry => ({ kind: 'monster', at: sea.at, sea: sea.name })),
 ];
 
 let built: Sea | null = null;
@@ -197,6 +204,8 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     alarm: {},
     wars,
     tension: {},
+    morale: MORALE_START,
+    lastSpoils: 0,
   };
 }
 
@@ -251,7 +260,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     for (const text of d.news) log.push({ turn, text });
   }
 
-  const next: WorldState = {
+  let next: WorldState = {
     ...s,
     rng: r.rng,
     turn,
@@ -270,10 +279,12 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     tension,
     wars,
   };
+  next = aDay(sea, next);
   // Home with a score — and no noose waiting.
   if (sea.map.nodes[to].port?.name === HOME && gold >= GOAL && !s.pirate) {
     return { ...next, won: true, ending: 'home', log: [...log, { turn, text: `home to London with ${gold}: the run is won` }] };
   }
+  if (to !== s.player) next = landfall(sea, next);
   return meeting(sea, next);
 }
 

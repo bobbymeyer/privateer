@@ -226,3 +226,21 @@ export const PRIVATEER_CARDS: readonly CardDef[] = [
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 1 },
   { key: 'strike', name: 'strike colours', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.8 }], copies: 1 },
 ];
+
+/** The islanders' war canoes, when they come out to fight instead of trade. */
+export const CANOE_CARDS: readonly CardDef[] = [
+  { key: 'spears', name: 'a shower of spears', text: 'hurt 1', effects: [{ kind: 'hurt', amount: 1 }], copies: 4 },
+  { key: 'canoes-close', name: 'the war canoes close', text: 'hurt 1, hold 1', effects: [{ kind: 'hurt', amount: 1 }, { kind: 'hold', amount: 1 }], copies: 3 },
+  { key: 'boarders', name: 'boarders from the canoes', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 2 },
+  { key: 'to-the-beach', name: 'they fall back to the beach', text: 'flee 2', effects: [{ kind: 'flee', amount: 2 }], copies: 2 },
+  { key: 'gifts', name: 'gifts, after all', text: 'plunder 2', effects: [{ kind: 'plunder', amount: 2 }], copies: 1 },
+];
+
+/** A sea monster: it grips, it rams, it sounds and comes up again. */
+export const MONSTER_CARDS: readonly CardDef[] = [
+  { key: 'arms', name: 'arms about the hull', text: 'hurt 2, hold 2', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'hold', amount: 2 }], copies: 3 },
+  { key: 'rams', name: 'it rams the hull', text: 'hurt 3, leak', effects: [{ kind: 'hurt', amount: 3 }, { kind: 'wound', what: 'leak' }], copies: 2 },
+  { key: 'thrashing', name: 'thrashing', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 3 },
+  { key: 'sounds', name: 'it sounds', text: 'flee 2', effects: [{ kind: 'flee', amount: 2 }], copies: 2 },
+  { key: 'surfaces', name: 'it surfaces again', text: 'recall 2', effects: [{ kind: 'recall', amount: 2 }], copies: 1 },
+];

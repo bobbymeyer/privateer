@@ -31,6 +31,7 @@ import { NOTABLE, sighting } from './bar.ts';
 import type { NodeId } from './map.ts';
 import { type Roller, roll } from './random.ts';
 import { serves } from './port.ts';
+import { PRIZE_CHEER, SACK_CHEER, spoils } from './events.ts';
 import { makeRumor } from './rumors.ts';
 import { adjective, article, type Nation, nationName } from './ports.ts';
 import { type Sea, type ShipKind, wantedBy } from './ships.ts';
@@ -91,7 +92,8 @@ export interface Reckoning {
  * nation that wants you, or that's at war with England.
  */
 export const hostile = (s: WorldState, ship: { kind: ShipKind; nation: Nation }) =>
-  (ship.kind === 'hunter' || ship.kind === 'armada' || ship.kind === 'privateer') && (wantedBy(s.standing, ship.nation) || isEnemy(s.wars, ship.nation));
+  ship.kind === 'monster' ||
+  ((ship.kind === 'hunter' || ship.kind === 'armada' || ship.kind === 'privateer') && (wantedBy(s.standing, ship.nation) || isEnemy(s.wars, ship.nation)));
 
 /** After a move: a ship here to fight, or to hail? Called by `advance`. */
 export function meeting(sea: Sea, s: WorldState): WorldState {
@@ -103,6 +105,21 @@ export function meeting(sea: Sea, s: WorldState): WorldState {
   const other = here[0];
   if (!hostile(s, other)) return { ...s, hail: { shipId: other.id, kind: other.kind, nation: other.nation } };
   return startFight(s, { shipId: other.id, port: null, kind: other.kind, nation: other.nation }, true);
+}
+
+/** Islanders who meet a ship with war canoes, as often as not, rather than with fruit: likelier still if you've given them cause. */
+export const CANOE_CHANCE = 0.3;
+export const CANOE_CHANCE_WANTED = 0.7;
+
+/** Coming into an island harbour: the canoes come out, to trade or to fight. Called by `advance` on arrival. */
+export function landfall(sea: Sea, s: WorldState): WorldState {
+  const port = sea.map.nodes[s.player].port;
+  if (!port || port.nation !== 'native' || s.encounter || s.hail || s.sunk) return s;
+  const r: Roller = { rng: s.rng };
+  const chance = wantedBy(s.standing, 'native') ? CANOE_CHANCE_WANTED : CANOE_CHANCE;
+  if (roll(r) >= chance) return { ...s, rng: r.rng };
+  const w = { ...s, rng: r.rng, log: [...s.log, { turn: s.turn, text: `war canoes put out from ${port.name}` }] };
+  return startFight(w, { shipId: -1, port: s.player, kind: 'canoes', nation: 'native' }, true);
 }
 
 function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean): WorldState {
@@ -127,7 +144,7 @@ function reckon(s: WorldState, nation: Nation, theirs: number, crown: { enemy: n
     pirate = true;
   } else if (isEnemy(s.wars, nation)) {
     if (crown.enemy && !s.pirate) standing[YOUR_NATION] = (standing[YOUR_NATION] ?? 0) + crown.enemy;
-  } else if (nation !== 'local') {
+  } else if (nation !== 'local' && nation !== 'native') {
     if (crown.neutral) {
       standing[YOUR_NATION] = Math.min(s.pirate ? PIRACY_FLOOR : Infinity, (standing[YOUR_NATION] ?? 0) - crown.neutral);
       log.push({ turn: s.turn, text: `${what(adjective(nation))}, at peace with England: the Crown will hear of it` });
@@ -207,10 +224,14 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   const hurtHer = taken || f.plunder > 0 || f.target.hull < f.target.maxHull;
   const attacked = !m.forced || hurtHer;
   const what = (flag: string) => (m.port !== null ? `you sacked ${sea.map.nodes[m.port].port!.name}, ${flag}` : `you took ${article(flag)} ${flag} ${m.kind.replace('-', ' ')}`);
-  if (m.forced && hurtHer) w = reckon(w, m.nation, taken ? 2 : 1, { enemy: taken ? 1 : 0, neutral: 1 }, what);
+  if (m.kind === 'monster' || m.kind === 'canoes') {
+    // A monster is nobody's; and islanders who came out to fight you bear no grudge for being beaten off.
+  } else if (m.forced && hurtHer) w = reckon(w, m.nation, taken ? 2 : 1, { enemy: taken ? 1 : 0, neutral: 1 }, what);
   else if (!m.forced && taken) w = reckon(w, m.nation, m.port !== null ? 2 : 1, { enemy: m.port !== null ? 2 : 1, neutral: 1 }, what, m.port !== null ? 2 : 1);
 
-  if (m.port !== null) {
+  if (m.kind === 'canoes') {
+    if (taken) w = { ...w, log: [...w.log, { turn: s.turn, text: `the canoes at ${sea.map.nodes[m.port!].port!.name} beaten off` }] };
+  } else if (m.port !== null) {
     if (taken) {
       w = { ...w, sacked: { ...w.sacked, [m.port]: s.turn + SACK_DAYS } };
       w = { ...w, log: [...w.log, { turn: s.turn, text: `${sea.map.nodes[m.port].port!.name} is sacked` }] };
@@ -227,6 +248,7 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     };
   }
 
+  if (f.payout > 0 && outcome !== 'sunk') w = spoils(w, m.port !== null && taken && m.kind !== 'canoes' ? SACK_CHEER : PRIZE_CHEER);
   return {
     ...w,
     gold: s.gold + f.payout,

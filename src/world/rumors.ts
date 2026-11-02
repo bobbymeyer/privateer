@@ -100,6 +100,10 @@ export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge,
   if (hunter) {
     goals = [huntGoal];
     after = () => [0];
+  } else if (rumor.kind === 'monster') {
+    // Mostly where the current takes it, and drawn back to its own sea.
+    goals = [rumor.home];
+    after = () => [0];
   } else if (rumor.route) {
     goals = rumor.route;
     after = (i) => [(i + 1) % goals.length];
@@ -113,7 +117,7 @@ export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge,
     const next = goals.map((g) => tradingPorts(map, g).map((q) => index.get(q)).filter((j): j is number => j !== undefined));
     after = (i) => next[i];
   }
-  const firstPorts = new Set(hunter || rumor.route ? goals : tradingPorts(map, rumor.reported));
+  const firstPorts = new Set(hunter || rumor.route || rumor.kind === 'monster' ? goals : tradingPorts(map, rumor.reported));
   const startWeight = (i: number) => (firstPorts.has(goals[i]) ? 1 : 0);
   const startTotal = goals.reduce((t, _, i) => t + startWeight(i), 0);
 

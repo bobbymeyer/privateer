@@ -9,6 +9,7 @@ import { adjective, type Nation } from './ports.ts';
 import { YOUR_NATION } from './meet.ts';
 import { type Sea, wantedBy } from './ships.ts';
 import { GOAL, type WorldState } from './world.ts';
+import { MORALE_MAX } from './events.ts';
 
 /** Gold per point of standing raised, times how far below zero you are. */
 export const BRIBE_COST = 10;
@@ -33,8 +34,40 @@ export const serves = (sea: Sea, s: WorldState): boolean => {
   if ((s.sacked[s.player] ?? -1) > s.turn) return false;
   if (isHaven(sea, s)) return true;
   if (s.pirate && port.nation === YOUR_NATION) return false;
+  // Islanders trade, but in kind: no bar, no hands to hire, no yard.
+  if (port.nation === 'native') return false;
   return port.nation === 'local' || !wantedBy(s.standing, port.nation);
 };
+
+/** What water, fruit and fresh meat cost from islanders, in trade goods. */
+export const PROVISION_COST = 3;
+/** And what they do for the crew, and for the ship. */
+export const PROVISION_CHEER = 3;
+export const PROVISION_HULL = 2;
+
+/** Whether the islanders here will trade with you today. */
+export const provisions = (sea: Sea, s: WorldState) =>
+  sea.map.nodes[s.player].port?.nation === 'native' && !wantedBy(s.standing, 'native') && s.rounds === 0 && !s.encounter;
+
+/**
+ * Trade with islanders for water, fruit and fresh meat, and timber for the
+ * ship: the crew's spirits up, a little hull mended. Once a day — a day's
+ * trading is counted, like a night in the bar, in `rounds`.
+ */
+export function provision(sea: Sea, s: WorldState): WorldState {
+  const port = portHere(sea, s);
+  if (port.nation !== 'native') throw new Error('provisions are traded for with islanders');
+  if (wantedBy(s.standing, 'native')) throw new Error(`the ${port.name} islanders won't trade with you`);
+  if (s.rounds > 0) throw new Error("you've traded here today");
+  const paid = pay(s, PROVISION_COST);
+  return {
+    ...paid,
+    rounds: s.rounds + 1,
+    morale: Math.min(MORALE_MAX, s.morale + PROVISION_CHEER),
+    hull: Math.min(s.maxHull, s.hull + PROVISION_HULL),
+    log: [...s.log, { turn: s.turn, text: `water, fruit and timber from the islanders at ${port.name}` }],
+  };
+}
 
 /** A royal pardon for piracy: bought in an English port, and dear. */
 export const PARDON_COST = 80;
@@ -65,7 +98,7 @@ const pay = (s: WorldState, cost: number): WorldState => {
 };
 
 /** The outfit changed: hull and sight follow it. A bigger ship comes with its hull whole; damage stays with the old one. */
-function refit(s: WorldState, outfit: Outfit, freshHull = false): WorldState {
+export function refit(s: WorldState, outfit: Outfit, freshHull = false): WorldState {
   const maxHull = maxHullOf(outfit);
   const hull = freshHull ? maxHull : Math.min(maxHull, s.hull + (maxHull - s.maxHull));
   return { ...s, outfit, maxHull, hull, sight: sightOf(outfit) };

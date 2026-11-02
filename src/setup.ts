@@ -3,7 +3,7 @@
  * hull, what's in its hold, and the price on its head.
  */
 
-import { ARMADA_CARDS, type Card, type CardDef, FORTRESS_CARDS, HUNTER_CARDS, MERCHANT_CARDS, PRIVATEER_CARDS, RAID_CARDS, RELIEF, SHIP_CARDS, TOWN_CARDS, TREASURE_FLEET_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
+import { ARMADA_CARDS, type Card, type CardDef, CANOE_CARDS, FORTRESS_CARDS, HUNTER_CARDS, MERCHANT_CARDS, MONSTER_CARDS, PRIVATEER_CARDS, RAID_CARDS, RELIEF, SHIP_CARDS, TOWN_CARDS, TREASURE_FLEET_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
 import { type EncounterState, type Reinforcement, createEncounter } from './rules.ts';
 import type { ShipKind } from './world/ships.ts';
 
@@ -22,7 +22,7 @@ export interface TargetDef {
 }
 
 /** What you can fight: a ship of any kind, or a port — open or fortified. */
-export type TargetKind = ShipKind | 'town' | 'fortress';
+export type TargetKind = ShipKind | 'town' | 'fortress' | 'canoes';
 
 /** A raid that runs past the sixth round brings the garrison's relief: a card every other round, four in all. */
 export const RELIEF_FROM = 7;
@@ -31,6 +31,8 @@ export const RELIEF_COUNT = 4;
 
 export const TARGETS: Record<TargetKind, TargetDef> = {
   merchant: { name: 'merchant', hull: 12, cargo: 12, bounty: 4, cards: MERCHANT_CARDS },
+  monster: { name: 'sea monster', hull: 18, cargo: 0, bounty: 25, cards: MONSTER_CARDS },
+  canoes: { name: 'war canoes', hull: 10, cargo: 4, bounty: 0, cards: CANOE_CARDS },
   privateer: { name: 'privateer', hull: 12, cargo: 8, bounty: 6, cards: PRIVATEER_CARDS },
   hunter: { name: 'guard ship', hull: 14, cargo: 3, bounty: 10, cards: HUNTER_CARDS },
   'treasure-ship': { name: 'galleon', hull: 13, cargo: 30, bounty: 6, cards: TREASURE_SHIP_CARDS },
