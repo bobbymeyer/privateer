@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Card } from '../cards.ts';
+  import { explainCard } from '../describe.ts';
 
   let { card, order, disabled = false, onpick }: {
     card: Card;
@@ -17,7 +18,7 @@
   const copy = $derived(card.damage || card.id.startsWith('reinforce') ? null : (card.id.split('#')[1] ?? null));
 </script>
 
-<button class="card" class:theirs={card.side === 'target'} class:damage={card.damage} class:picked={order !== null} {disabled} onclick={onpick} aria-pressed={order !== null}>
+<button class="card" class:theirs={card.side === 'target'} class:damage={card.damage} class:picked={order !== null} {disabled} onclick={onpick} aria-pressed={order !== null} title={explainCard(card.text)}>
   <span class="side">{card.damage ? (card.side === 'ship' ? 'a wound to you' : 'a wound to them') : card.side === 'ship' ? 'yours' : 'theirs'}</span>
   <span class="name">{card.name}{#if copy}<span class="copy"> #{copy}</span>{/if}</span>
   <span class="text">{card.text}</span>

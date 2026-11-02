@@ -73,7 +73,14 @@ export interface WorldState {
   /** The day the last prize was taken: the crew count from it. */
   lastSpoils: number;
   /** What happened that you'd hear about: navies driving off intruders, and the like. */
-  log: { turn: number; text: string }[];
+  log: LogEntry[];
+}
+
+/** A line of news. `stop`: worth heaving to for, when you're under sail — a storm, a mutiny, a war. */
+export interface LogEntry {
+  turn: number;
+  text: string;
+  stop?: boolean;
 }
 
 /** Days of each ship's wake that are remembered. */
@@ -257,7 +264,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   if (turn % sea.pattern.seasonLength === 0) {
     const d = drift(s.wars, r);
     wars = d.wars;
-    for (const text of d.news) log.push({ turn, text });
+    for (const text of d.news) log.push({ turn, text, stop: true });
   }
 
   let next: WorldState = {

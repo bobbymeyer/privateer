@@ -60,3 +60,26 @@ export function describeEvent(e: GameEvent): string | null {
     case 'dealt': return null;
   }
 }
+
+/** What each word on a card means, in a line: for the card's tooltip and the fight sheet's glossary. */
+export const GLOSSARY: { word: string; means: string }[] = [
+  { word: 'hit', means: 'shot into her: that much off her hull' },
+  { word: 'hurt', means: 'shot into you: that much off your hull, less any brace' },
+  { word: 'leak, fire', means: 'a wound left on top of the deck: keep it to deal with it, at its cost in hull (leak 2, fire 3), or send it under and face it later' },
+  { word: 'sails', means: 'sails shot away: no flee card works for that side until the wound is dealt with' },
+  { word: 'plunder', means: 'that much from her hold into yours; kept even if you run' },
+  { word: 'brace', means: 'soaks up the next hurt' },
+  { word: 'repair, mend', means: 'hull back: repair is yours, mend is hers' },
+  { word: 'jettison', means: 'she throws cargo over the side to lighten ship' },
+  { word: 'flee', means: 'makes way; three way and that side is away' },
+  { word: 'chase, hold', means: "take way off the other side: run her down, or grapple her" },
+  { word: 'recall', means: 'that many of the side’s spent cards back under the deck' },
+  { word: 'interrogate', means: 'prisoners will talk: a rumor, if you come through the fight' },
+];
+
+/** The glossary lines a card's text uses, for its tooltip. */
+export function explainCard(text: string): string {
+  return GLOSSARY.filter((g) => g.word.split(', ').some((w) => new RegExp(`\\b${w}\\b`).test(text)))
+    .map((g) => `${g.word}: ${g.means}`)
+    .join('\n');
+}

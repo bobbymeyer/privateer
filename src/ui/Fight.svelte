@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { describeEvent, OUTCOME_TEXT, RAID_OUTCOME_TEXT } from '../describe.ts';
+  import { describeEvent, GLOSSARY, OUTCOME_TEXT, RAID_OUTCOME_TEXT } from '../describe.ts';
   import { ESCAPE, threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
   import type { Reckoning } from '../world/meet.ts';
   import { adjective, type Nation } from '../world/ports.ts';
@@ -66,7 +66,7 @@
 <svelte:window {onkeydown} />
 
 {#snippet state(isThreatened: boolean, way: number)}
-  {`way ${way} of ${ESCAPE}` + (isThreatened ? ' · threatened: runs harder, a flee card counts one more' : '')}
+  {`way ${way} of ${ESCAPE}` + (isThreatened ? ' · threatened: hard pressed, and likely to run' : '')}
 {/snippet}
 
 <section class="fight" aria-label="encounter">
@@ -129,6 +129,12 @@
       </ul>
     </div>
   {/if}
+  <details class="glossary">
+    <summary>what the cards say</summary>
+    <dl>
+      {#each GLOSSARY as g}<dt>{g.word}</dt><dd>{g.means}</dd>{/each}
+    </dl>
+  </details>
   <p class="keys">{fight.outcome ? 'enter to go on' : '1 2 3 pick · enter resolve'}</p>
 </section>
 
@@ -148,6 +154,11 @@
   .log li.played { color: var(--ink); margin-top: 0.4rem; }
   .log li.effect { padding-left: 1rem; }
   .log li.rejected { font-style: italic; }
+  .glossary { color: var(--faint); font-size: 0.85rem; }
+  .glossary summary { cursor: pointer; }
+  .glossary dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0.5rem 0 0; }
+  .glossary dt { color: var(--ink); }
+  .glossary dd { margin: 0; }
   .keys { font-size: 0.8rem; border-top: 1px dashed var(--rule); padding-top: 0.75rem; }
   @media (max-width: 34rem) {
     .ships, .hand { grid-template-columns: 1fr; }

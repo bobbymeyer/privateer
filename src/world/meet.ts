@@ -152,7 +152,7 @@ function reckon(s: WorldState, nation: Nation, theirs: number, crown: { enemy: n
     // Strain on the peace. Enough of it and England is at war with them.
     const t = (s.tension[nation] ?? 0) + strain;
     if (t >= CASUS_BELLI) {
-      log.push({ turn: s.turn, text: `England and ${nationName(nation)} are at war: your attacks have seen to it` });
+      log.push({ turn: s.turn, text: `England and ${nationName(nation)} are at war: your attacks have seen to it`, stop: true });
       return { ...s, standing, pirate, log, tension: { ...s.tension, [nation]: 0 }, wars: declare(s.wars, YOUR_NATION, nation) };
     }
     return { ...s, standing, pirate, log, tension: { ...s.tension, [nation]: t } };

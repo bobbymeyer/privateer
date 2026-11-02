@@ -132,3 +132,23 @@ test('a monster keeps each sea, attacks whoever it meets, and wanders with the c
   assert.equal(met.encounter?.kind, 'monster');
   assert.ok(met.encounter?.forced);
 });
+
+test('under sail, a storm or a mutiny brings you to; a fair day does not', async () => {
+  const { sailToward } = await import('./course.ts');
+  const far = at('Cape Town');
+  let halts = 0;
+  for (let seed = 0; seed < 6 && halts < 2; seed++) {
+    let w = quiet({ ...createWorld(sea, seed), player: at('Plymouth') });
+    for (let day = 0; day < 200 && w.player !== far; day++) {
+      const before = w;
+      const out = sailToward(sea, w, far);
+      w = out.world;
+      const fresh = w.log.slice(before.log.length);
+      if (out.halt === 'news') {
+        halts++;
+        assert.ok(fresh.some((l) => l.stop));
+      } else if (out.halt === null) assert.ok(!fresh.some((l) => l.stop), 'news worth stopping for, and she sailed on');
+    }
+  }
+  assert.ok(halts >= 1);
+});

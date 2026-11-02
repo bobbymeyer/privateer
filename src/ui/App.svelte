@@ -21,21 +21,57 @@
   import type { Nation } from '../world/ports.ts';
   import Gauge from './Gauge.svelte';
   import SeaChart from './SeaChart.svelte';
+  import { forget, load, store } from '../save.ts';
 
-  function seedFromUrl(): number {
+  function seedFromUrl(): number | null {
     const raw = new URLSearchParams(location.search).get('seed');
     const n = raw === null ? NaN : Number(raw);
-    return Number.isInteger(n) ? n : Math.floor(Math.random() * 2 ** 31);
+    return Number.isInteger(n) ? n : null;
   }
+
+  // A run in progress is picked up where it was left, unless the address
+  // asks for a different seed.
+  const asked = seedFromUrl();
+  const saved = load();
+  const resuming = saved && (asked === null || asked === saved.seed) ? saved : null;
 
   // Building the sea takes a moment; let the page paint first.
   let sea: Sea | null = $state.raw(null);
-  let seed = $state(seedFromUrl());
+  let seed = $state(resuming?.seed ?? asked ?? Math.floor(Math.random() * 2 ** 31));
   let world: WorldState | null = $state.raw(null);
   setTimeout(() => {
     sea = createSea();
-    world = createWorld(sea, seed);
+    world = resuming?.world ?? createWorld(sea, seed);
   }, 30);
+
+  // How to play: shown on a first visit, and from the header after.
+  const INTRO_KEY = 'privateer:intro-seen';
+  let intro = $state(!resuming && !seenIntro());
+  function seenIntro() {
+    try {
+      return localStorage.getItem(INTRO_KEY) !== null;
+    } catch {
+      return false;
+    }
+  }
+  function closeIntro() {
+    intro = false;
+    try {
+      localStorage.setItem(INTRO_KEY, '1');
+    } catch {
+      // Then it shows again next time; no harm.
+    }
+  }
+  function abandon() {
+    if (confirm('give up this run and start another?')) newRun();
+  }
+
+  // Saved after every change; a finished run is forgotten, so the next visit starts afresh.
+  $effect(() => {
+    if (!world) return;
+    if (world.sunk || world.won) forget();
+    else store(seed, world);
+  });
 
   $effect(() => {
     const url = new URL(location.href);
@@ -79,6 +115,7 @@
       sunk: '',
     };
     if (out.halt === 'arrived') dest = null;
+    if (out.halt === 'news') return stop([...world.log].reverse().find((l) => l.stop)!.text);
     stop(why[out.halt]);
   }
   function oneDay() {
@@ -207,6 +244,10 @@
         {world.gold} gold of {GOAL} to bring home to {HOME} · seed {seed}
         {#if world.pirate}<span class="wanted"> · a pirate</span>{/if}
       </p>
+      <div class="row">
+        <button onclick={() => (intro = true)}>how to play</button>
+        <button onclick={abandon}>a new run</button>
+      </div>
     </header>
 
     <div class="layout">
@@ -353,14 +394,37 @@
           <section>
             <h2>news</h2>
             <ul class="plain">
-              {#each world.log.slice(-4).reverse() as l}<li><span class="faint">day {l.turn + 1}:</span> {l.text}</li>{/each}
+              {#each world.log.slice(-6).reverse() as l}<li class:wanted={l.stop}><span class="faint">day {l.turn + 1}:</span> {l.text}</li>{/each}
             </ul>
           </section>
         {/if}
       </aside>
     </div>
 
-    {#if world.hail && !shown}
+    {#if intro}
+      <div class="overlay">
+        <div class="sheet intro">
+          <h2>how to play</h2>
+          <p>It is 16XX. You are a privateer out of Plymouth with a pinnace and 20 gold. <strong>Bring {GOAL} home to {HOME} and the run is won.</strong> Sink, and it is over.</p>
+          <dl>
+            <dt>sailing</dt>
+            <dd>Click the sea to set a course, then set sail. The ship goes a day at a time, and heaves to when a ship comes alongside, when you sight land, or when there is news worth stopping for: a storm, a mutiny, a war.</dd>
+            <dt>rumors</dt>
+            <dd>Buy rounds in a port's bar and somebody may have seen a ship. Rumors show as rings that fade; pick one to see where her ship could be by now. The more of the current and wind you have seen, the tighter the guess.</dd>
+            <dt>fair game</dt>
+            <dd>England's enemies, listed under "at war", are fair game, and the Crown thinks the better of you for taking them. Anyone else's ships, the Crown hears of, and enough of that starts a war. Fire on an English ship and you are a pirate: London will hang you, but Port Royal and the Barbary coast will let you retire there, rich.</dd>
+            <dt>fighting</dt>
+            <dd>A fight is cards, yours and hers in one deck. Each round three are dealt: keep two, which play in the order you pick them; the third goes to the bottom. A hull at nothing is sunk; three way and a ship is away. Hover a card, or open "what the cards say", for what its words mean.</dd>
+            <dt>in port</dt>
+            <dd>Mend the hull, hire hands of note and buy refits and bigger ships. All of them change the cards you fight with. A port of a nation that wants you will not deal with you until its officials are paid.</dd>
+            <dt>the crew</dt>
+            <dd>Keep them in heart. A long stretch with no prize sours them, and at nothing it is mutiny. Prizes, a round ashore, fresh water and good omens all help.</dd>
+          </dl>
+          <p class="faint">The run saves as you go. The seed in the address plays the same world again.</p>
+          <button onclick={closeIntro}>to sea</button>
+        </div>
+      </div>
+    {:else if world.hail && !shown}
       {@const h = world.hail}
       {@const flagName = adjective(h.nation)}
       {@const what = h.kind === 'hunter' ? 'guard ship' : h.kind.replace('-', ' ')}
@@ -429,6 +493,9 @@
   .wanted { color: var(--theirs); }
   .chip { display: inline-block; margin-right: 0.8rem; }
   .overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.92); display: grid; place-items: start center; overflow: auto; padding: 2rem 16px; }
+  .intro dl { margin: 1rem 0; }
+  .intro dt { margin-top: 0.75rem; }
+  .intro dd { margin: 0.2rem 0 0; }
   .sheet { width: min(44rem, 100%); background: var(--paper); border: 1.5px solid var(--ink); padding: 1.25rem; }
   @media (max-width: 60rem) {
     .layout { grid-template-columns: 1fr; }
