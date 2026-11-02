@@ -1,6 +1,6 @@
 <script lang="ts">
   import { describeEvent, OUTCOME_TEXT, RAID_OUTCOME_TEXT } from '../describe.ts';
-  import { threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
+  import { ESCAPE, threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
   import type { Reckoning } from '../world/meet.ts';
   import { adjective, type Nation } from '../world/ports.ts';
   import Flag from './Flag.svelte';
@@ -65,8 +65,8 @@
 
 <svelte:window {onkeydown} />
 
-{#snippet state(isThreatened: boolean, held: number)}
-  {(isThreatened ? 'threatened: flee cards work' : 'not threatened: flee cards do nothing') + (held ? ` · held ${held}` : '')}
+{#snippet state(isThreatened: boolean, way: number)}
+  {`way ${way} of ${ESCAPE}` + (isThreatened ? ' · threatened: runs harder, a flee card counts one more' : '')}
 {/snippet}
 
 <section class="fight" aria-label="encounter">
@@ -82,7 +82,7 @@
       <p>plunder {fight.plunder}{#if fight.ship.brace} · brace {fight.ship.brace}{/if}</p>
       {#if !fight.outcome}
         <p class="status">{waiting('ship')} {waiting('ship') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('ship')} of your cards spent</p>
-        <p class="status">{@render state(threatened(fight.ship, fight.target), fight.ship.held)}</p>
+        <p class="status">{@render state(threatened(fight.ship, fight.target), fight.ship.way)}</p>
       {/if}
     </div>
     <div class="ship theirs">
@@ -91,7 +91,7 @@
       <p>cargo {fight.target.cargo} · bounty {fight.target.bounty}</p>
       {#if !fight.outcome}
         <p class="status">{waiting('target')} {waiting('target') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('target')} of theirs spent</p>
-        <p class="status">{@render state(threatened(fight.target, fight.ship), fight.target.held)}</p>
+        <p class="status">{@render state(threatened(fight.target, fight.ship), fight.target.way)}</p>
       {/if}
     </div>
   </div>
@@ -105,7 +105,7 @@
       <button onclick={oncontinue}>{fight.outcome === 'sunk' ? 'the end' : 'back to sea'}</button>
     </div>
   {:else}
-    <p class="prompt">keep two. they resolve in the order you pick them, and then they're spent; the third goes to the bottom. spent cards come back only when a card recalls them.</p>
+    <p class="prompt">keep two. they resolve in the order you pick them, and then they're spent; the third goes to the bottom. spent cards come back only when a card recalls them. three way and a ship is away; chase and hold take it off her.</p>
     <div class="hand">
       {#each fight.hand as card, i (card.id)}
         <CardView {card} order={picks.includes(i) ? picks.indexOf(i) + 1 : null} disabled={picks.length === 2 && !picks.includes(i)} onpick={() => toggle(i)} />

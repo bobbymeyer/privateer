@@ -88,12 +88,13 @@ Every action and decision in combat is a card. There is no stop button.
   armada's broadside leave leaks. A fort fires heated shot. A guard ship
   fires chain and bar at your rigging, to stop you running.
 
-- **flee** — the card's own side breaks away. It only works when that side
-  is *threatened*, meaning its hull is at half or less; otherwise the card does
-  nothing. A ship that isn't in danger doesn't run. You get away the same
-  way the merchant does.
-- **hold** — cancels the other side's next flee: grapnels, boarders,
-  marksmen in the tops, a fleet cutting off your retreat.
+- **way** — a side gets away by making way: three of it and she's away.
+  A flee card makes 2, so it takes two, unless the other side takes way back
+  in between. Anyone may run at any time, you included, with plunder in the
+  hold; shot-away sails stop it.
+- **chase** and **hold** take way off the other side: give chase, crowd on
+  sail, grapnels, boarders, marksmen in the tops, a fleet cutting off your
+  retreat, an armada with the weather gauge. Whoever hunts carries them.
 
 Threat is checked when the card resolves, so order matters. If you play a
 merchant's flee card before you hurt it, it does nothing. Play it after your

@@ -33,13 +33,15 @@ export type Effect =
   /** Hull back on the target, up to its maximum. */
   | { kind: 'mend'; amount: number }
   /**
-   * The card's own side breaks away and the encounter ends — but only when
-   * that side is threatened (hull at half or less) and not held. Otherwise it
-   * does nothing: a ship that is not in danger does not run.
+   * The card's own side makes way — this many points toward breaking away.
+   * At three, it's away and the fight is over. Not while its sails are shot
+   * away.
    */
-  | { kind: 'flee' }
-  /** Cancels the other side's next flee. Stacks; lasts until used. */
+  | { kind: 'flee'; amount: number }
+  /** Grapnels, boarders, marksmen: takes this much way from the other side. */
   | { kind: 'hold'; amount: number }
+  /** Pursuit: crowding on sail after her, takes this much way from the other side. */
+  | { kind: 'chase'; amount: number }
   /**
    * Brings this many of the card's own side's spent cards back into play,
    * the most recently spent first, under the deck. Never damage cards. This
@@ -123,7 +125,8 @@ export const SHIP_CARDS: readonly CardDef[] = [
   { key: 'swivel', name: 'swivel guns', text: 'hit 1, plunder 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'plunder', amount: 1 }], copies: 1 },
   { key: 'patch', name: 'patch the hull', text: 'repair 2', effects: [{ kind: 'repair', amount: 2 }], copies: 1 },
   { key: 'brace', name: 'brace', text: 'brace 2', effects: [{ kind: 'brace', amount: 2 }], copies: 1 },
-  { key: 'bear-away', name: 'bear away', text: 'flee', effects: [{ kind: 'flee' }], copies: 2 },
+  { key: 'bear-away', name: 'bear away', text: 'flee 2', effects: [{ kind: 'flee', amount: 2 }], copies: 2 },
+  { key: 'give-chase', name: 'give chase', text: 'chase 2', effects: [{ kind: 'chase', amount: 2 }], copies: 1 },
 ];
 
 export const MERCHANT_CARDS: readonly CardDef[] = [
@@ -133,7 +136,7 @@ export const MERCHANT_CARDS: readonly CardDef[] = [
   { key: 'jettison', name: 'jettison cargo', text: 'jettison 3', effects: [{ kind: 'jettison', amount: 3 }], copies: 2 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2, recall 1', effects: [{ kind: 'mend', amount: 2 }, { kind: 'recall', amount: 1 }], copies: 1 },
   { key: 'strike', name: 'strike colours', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.9 }], copies: 1 },
-  { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
+  { key: 'crack-on', name: 'crack on sail', text: 'flee 2', effects: [{ kind: 'flee', amount: 2 }], copies: 3 },
   { key: 'lucky-shot', name: 'a lucky shot', text: 'hurt 1, leak', effects: [{ kind: 'hurt', amount: 1 }, { kind: 'wound', what: 'leak' }], copies: 1 },
 ];
 
@@ -147,8 +150,9 @@ export const HUNTER_CARDS: readonly CardDef[] = [
   { key: 'grapnels', name: 'grapnels', text: 'hurt 2, hold 1', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'hold', amount: 1 }], copies: 2 },
   { key: 'boarders', name: 'boarders away', text: 'hurt 3, hold 1', effects: [{ kind: 'hurt', amount: 3 }, { kind: 'hold', amount: 1 }], copies: 1 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 1 },
-  { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 1 },
+  { key: 'crack-on', name: 'crack on sail', text: 'flee 2', effects: [{ kind: 'flee', amount: 2 }], copies: 1 },
   { key: 'reload', name: 'the gun crews reload', text: 'recall 2', effects: [{ kind: 'recall', amount: 2 }], copies: 1 },
+  { key: 'give-chase', name: 'give chase', text: 'chase 2', effects: [{ kind: 'chase', amount: 2 }], copies: 2 },
 ];
 
 /** A lone galleon: heavy guns, slow to answer, a hold full of silver, and she runs. */
@@ -156,7 +160,7 @@ export const TREASURE_SHIP_CARDS: readonly CardDef[] = [
   { key: 'great-guns', name: 'great guns', text: 'hurt 2, leak', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'wound', what: 'leak' }], copies: 2 },
   { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 3 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 2 },
-  { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
+  { key: 'crack-on', name: 'crack on sail', text: 'flee 2', effects: [{ kind: 'flee', amount: 2 }], copies: 3 },
   { key: 'strike', name: 'strike colours', text: 'plunder 4, interrogate', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'interrogate', reliability: 0.9 }], copies: 1 },
   { key: 'reload', name: 'reload the great guns', text: 'recall 2', effects: [{ kind: 'recall', amount: 2 }], copies: 1 },
 ];
@@ -165,7 +169,8 @@ export const TREASURE_SHIP_CARDS: readonly CardDef[] = [
 export const TREASURE_FLEET_CARDS: readonly CardDef[] = [
   { key: 'escort-broadside', name: "escort's broadside", text: 'hurt 2, leak', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'wound', what: 'leak' }], copies: 4 },
   { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 4 },
-  { key: 'cut-off', name: 'cut off', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 2 },
+  { key: 'cut-off', name: 'cut off', text: 'hold 2', effects: [{ kind: 'hold', amount: 2 }], copies: 2 },
+  { key: 'escort-chase', name: 'the escort gives chase', text: 'chase 1', effects: [{ kind: 'chase', amount: 1 }], copies: 2 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
   { key: 'straggler', name: 'a straggler', text: 'plunder 5, interrogate', effects: [{ kind: 'plunder', amount: 5 }, { kind: 'interrogate', reliability: 0.8 }], copies: 2 },
   { key: 'fresh-escort', name: 'a fresh escort comes up', text: 'hurt 2, recall 1', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'recall', amount: 1 }], copies: 1 },
@@ -175,7 +180,8 @@ export const TREASURE_FLEET_CARDS: readonly CardDef[] = [
 export const ARMADA_CARDS: readonly CardDef[] = [
   { key: 'broadside', name: 'broadside', text: 'hurt 3, leak', effects: [{ kind: 'hurt', amount: 3 }, { kind: 'wound', what: 'leak' }], copies: 4 },
   { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 4 },
-  { key: 'weather-gauge', name: 'the weather gauge', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 2 },
+  { key: 'weather-gauge', name: 'the weather gauge', text: 'hold 2', effects: [{ kind: 'hold', amount: 2 }], copies: 2 },
+  { key: 'crowd-sail', name: 'crowd on sail', text: 'chase 2', effects: [{ kind: 'chase', amount: 2 }], copies: 1 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
 ];
 
@@ -207,5 +213,5 @@ export const RELIEF = { side: 'target' as const, name: 'the garrison is reinforc
 
 /** A raiding party can always fall back to the boats: in a raid, these go into your deck. */
 export const RAID_CARDS: readonly CardDef[] = [
-  { key: 'to-the-boats', name: 'back to the boats', text: 'flee', effects: [{ kind: 'flee' }], copies: 2 },
+  { key: 'to-the-boats', name: 'back to the boats', text: 'flee 2', effects: [{ kind: 'flee', amount: 2 }], copies: 2 },
 ];

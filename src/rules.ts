@@ -44,8 +44,8 @@ export interface ShipState {
   hull: number;
   maxHull: number;
   brace: number;
-  /** Flee attempts of yours the target will cancel. */
-  held: number;
+  /** How far you've made toward breaking away. At ESCAPE, you're away. */
+  way: number;
 }
 
 export interface TargetState {
@@ -56,16 +56,16 @@ export interface TargetState {
   cargo: number;
   /** Paid on `destroyed`. */
   bounty: number;
-  /** Flee attempts of the target's that you will cancel. */
-  held: number;
+  /** How far she's made toward breaking away. At ESCAPE, she's away. */
+  way: number;
   /** Taken rather than sunk — a town — so what's left in the hold is yours too. */
   takenWhole?: boolean;
 }
 
 /**
  * Credibly threatened: hull at half or less, or outgunned two to one. The
- * only state in which a flee card works — a ship that is not in danger does
- * not run, and one facing a squadron of the line runs from the first shot.
+ * rules no longer turn on it — any ship may run — but it's how a captain
+ * reads a fight, and the bots and the fight sheet use it.
  */
 export function threatened(side: { hull: number; maxHull: number }, other: { hull: number }): boolean {
   return side.hull * 2 <= side.maxHull || other.hull >= OUTGUNNED * side.hull;
@@ -73,8 +73,11 @@ export function threatened(side: { hull: number; maxHull: number }, other: { hul
 
 export const OUTGUNNED = 2;
 
+/** Way needed to break away: two flee cards, unless chase or hold takes it back in between. */
+export const ESCAPE = 3;
+
 /** Why an effect did less than its face value, when that is worth saying. */
-export type EffectNote = 'held' | 'unthreatened' | 'rigging';
+export type EffectNote = 'rigging';
 
 export type GameEvent =
   | { type: 'dealt'; round: number; cards: Card[] }
@@ -128,8 +131,8 @@ export interface EncounterSetup {
   seed: number;
   shipCards: Card[];
   targetCards: Card[];
-  ship: Omit<ShipState, 'held'>;
-  target: Omit<TargetState, 'held'>;
+  ship: Omit<ShipState, 'way'>;
+  target: Omit<TargetState, 'way'>;
   reinforce?: Reinforcement;
 }
 
@@ -140,8 +143,8 @@ export function createEncounter(setup: EncounterSetup): EncounterState {
     deck,
     hand: [],
     discard: [],
-    ship: { ...setup.ship, held: 0 },
-    target: { ...setup.target, held: 0 },
+    ship: { ...setup.ship, way: 0 },
+    target: { ...setup.target, way: 0 },
     plunder: 0,
     round: 0,
     outcome: null,
@@ -258,26 +261,29 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterS
       s.target.hull += applied;
       break;
     case 'flee': {
+      // Making way: the card's worth. Not with the sails shot away.
       const runner = mine ? s.ship : s.target;
-      if (rigged(s, card.side)) note = 'rigging';
-      else if (!threatened(runner, mine ? s.target : s.ship)) note = 'unthreatened';
-      else if (runner.held > 0) {
-        runner.held -= 1;
-        note = 'held';
-      } else {
-        applied = 1;
-        fled = mine ? 'fled' : 'escaped';
+      if (rigged(s, card.side)) {
+        note = 'rigging';
+        break;
       }
+      applied = effect.amount;
+      runner.way += applied;
+      if (runner.way >= ESCAPE) fled = mine ? 'fled' : 'escaped';
       break;
     }
     case 'interrogate':
       applied = 1;
       s.intel.push(effect.reliability);
       break;
-    case 'hold':
-      applied = effect.amount;
-      (mine ? s.target : s.ship).held += applied;
+    case 'chase':
+    case 'hold': {
+      // Taking way off the other side: grappled, or run down.
+      const other = mine ? s.target : s.ship;
+      applied = Math.min(effect.amount, other.way);
+      other.way -= applied;
       break;
+    }
     case 'recall': {
       // The side's own spent cards, most recent first, back under the deck.
       for (let i = s.discard.length - 1; i >= 0 && applied < effect.amount; i--) {
