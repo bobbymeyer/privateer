@@ -15,6 +15,9 @@
   import type { Sea } from '../world/ships.ts';
   import { atIsland, createSea, createWorld, GOAL, HOME, knowledge, type WorldState } from '../world/world.ts';
   import Fight from './Fight.svelte';
+  import Flag from './Flag.svelte';
+  import { COLORS } from '../world/colors.ts';
+  import type { Nation } from '../world/ports.ts';
   import Gauge from './Gauge.svelte';
   import SeaChart from './SeaChart.svelte';
 
@@ -89,6 +92,7 @@
   let lastRound: GameEvent[] = $state.raw([]);
   let reckoning: Reckoning | null = $state.raw(null);
   let title = $state('');
+  let nation: Nation = $state('local');
   let isRaid = $state(false);
 
   $effect(() => {
@@ -97,6 +101,7 @@
       const m = world.encounter;
       const flagName = adjective(m.nation);
       isRaid = m.port !== null;
+      nation = m.nation;
       title = m.port !== null ? `the raid on ${sea!.map.nodes[m.port].port!.name}, ${flagName}` : `${article(flagName)} ${flagName} ${TARGETS[m.kind].name}`;
       lastRound = [];
       reckoning = null;
@@ -203,7 +208,10 @@
           <button onclick={() => chart?.zoom(1.4)} aria-label="zoom out">−</button>
           <button onclick={() => chart?.recentre()}>find the ship</button>
         </div>
-        <p class="legend">blue: the current a step out · dashed grey: this season's wind · red rings: rumors, fading · red cloud: where the selected one's ship could be by now</p>
+        <p class="legend">blue: the current a step out · dashed grey: this season's wind · rings: rumors, in the ship's colours, fading · red cloud: where the selected one's ship could be by now · squares are fortified ports, circles open towns, triangles ships</p>
+        <ul class="key" aria-label="the nations' colours">
+          {#each Object.keys(COLORS) as n}<li><Flag nation={n as Nation} size={12} />{adjective(n as Nation)}</li>{/each}
+        </ul>
       </div>
 
       <aside>
@@ -232,7 +240,7 @@
 
         {#if port}
           <section>
-            <h2>{port.name}, {adjective(port.nation)}</h2>
+            <h2><Flag nation={port.nation} />{port.name}, {adjective(port.nation)}</h2>
             {#if world.pirate && port.nation === YOUR_NATION}
               <p>they know you for a pirate here.</p>
               <button onclick={() => attempt(() => buyPardon(sea!, world!), 'pardoned, at a price')}>buy a royal pardon ({PARDON_COST})</button>
@@ -288,7 +296,7 @@
             {#each [...world.rumors].reverse() as r (r.id)}
               <li>
                 <button class:focused={focus === r.id} onclick={() => (focus = focus === r.id ? null : r.id)}>
-                  {article(adjective(r.nation))} {adjective(r.nation)} {r.kind.replace('-', ' ')}, {ago(world.turn - r.turn)}
+                  <Flag nation={r.nation} />{article(adjective(r.nation))} {adjective(r.nation)} {r.kind.replace('-', ' ')}, {ago(world.turn - r.turn)}
                   <span class="faint">· {Math.round(markerStrength(r, world.turn) * 100)}%</span>
                 </button>
               </li>
@@ -301,7 +309,7 @@
           {#if !Object.values(world.standing).some((v) => v)}<p class="faint">nobody has reason to hunt you.</p>{/if}
           <ul class="plain">
             {#each Object.entries(world.standing).filter(([, v]) => v) as [n, v]}
-              <li class:wanted={v! < 0}>{adjective(n as never)}: {v! > 0 ? '+' : ''}{v}{v! < 0 ? ', and their guard ships are out' : ''}</li>
+              <li class:wanted={v! < 0}><Flag nation={n as Nation} />{adjective(n as Nation)}: {v! > 0 ? '+' : ''}{v}{v! < 0 ? ', and their guard ships are out' : ''}</li>
             {/each}
           </ul>
         </section>
@@ -323,7 +331,7 @@
       {@const what = h.kind === 'hunter' ? 'guard ship' : h.kind.replace('-', ' ')}
       <div class="overlay">
         <div class="sheet">
-          <h2>{article(flagName)} {flagName} {what} alongside</h2>
+          <h2><Flag nation={h.nation} size={18} />{article(flagName)} {flagName} {what} alongside</h2>
           {#if h.nation === YOUR_NATION}
             <p class="wanted">she flies your flag. fire on her and you are a pirate: England will want you, its ports will shut, and London will hang you until you're pardoned.</p>
           {:else if isEnemy(h.nation)}
@@ -340,7 +348,7 @@
     {:else if shown}
       <div class="overlay">
         <div class="sheet">
-          <Fight fight={shown} {lastRound} {reckoning} {title} {isRaid} {onact} {oncontinue} />
+          <Fight fight={shown} {lastRound} {reckoning} {title} {isRaid} nation={nation} {onact} {oncontinue} />
         </div>
       </div>
     {:else if world.sunk || world.won}
@@ -364,6 +372,7 @@
   p { margin: 0.3rem 0; }
   .meta, .faint, .legend { color: var(--faint); }
   .legend { font-size: 0.8rem; }
+  .key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; font-size: 0.8rem; color: var(--faint); }
   .layout { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; gap: 1.25rem; align-items: start; }
   .map { display: flex; flex-direction: column; gap: 0.5rem; height: min(78vh, 52rem); }
   .mapkeys { display: flex; gap: 0.5rem; }

@@ -32,6 +32,15 @@ and it's over.
 
 Each run has a seed in the URL; `?seed=42` plays the same world again.
 
+**Every nation has its colours**, a field and a border, like a flag at a
+distance (`src/world/colors.ts`). England is white edged red, the Dutch
+orange edged blue, France blue edged gold, Spain yellow edged red, Portugal
+green edged red, the Danes red edged gold, Japan red edged white,
+independent harbours black. They mark ports (squares fortified, circles
+open), ships in sight (triangles, warships larger), rumor rings, each
+nation's protected waters (a faint wash), the standing list and the fight
+sheet, with a key under the chart. The chart itself is parchment and sepia.
+
 ## the loop
 
 1. Your ship's cards and the target's cards are shuffled into one deck.

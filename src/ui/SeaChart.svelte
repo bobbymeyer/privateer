@@ -1,6 +1,8 @@
 <script lang="ts">
   import coast from '../world/data/coast.json';
-  import type { NodeId } from '../world/map.ts';
+  import type { NodeId, SeaNode } from '../world/map.ts';
+  import { COLORS } from '../world/colors.ts';
+  import { adjective, type Nation } from '../world/ports.ts';
   import { markerStrength } from '../world/rumors.ts';
   import type { Sea } from '../world/ships.ts';
   import type { WorldState } from '../world/world.ts';
@@ -99,6 +101,18 @@
   }
 
   const ports = $derived(map.nodes.filter((n) => n.port));
+  /** Protected water by nation: its nodes, and the legs between two of them. */
+  const waterGroups = $derived.by(() => {
+    const groups = new Map<Nation, { nation: Nation; nodes: SeaNode[]; links: [SeaNode, SeaNode][] }>();
+    for (const n of map.nodes) {
+      if (!n.waters) continue;
+      let g = groups.get(n.waters);
+      if (!g) groups.set(n.waters, (g = { nation: n.waters, nodes: [], links: [] }));
+      g.nodes.push(n);
+      for (const m of map.adj[n.id]) if (m > n.id && map.nodes[m].waters === n.waters) g.links.push([n, map.nodes[m]]);
+    }
+    return [...groups.values()];
+  });
   const ARROW = 18; // px
   const arrow = (n: NodeId, v: [number, number], scale = 1) => {
     const len = Math.hypot(...v);
@@ -122,7 +136,18 @@
     onpointerup={up}
     onwheel={wheel}
   >
-    <rect x={center.lon - span} y={-center.lat - tall} width={span * 2} height={tall * 2} fill="var(--paper)" />
+    <rect x={center.lon - span} y={-center.lat - tall} width={span * 2} height={tall * 2} fill="var(--sea)" />
+
+    <!-- Protected waters: a faint, even wash of the owner's colour. Each
+         nation's is drawn opaque — round blobs at its nodes, thick strokes
+         joining neighbours — inside one group faded as a whole, so overlaps
+         don't darken and gaps between nodes fill. -->
+    {#each waterGroups as g (g.nation)}
+      <g opacity="0.2" fill={COLORS[g.nation].field} stroke={COLORS[g.nation].field} stroke-linecap="round">
+        {#each g.nodes as n (n.id)}<circle cx={X(n.lon)} cy={Y(n.lat)} r="0.8" stroke="none" />{/each}
+        {#each g.links as [a, b]}<line x1={X(a.lon)} y1={Y(a.lat)} x2={X(a.lon) + (((b.lon - a.lon + 540) % 360) - 180)} y2={Y(b.lat)} stroke-width="1.6" />{/each}
+      </g>
+    {/each}
     {#each coastPaths as d}<path {d} fill="var(--land)" stroke="var(--coast)" stroke-width={px * 0.8} />{/each}
 
     <!-- The selected rumor: where the ship could be by now. -->
@@ -130,26 +155,38 @@
       <circle cx={X(map.nodes[c.node].lon)} cy={Y(map.nodes[c.node].lat)} r={px * (2 + 14 * Math.sqrt(c.p))} fill="var(--theirs)" fill-opacity="0.28" />
     {/each}
 
-    <!-- Rumor markers, fading. -->
+    <!-- Rumor markers, fading: a ring in the ship's colours. -->
     {#each world.rumors as r (r.id)}
       {@const n = map.nodes[r.reported]}
-      <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * 9} fill="none" stroke="var(--theirs)" stroke-width={px * (r.id === focus ? 3 : 1.5)} stroke-opacity={Math.max(0.15, markerStrength(r, world.turn))} />
+      {@const c = COLORS[r.nation]}
+      {@const o = Math.max(0.15, markerStrength(r, world.turn))}
+      <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * 9} fill="none" stroke={c.border} stroke-width={px * (r.id === focus ? 5 : 3.5)} stroke-opacity={o} />
+      <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * 9} fill="none" stroke={c.field} stroke-width={px * (r.id === focus ? 2.5 : 1.5)} stroke-opacity={o} />
     {/each}
 
     <!-- Ports and charted islands. -->
     {#each ports as n (n.id)}
-      <rect x={X(n.lon) - px * 3.5} y={Y(n.lat) - px * 3.5} width={px * 7} height={px * 7} fill={n.port!.fort ? 'var(--ink)' : 'var(--paper)'} stroke="var(--ink)" stroke-width={px} />
-      {#if span < 50}<text x={X(n.lon) + px * 7} y={Y(n.lat) + px * 4} font-size={px * 12} fill="var(--ink)">{n.port!.name}</text>{/if}
+      {@const c = COLORS[n.port!.nation]}
+      {#if n.port!.fort}
+        <!-- A fortified port: a square. -->
+        <rect x={X(n.lon) - px * 4.5} y={Y(n.lat) - px * 4.5} width={px * 9} height={px * 9} fill={c.field} stroke={c.border} stroke-width={px * 2} />
+        <rect x={X(n.lon) - px * 5.5} y={Y(n.lat) - px * 5.5} width={px * 11} height={px * 11} fill="none" stroke="var(--sepia)" stroke-width={px * 0.8} />
+      {:else}
+        <!-- An open town: a circle. -->
+        <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * 4.5} fill={c.field} stroke={c.border} stroke-width={px * 2} />
+        <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * 5.5} fill="none" stroke="var(--sepia)" stroke-width={px * 0.8} />
+      {/if}
+      {#if span < 50}<text x={X(n.lon) + px * 8} y={Y(n.lat) + px * 4} font-size={px * 12} fill="var(--sepia)">{n.port!.name}</text>{/if}
     {/each}
     {#each world.islands.filter((i) => i.found) as isle}
       {@const n = map.nodes[isle.node]}
-      <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * 6} fill="var(--land)" stroke="var(--ink)" stroke-width={px} />
-      {#if span < 50}<text x={X(n.lon) + px * 8} y={Y(n.lat) + px * 4} font-size={px * 12} font-style="italic" fill="var(--ink)">uncharted isle</text>{/if}
+      <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * 6} fill="var(--land)" stroke="var(--sepia)" stroke-width={px} />
+      {#if span < 50}<text x={X(n.lon) + px * 8} y={Y(n.lat) + px * 4} font-size={px * 12} font-style="italic" fill="var(--sepia)">uncharted isle</text>{/if}
     {/each}
 
     <!-- The course. -->
     {#if course.length > 1}
-      <polyline points={course.map((id) => `${X(map.nodes[id].lon)},${Y(map.nodes[id].lat)}`).join(' ')} fill="none" stroke="var(--ink)" stroke-width={px * 1.5} stroke-dasharray="{px * 5} {px * 4}" />
+ <polyline points={course.map((id) => `${X(map.nodes[id].lon)},${Y(map.nodes[id].lat)}`).join(' ')} fill="none" stroke="var(--sepia)" stroke-width={px * 1.5} stroke-dasharray="{px * 5} {px * 4}" />
     {/if}
 
     <!-- What you can see of the sea: current and wind, a step out. -->
@@ -164,10 +201,14 @@
     {#each visible as id (id)}
       {@const s = world.ships[id]}
       {@const n = map.nodes[s.node]}
-      {@const danger = s.kind === 'hunter' || s.kind === 'armada'}
-      <path d="M{X(n.lon)},{Y(n.lat) - px * 6}l{px * 5},{px * 10}h{-px * 10}z" fill={danger ? 'var(--theirs)' : 'var(--ink)'}>
-        <title>{s.kind.replace('-', ' ')}</title>
+      {@const warship = s.kind === 'hunter' || s.kind === 'armada'}
+      {@const c = COLORS[s.nation]}
+      {@const k = warship ? 1.4 : 1}
+      <!-- A ship in her flag's colours; warships drawn larger. -->
+      <path d="M{X(n.lon)},{Y(n.lat) - px * 7 * k}l{px * 6 * k},{px * 12 * k}h{-px * 12 * k}z" fill={c.field} stroke={c.border} stroke-width={px * 2} stroke-linejoin="round">
+        <title>{adjective(s.nation)} {s.kind === 'hunter' ? 'guard ship' : s.kind.replace('-', ' ')}</title>
       </path>
+      <path d="M{X(n.lon)},{Y(n.lat) - px * 9 * k}l{px * 7.5 * k},{px * 15 * k}h{-px * 15 * k}z" fill="none" stroke="var(--sepia)" stroke-width={px * 0.8} stroke-linejoin="round" />
     {/each}
 
     <!-- You. -->
