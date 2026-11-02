@@ -3,7 +3,7 @@
  * hull, what's in its hold, and the price on its head.
  */
 
-import { ARMADA_CARDS, type CardDef, HUNTER_CARDS, MERCHANT_CARDS, SHIP_CARDS, TREASURE_FLEET_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
+import { ARMADA_CARDS, type Card, type CardDef, HUNTER_CARDS, MERCHANT_CARDS, SHIP_CARDS, TREASURE_FLEET_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
 import { type EncounterState, createEncounter } from './rules.ts';
 import type { ShipKind } from './world/ships.ts';
 
@@ -26,11 +26,11 @@ export const TARGETS: Record<ShipKind, TargetDef> = {
 /** Your ship, as it sails into a fight. */
 export const SHIP = { hull: 6, maxHull: 6 };
 
-export function encounterWith(kind: ShipKind, seed: number, ship: { hull: number; maxHull: number } = SHIP): EncounterState {
+export function encounterWith(kind: ShipKind, seed: number, ship: { hull: number; maxHull: number } = SHIP, shipCards: Card[] = buildDeck('ship', SHIP_CARDS)): EncounterState {
   const t = TARGETS[kind];
   return createEncounter({
     seed,
-    shipCards: buildDeck('ship', SHIP_CARDS),
+    shipCards,
     targetCards: buildDeck('target', t.cards),
     ship: { hull: ship.hull, maxHull: ship.maxHull, brace: 0 },
     target: { name: t.name, hull: t.hull, maxHull: t.hull, cargo: t.cargo, bounty: t.bounty },

@@ -14,6 +14,7 @@
 
 import { type NodeId, portNamed } from './map.ts';
 import { type Roller, roll, weighted } from './random.ts';
+import { serves } from './port.ts';
 import { type Rumor, makeRumor } from './rumors.ts';
 import type { Sea, ShipKind } from './ships.ts';
 import type { WorldState } from './world.ts';
@@ -41,6 +42,7 @@ export function buyRound(sea: Sea, s: WorldState): Round {
   const port = sea.map.nodes[s.player].port;
   if (!port) throw new Error('there is no bar at sea');
   if (s.gold < ROUND_COST) throw new Error('not enough in the purse for a round');
+  if (!serves(sea, s)) throw new Error("the house won't serve you");
   const r: Roller = { rng: s.rng };
   const paid: WorldState = { ...s, gold: s.gold - ROUND_COST, rounds: s.rounds + 1 };
 

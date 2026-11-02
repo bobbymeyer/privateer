@@ -6,9 +6,11 @@
  */
 
 import { act, type Action, type EncounterState, type Outcome } from '../rules.ts';
+import { deckOf } from '../outfit.ts';
 import { encounterWith } from '../setup.ts';
 import { NOTABLE, sighting } from './bar.ts';
 import { type Roller, roll } from './random.ts';
+import { serves } from './port.ts';
 import { makeRumor } from './rumors.ts';
 import type { Nation } from './ports.ts';
 import type { Sea, ShipKind } from './ships.ts';
@@ -43,7 +45,7 @@ export interface Reckoning {
 
 /** After a move: is there a ship here to fight? Called by `advance`. */
 export function meeting(sea: Sea, s: WorldState): WorldState {
-  if (s.encounter || s.sunk || sea.map.nodes[s.player].port) return s;
+  if (s.encounter || s.sunk || sea.map.nodes[s.player].port || s.islands.some((i) => i.found && i.node === s.player)) return s;
   const here = s.ships.filter((x) => x.node === s.player && x.laidUp <= s.turn && (s.parted[x.id] ?? -1) < s.turn);
   if (!here.length) return s;
   // The one that matters most, if more than one.
@@ -51,7 +53,7 @@ export function meeting(sea: Sea, s: WorldState): WorldState {
   const other = here[0];
   const r: Roller = { rng: s.rng };
   const seed = Math.floor(roll(r) * 2 ** 31);
-  const fight = encounterWith(other.kind, seed, { hull: s.hull, maxHull: s.maxHull });
+  const fight = encounterWith(other.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit));
   return { ...s, rng: r.rng, encounter: { shipId: other.id, kind: other.kind, fight } };
 }
 
@@ -110,6 +112,7 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
 /** Patch the hull in port, a point at a time, as far as the purse goes. */
 export function repair(sea: Sea, s: WorldState, points = s.maxHull - s.hull): WorldState {
   if (!sea.map.nodes[s.player].port) throw new Error('repairs are made in port');
+  if (!serves(sea, s)) throw new Error("this port won't deal with you");
   const can = Math.min(points, s.maxHull - s.hull, Math.floor(s.gold / REPAIR_COST));
   return { ...s, hull: s.hull + can, gold: s.gold - can * REPAIR_COST };
 }
