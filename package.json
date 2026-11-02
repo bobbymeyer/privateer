@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning src/*.test.ts src/world/*.test.ts",
+    "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning src/*.test.ts src/world/*.test.ts src/ui/*.test.ts",
     "play": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/play.ts",
     "sim": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/sim.ts",
     "rumors": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/rumors.ts",

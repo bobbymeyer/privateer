@@ -39,7 +39,25 @@ green edged red, the Danes red edged gold, Japan red edged white,
 independent harbours black. They mark ports (squares fortified, circles
 open), ships in sight (triangles, warships larger), rumor rings, each
 nation's protected waters (a faint wash), the standing list and the fight
-sheet, with a key under the chart. The chart itself is parchment and sepia.
+sheet, with a key under the chart.
+
+**The chart is a woodcut** (`src/ui/woodcut.ts`, `src/ui/SeaChart.svelte`),
+sepia on parchment, after the engraved charts of the century, and all of it
+drawn in code:
+- **Water-lining:** every coast drawn again and again out to sea.
+- **Hatching** across the land, the same density at any zoom.
+- **Wave marks** scattered on the open sea.
+- **Rhumb lines** fanning from a rose in each ocean.
+- **The seas lettered** as the charts of the time named them: Mar del
+  Nort, Mar del Sur, Oceanus Indicus, Mare Germanicum.
+- **Ports as woodcuts**, a tower for a fortified port and two houses for an
+  open town, and **ships** as hull and sails in their flag's colours.
+- **A wind rose and a graduated border**, fixed to the frame.
+
+The coast is drawn nine times over for the water lines, so it's drawn
+only where it can be seen and only as fine as a pixel. Each nation's
+protected waters are built once, as one path. A pan costs the same as it
+did before the engraving.
 
 ## the loop
 
