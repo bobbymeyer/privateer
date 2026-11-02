@@ -33,6 +33,8 @@
 
   let picks: number[] = $state([]);
   const waiting = (side: 'ship' | 'target') => fight.deck.filter((c) => c.damage && c.side === side).length;
+  const bottom = $derived(fight.deck.at(-1) ?? null);
+  const bottomCopy = $derived(bottom && !bottom.damage && !bottom.id.startsWith('reinforce') ? bottom.id.split('#')[1] : null);
   const spent = (side: 'ship' | 'target') => fight.discard.filter((c) => c.side === side && !c.damage).length;
 
   function toggle(i: number) {
@@ -79,7 +81,7 @@
       <Gauge label="hull" value={fight.ship.hull} max={fight.ship.maxHull} />
       <p>plunder {fight.plunder}{#if fight.ship.brace} · brace {fight.ship.brace}{/if}</p>
       {#if !fight.outcome}
-        <p class="status">{waiting('ship')} damage waiting in the deck · {spent('ship')} of your cards spent</p>
+        <p class="status">{waiting('ship')} {waiting('ship') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('ship')} of your cards spent</p>
         <p class="status">{@render state(threatened(fight.ship, fight.target), fight.ship.held)}</p>
       {/if}
     </div>
@@ -88,7 +90,7 @@
       <Gauge label="hull" value={fight.target.hull} max={fight.target.maxHull} color="var(--theirs)" />
       <p>cargo {fight.target.cargo} · bounty {fight.target.bounty}</p>
       {#if !fight.outcome}
-        <p class="status">{waiting('target')} damage waiting in the deck · {spent('target')} of theirs spent</p>
+        <p class="status">{waiting('target')} {waiting('target') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('target')} of theirs spent</p>
         <p class="status">{@render state(threatened(fight.target, fight.ship), fight.target.held)}</p>
       {/if}
     </div>
@@ -110,6 +112,10 @@
       {/each}
     </div>
     <button onclick={resolve} disabled={picks.length < 2}>resolve</button>
+    <p class="status">
+      {#if bottom}at the bottom of the deck: {bottom.name}{bottomCopy ? ` #${bottomCopy}` : ''} ({bottom.damage ? (bottom.side === 'ship' ? 'a wound to you' : 'a wound to them') : bottom.side === 'ship' ? 'yours' : 'theirs'}){/if}
+      {#if fight.reinforce} · relief still to come: {fight.reinforce.count - fight.reinforced}{fight.reinforced < fight.reinforce.count && fight.round < fight.reinforce.from ? `, from round ${fight.reinforce.from}` : ''}{/if}
+    </p>
   {/if}
 
   {#if lastRound.length}

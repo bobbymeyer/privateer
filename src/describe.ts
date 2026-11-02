@@ -3,7 +3,7 @@
 import type { Effect } from './cards.ts';
 import type { EffectNote, GameEvent, Outcome } from './rules.ts';
 
-const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold' | 'hit' | 'hurt' | 'breach' | 'interrogate' | 'recall'>, string> = {
+const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold' | 'hit' | 'hurt' | 'breach' | 'interrogate' | 'recall' | 'wound'>, string> = {
   plunder: 'hauls aboard',
   repair: 'repairs',
   brace: 'braces for',
@@ -16,10 +16,12 @@ export function describeEffect(e: Effect, applied: number, note?: EffectNote, mi
     const who = mine ? 'you' : 'the target';
     if (note === 'unthreatened') return `${who} ${mine ? 'are' : 'is'} not threatened enough to run`;
     if (note === 'held') return `${who} ${mine ? 'try' : 'tries'} to run, but ${mine ? 'are' : 'is'} held`;
+    if (note === 'rigging') return `${who} ${mine ? 'try' : 'tries'} to run, but the sails are shot away`;
     return `${who} break${mine ? '' : 's'} away`;
   }
-  if (e.kind === 'hit') return `puts ${applied} damage ${applied === 1 ? 'card' : 'cards'} against the target in the deck`;
-  if (e.kind === 'hurt') return `puts ${applied} damage ${applied === 1 ? 'card' : 'cards'} against you in the deck`;
+  if (e.kind === 'hit') return `hits the target for ${applied}`;
+  if (e.kind === 'hurt') return `hurts you for ${applied}${applied < e.amount ? ` (${e.amount - applied} braced)` : ''}`;
+  if (e.kind === 'wound') return `${mine ? 'leaves them' : 'leaves you'} ${e.what === 'leak' ? 'a leak below' : e.what === 'fire' ? 'fire aboard' : 'with sails shot away'}`;
   if (e.kind === 'breach') {
     if (!mine) return `the target loses ${applied} hull`;
     return `you lose ${applied} hull${applied < e.amount ? ` (${e.amount - applied} braced)` : ''}`;

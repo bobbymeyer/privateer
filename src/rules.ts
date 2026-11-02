@@ -12,15 +12,17 @@
  *   3. It ends when either side flees, when either hull reaches 0, or when
  *      the deck can no longer deal a full hand.
  *
- * Shot is a card too. A hit does not touch the hull: it puts damage cards
- * on top of the deck, and the hull only drops when one is kept. One can be
- * sent to the bottom each hand; once they pile up, you have to take them.
+ * Shot strikes the hull at once. Some of it also leaves a wound that
+ * outlasts it — a leak, a fire, shot-away sails — as a card on top of the
+ * deck against the side it struck. Keeping a wound card deals with it, at
+ * its cost; sending it to the bottom only puts it off. Shot-away sails cost
+ * no hull, but till they're dealt with, that side can't flee.
  *
  * Every decision in combat is a card. There is no stop button: you get away
  * the same way the target does, by playing a flee card while threatened.
  */
 
-import { type Card, type Effect, type Side, damageCard } from './cards.ts';
+import { type Card, type Effect, type Side, type Wound, woundCard } from './cards.ts';
 import { type RngState, shuffle } from './rng.ts';
 
 export const HAND_SIZE = 3;
@@ -72,7 +74,7 @@ export function threatened(side: { hull: number; maxHull: number }, other: { hul
 export const OUTGUNNED = 2;
 
 /** Why an effect did less than its face value, when that is worth saying. */
-export type EffectNote = 'held' | 'unthreatened';
+export type EffectNote = 'held' | 'unthreatened' | 'rigging';
 
 export type GameEvent =
   | { type: 'dealt'; round: number; cards: Card[] }
@@ -100,6 +102,8 @@ export interface EncounterState {
   minted: number;
   /** Help that comes to the target if the fight drags on. */
   reinforce: Reinforcement | null;
+  /** How much of that help has come. */
+  reinforced: number;
   /** Reliability of each rumor got from prisoners. Emptied if you are sunk. */
   intel: number[];
   events: GameEvent[];
@@ -108,9 +112,15 @@ export interface EncounterState {
 /** Indices into the hand, in the order the cards should resolve. */
 export type Action = { type: 'keep'; picks: [number, number] };
 
-/** Help for the target that comes if the fight goes on: from round `from`, a card on top of the deck every round. */
+/**
+ * Help for the target that comes if the fight goes on: from round `from`, a
+ * card on top of the deck every `every` rounds, `count` of them in all. It
+ * is a fixed relief, not a flood: once it's all come, no more does.
+ */
 export interface Reinforcement {
   from: number;
+  every: number;
+  count: number;
   card: Omit<Card, 'id'>;
 }
 
@@ -138,6 +148,7 @@ export function createEncounter(setup: EncounterSetup): EncounterState {
     payout: 0,
     minted: 0,
     reinforce: setup.reinforce ?? null,
+    reinforced: 0,
     intel: [],
     events: [],
   };
@@ -200,10 +211,19 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterS
   const mine = card.side === 'ship';
   switch (effect.kind) {
     case 'hit':
-      applied = mintDamage(s, 'target', effect.amount);
+      applied = Math.min(effect.amount, s.target.hull);
+      s.target.hull -= applied;
       break;
-    case 'hurt':
-      applied = mintDamage(s, 'ship', effect.amount);
+    case 'hurt': {
+      const soaked = Math.min(effect.amount, s.ship.brace);
+      s.ship.brace -= soaked;
+      applied = Math.min(effect.amount - soaked, s.ship.hull);
+      s.ship.hull -= applied;
+      break;
+    }
+    case 'wound':
+      applied = 1;
+      wound(s, mine ? 'target' : 'ship', effect.what);
       break;
     case 'breach':
       if (mine) {
@@ -239,7 +259,8 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterS
       break;
     case 'flee': {
       const runner = mine ? s.ship : s.target;
-      if (!threatened(runner, mine ? s.target : s.ship)) note = 'unthreatened';
+      if (rigged(s, card.side)) note = 'rigging';
+      else if (!threatened(runner, mine ? s.target : s.ship)) note = 'unthreatened';
       else if (runner.held > 0) {
         runner.held -= 1;
         note = 'held';
@@ -273,21 +294,14 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterS
   return [s, fled];
 }
 
-/**
- * Puts `n` damage cards against `side` on top of the deck, so fire lands in
- * the next hand. Random depths were tried first: spread out, damage cards
- * almost never shared a hand, one per hand can be dodged, and so incoming
- * fire almost never landed.
- */
-function mintDamage(s: EncounterState, side: Side, n: number): number {
-  const made: Card[] = [];
-  for (let i = 0; i < n; i++) {
-    s.minted += 1;
-    made.push(damageCard(side, `damage-${side}#${s.minted}`));
-  }
-  s.deck.unshift(...made);
-  return n;
+/** A wound against `side`, on top of the deck: it's in the next hand. */
+function wound(s: EncounterState, side: Side, what: Wound): void {
+  s.minted += 1;
+  s.deck.unshift(woundCard(side, `${what}-${side}#${s.minted}`, what));
 }
+
+/** Shot-away sails still in a side's deck or hand: it can't flee. */
+const rigged = (s: EncounterState, side: Side) => [...s.deck, ...s.hand].some((c) => c.side === side && c.wound === 'sails');
 
 /** Your hull is checked first: if both reach 0 on one effect, you went down. */
 function settled(s: EncounterState): Outcome | null {
@@ -297,10 +311,14 @@ function settled(s: EncounterState): Outcome | null {
 }
 
 function deal(s: EncounterState): EncounterState {
-  // Fight too long and help comes: on top, so it's in the next hand.
-  if (s.reinforce && s.round + 1 >= s.reinforce.from) {
+  // Fight too long and help comes: on top, so it's in the next hand — a
+  // card every so many rounds, till the relief has all arrived.
+  const r = s.reinforce;
+  const round = s.round + 1;
+  if (r && s.reinforced < r.count && round >= r.from && (round - r.from) % r.every === 0) {
     s.minted += 1;
-    s.deck.unshift({ ...s.reinforce.card, id: `reinforce#${s.minted}` });
+    s.reinforced += 1;
+    s.deck.unshift({ ...r.card, id: `reinforce#${s.minted}` });
   }
   if (s.deck.length < HAND_SIZE) return end(s, 'parted');
   s.round += 1;

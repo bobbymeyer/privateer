@@ -73,20 +73,29 @@ did before the engraving.
 
 Every action and decision in combat is a card. There is no stop button.
 
-- **shot** — `hit` and `hurt` don't touch a hull. They put damage cards on
-  top of the deck, one per point, marked against the side they hit. A
-  damage card costs its side 1 hull when it's kept, and brace soaks it. You
-  can send one to the bottom each hand, but fire lands on top, so they
-  arrive together. Once two of yours share a hand, one gets through.
+- **shot** — `hit` and `hurt` strike the hull at once; brace soaks yours.
+- **wounds** — some shot also leaves a wound that outlasts it, a card on
+  top of the deck against the side it struck:
+  - **a leak below** costs 2 hull when it's kept;
+  - **fire aboard** costs 3;
+  - **sails shot away** cost nothing, but while they're in a side's deck or
+    hand, its flee cards don't work.
+
+  Keeping a wound deals with it, pumping or fighting the fire or repairing
+  aloft, at its cost, and it's spent. Sending it to the bottom only puts it
+  off. Two in a hand, and one gets through. Your broadside leaves a leak,
+  your chain shot their sails. A galleon's great guns, an escort's or an
+  armada's broadside leave leaks. A fort fires heated shot. A guard ship
+  fires chain and bar at your rigging, to stop you running.
 
 - **flee** — the card's own side breaks away. It only works when that side
   is *threatened*, meaning its hull is at half or less; otherwise the card does
   nothing. A ship that isn't in danger doesn't run. You get away the same
   way the merchant does.
-- **hold** — cancels the other side's next flee. Chain shot carries it.
+- **hold** — cancels the other side's next flee: grapnels, boarders,
+  marksmen in the tops, a fleet cutting off your retreat.
 
-Damage only lowers a hull when it's kept, and threat is checked when the
-card resolves, so order matters. If you play a
+Threat is checked when the card resolves, so order matters. If you play a
 merchant's flee card before you hurt it, it does nothing. Play it after your
 broadside and the merchant gets away.
 
@@ -281,7 +290,9 @@ same game against the town's defences, from `src/setup.ts`:
 - **An open town** has a battery, musketry, barricades. **A fortified
   port** has great guns and walls to mend, and is too much for a pinnace.
 - **If the raid goes on, help comes**: from the seventh round, the
-  garrison is reinforced, a card on top of the town's deck every round.
+  garrison is reinforced, a card on top of the town's deck every other
+  round, four in all. (At first it came every round without end, which
+  flooded every hand with relief.)
 - **A raiding party can fall back to the boats**: two extra flee cards in
   your deck for a raid. They work when you're threatened, as always.
 - **Sacking it takes everything left in its treasury**, and the town has
@@ -293,9 +304,9 @@ same game against the town's defences, from `src/setup.ts`:
 
 | raiding with | open town | fortified port |
 | --- | --- | --- |
-| pinnace | sacked 63%, sunk 18% | never sacked, sunk 36% |
-| brigantine | sacked nearly always | sacked 45%, sunk 8% |
-| frigate | sacked nearly always | sacked 86%, sunk 0% |
+| pinnace | sacked 65%, sunk 8% | never sacked, sunk 3% |
+| brigantine | sacked 91% | sacked 48%, sunk 15% |
+| frigate | sacked nearly always | sacked 95% |
 
 The relief was first a card that hurt *and* mended the walls, which made a
 town nearly impossible to sack; mending only from the barricades, and
@@ -389,10 +400,15 @@ At sea it chases the best rumor, sheers off from armadas and from guard
 ships that want it, fights by lookahead, runs when outgunned, and goes
 home with the score. It attacks only enemies (Spanish and Barbary
 merchants and galleons) on a sound hull, lets the rest pass, and raids
-enemy towns, and fortified ports only from a brigantine up. Over 40 runs it
-**wins 33%**, home around day 460, after about eight raids a run. Most of
-the rest sink: 15 in about 260 raids, 11 to armadas, which attack on sight
+enemy towns, and fortified ports only from a brigantine up. Over 100 runs
+it **wins 39%**, home around day 525, after about eleven raids a run. Most
+of the rest sink: 30 raiding towns, 13 to armadas, which attack on sight
 now that Spain is at war with you.
+
+The economy and the danger are one dial. Cutting a town's treasury from
+25 to 20 took wins from 39% to 9%, and *more* captains sank raiding, not
+fewer: short of gold, they couldn't buy a sturdier ship, and kept raiding
+in a pinnace.
 
 Getting there took three changes:
 
@@ -488,7 +504,9 @@ pinnace now has 10 (see *balance* above), which makes a merchant 81%
 destroyed and 6% sunk for the balanced bot: `npm run sim -- --hull 6` gives
 the table above back.
 
-How we got here, because the cliffs are the useful part:
+How we got here, because the cliffs are the useful part. (This was the
+first damage model, where all shot became damage cards. It's been replaced
+by direct damage and wounds; see below.)
 
 - **Damage cards spread through the deck at random** made you nearly
   untouchable: 92% destroyed, 4% sunk. Spread out, two of your damage cards
@@ -502,7 +520,13 @@ How we got here, because the cliffs are the useful part:
   that total, every keep spent on something else costs you. One point past
   it and the merchant can't be sunk.
 
-Open questions:
+**Then shot went straight to the hull.** Damage cards for every point of
+shot made fights long (21 rounds) and let you dodge most of what came at
+you. Now shot lands at once, and only some of it leaves a wound card. Fights
+are shorter and threat comes sooner, so running matters again: a captain
+who runs when it can gets away from a merchant a third of the time.
+
+Old open questions from the damage-card model, kept for the record:
 
 - **Fleeing hardly matters now.** Damage you're owed lands late, so by the
   time you're threatened the merchant usually is too, and finishing it pays

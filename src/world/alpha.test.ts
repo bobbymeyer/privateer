@@ -24,7 +24,8 @@ test('your deck is your ship, its refits and your crew', () => {
   assert.equal(cards['raking-fire'], 2 + 1 + 1);
   assert.equal(cards['double-shot'], 1);
   assert.equal(cards.marksmen, 2);
-  assert.equal(deckOf(kitted).length, bare + 1 + 1 + 1 + 2);
+  // sloop +1, guns +1, gunner +2 (double-shot, reload), marksmen +2
+  assert.equal(deckOf(kitted).length, bare + 1 + 1 + 2 + 2);
 });
 
 test('hiring, buying a ship and refitting change the deck, the hull and the sight', () => {
