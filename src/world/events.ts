@@ -35,7 +35,9 @@ export const MUTINY_LOOT = 0.3;
 export const OMEN_CHANCE = 1 / 45;
 export const OMEN_CHEER = 2;
 /** A storm, on any day at sea, outside its seasons and its latitudes. */
-export const STORM_CHANCE = 1 / 80;
+export const STORM_CHANCE = 1 / 120;
+/** What a storm can make you throw over: a share of the purse, and no more than this. */
+export const JETTISON_MAX = 30;
 /** What a prize does for the crew: more for a sacked town. */
 export const PRIZE_CHEER = 3;
 export const SACK_CHEER = 4;
@@ -85,7 +87,7 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
     if (roll(r) < stormChance(sea, s.player, s.turn)) {
       const throwOver = w.gold > 0 && roll(r) < 0.5;
       if (throwOver) {
-        const lost = Math.max(1, Math.round(w.gold * (0.2 + 0.2 * roll(r))));
+        const lost = Math.min(JETTISON_MAX, Math.max(1, Math.round(w.gold * (0.1 + 0.15 * roll(r)))));
         w = { ...w, gold: w.gold - lost };
         log(`a storm: ${lost} in cargo thrown over the side to keep her afloat`);
       } else {

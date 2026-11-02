@@ -320,10 +320,14 @@ fighting:
   anchor off a charted island, +1; a good omen, +2.
 - **Good omens**, about one day in 45 at sea: birds over the bow, a spring on
   an island, Saint Elmo's fire, porpoises under the bow.
-- **Storms**, about one day in 80 at sea. Three times as often in the
+- **Storms**, about one day in 120 at sea. Three times as often in the
   Antilles in autumn and in the Indian seas in the summer monsoon, and
   twice as often past forty degrees. A storm costs 1 to 3 hull, never the
-  last point, or a fifth to two fifths of the gold, thrown over the side.
+  last point, or a tenth to a quarter of the gold, 30 at most, thrown over
+  the side. (At first it was one day in 80 and up to two fifths of the
+  purse, and the captain bot's wins fell from 43% to 27%; as now, 33% over
+  30 runs, about 5 storms and 10 omens a run, and no mutinies: the bot
+  takes a prize often enough to keep its crew.)
 - **Islanders**: Umatac on Guam (Spanish, the galleon's watering stop on
   the way to Manila), and native harbours at Kealakekua, Matavai, Nuku'alofa,
   Nuku Hiva and Rapa Nui. Native ports have no bar, yard or hands to hire,
