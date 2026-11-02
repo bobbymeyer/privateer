@@ -6,7 +6,9 @@
  * The loop:
  *   1. Ship cards and target cards are shuffled into one deck.
  *   2. Three are dealt. You keep two, which resolve in the order you name
- *      them; the third goes to the bottom of the deck.
+ *      them and are then spent, into the discard; the third goes to the
+ *      bottom of the deck. A spent card comes back only when a card says
+ *      so (`recall`).
  *   3. It ends when either side flees, when either hull reaches 0, or when
  *      the deck can no longer deal a full hand.
  *
@@ -84,6 +86,8 @@ export interface EncounterState {
   /** Index 0 is the top. */
   deck: Card[];
   hand: Card[];
+  /** Cards kept and played, most recent last. They come back only by `recall`. */
+  discard: Card[];
   ship: ShipState;
   target: TargetState;
   /** Hauled aboard this encounter, not yet safe. */
@@ -125,6 +129,7 @@ export function createEncounter(setup: EncounterSetup): EncounterState {
     rng,
     deck,
     hand: [],
+    discard: [],
     ship: { ...setup.ship, held: 0 },
     target: { ...setup.target, held: 0 },
     plunder: 0,
@@ -176,8 +181,13 @@ export function act(state: EncounterState, action: Action): EncounterState {
       let fled: Outcome | null;
       [s, fled] = applyEffect(s, card, effect);
       const outcome = fled ?? settled(s);
-      if (outcome) return end(s, outcome);
+      if (outcome) {
+        s.discard.push(card);
+        return end(s, outcome);
+      }
     }
+    // Played, and spent.
+    s.discard.push(card);
   }
 
   return deal(s);
@@ -247,6 +257,17 @@ function applyEffect(s: EncounterState, card: Card, effect: Effect): [EncounterS
       applied = effect.amount;
       (mine ? s.target : s.ship).held += applied;
       break;
+    case 'recall': {
+      // The side's own spent cards, most recent first, back under the deck.
+      for (let i = s.discard.length - 1; i >= 0 && applied < effect.amount; i--) {
+        const spent = s.discard[i];
+        if (spent.side !== card.side || spent.damage) continue;
+        s.discard.splice(i, 1);
+        s.deck.push(spent);
+        applied++;
+      }
+      break;
+    }
   }
   s.events.push({ type: 'effect', round: s.round, card, effect, applied, ...(note ? { note } : {}) });
   return [s, fled];
@@ -305,6 +326,7 @@ function clone(s: EncounterState): EncounterState {
     ...s,
     deck: s.deck.slice(),
     hand: s.hand.slice(),
+    discard: s.discard.slice(),
     ship: { ...s.ship },
     target: { ...s.target },
     events: s.events.slice(),

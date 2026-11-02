@@ -220,3 +220,47 @@ test('the same seed makes the same damage', () => {
   };
   assert.deepEqual(run(), run());
 });
+
+test('the two kept are spent into the discard; the third goes under the deck', () => {
+  const [a, b, c] = blank(3).map((x, i) => ({ ...x, id: `h${i}` }));
+  const s0 = stacked([a, b, c]);
+  const s1 = act(s0, { type: 'keep', picks: [1, 0] });
+  assert.deepEqual(s1.discard.map((x) => x.id), ['h1', 'h0'], 'in the order played');
+  assert.equal(s1.deck.at(-1)!.id, 'h2');
+  assert.ok(![...s1.deck, ...s1.hand].some((x) => x.id === 'h0' || x.id === 'h1'), 'spent cards are out of play');
+});
+
+test('a card that ends the fight is spent too', () => {
+  const kill = card('kill', 'target', [{ kind: 'breach', amount: 9 }]);
+  const s1 = act(stacked([kill, ...blank(2)]), { type: 'keep', picks: [0, 1] });
+  assert.equal(s1.outcome, 'destroyed');
+  assert.equal(s1.discard.at(-1)!.id, 'kill');
+});
+
+test('recall brings back the side’s own spent cards, most recent first — never damage, never theirs', () => {
+  const recall = card('recall', 'ship', [{ kind: 'recall', amount: 2 }]);
+  const s0 = {
+    ...stacked([recall, ...blank(2)]),
+    discard: [
+      card('old', 'ship', []),
+      card('theirs', 'target', []),
+      damageCard('ship', 'dmg'),
+      card('recent', 'ship', []),
+    ],
+  };
+  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
+  // The deck was blanks; the hand dealt from its top, so look at the bottom.
+  const back = [...s1.deck, ...s1.hand].map((x) => x.id);
+  assert.ok(back.includes('recent') && back.includes('old'));
+  assert.ok(!back.includes('dmg') && !back.includes('theirs'));
+  assert.deepEqual(s1.discard.map((x) => x.id), ['theirs', 'dmg', 'recall', 'blank0']);
+  const e = s1.events.find((x) => x.type === 'effect' && x.effect.kind === 'recall');
+  assert.equal(e?.type === 'effect' && e.applied, 2);
+});
+
+test('with nothing spent, a recall brings nothing', () => {
+  const recall = card('recall', 'ship', [{ kind: 'recall', amount: 3 }]);
+  const s1 = act(stacked([recall, ...blank(2)]), { type: 'keep', picks: [0, 1] });
+  const e = s1.events.find((x) => x.type === 'effect' && x.effect.kind === 'recall');
+  assert.equal(e?.type === 'effect' && e.applied, 0);
+});

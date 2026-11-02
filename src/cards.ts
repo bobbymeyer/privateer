@@ -39,6 +39,12 @@ export type Effect =
   /** Cancels the other side's next flee. Stacks; lasts until used. */
   | { kind: 'hold'; amount: number }
   /**
+   * Brings this many of the card's own side's spent cards back into play,
+   * the most recently spent first, under the deck. Never damage cards. This
+   * is the only way a spent card comes back.
+   */
+  | { kind: 'recall'; amount: number }
+  /**
    * Prisoners talk: a rumor of this reliability, carried out of the fight
    * and turned into a sighting on the map. Lost if you are sunk.
    */
@@ -167,7 +173,7 @@ export const FORTRESS_CARDS: readonly CardDef[] = [
   { key: 'battery', name: 'shore battery', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 3 },
   { key: 'musketry', name: 'musketry from the walls', text: 'hurt 1', effects: [{ kind: 'hurt', amount: 1 }], copies: 2 },
   { key: 'inland', name: 'valuables carried inland', text: 'jettison 4', effects: [{ kind: 'jettison', amount: 4 }], copies: 2 },
-  { key: 'walls', name: 'mend the walls', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
+  { key: 'walls', name: 'mend the walls, man the guns', text: 'mend 3, recall 1', effects: [{ kind: 'mend', amount: 3 }, { kind: 'recall', amount: 1 }], copies: 2 },
 ];
 
 /** Help for a town under attack, arriving if the raid goes on too long. */
