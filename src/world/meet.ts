@@ -21,7 +21,7 @@ export const PARTED_DAYS = 5;
 /** A ship sunk or taken is laid up at home this long. */
 export const REFIT_DAYS = 60;
 /** Gold per point of hull, in port. */
-export const REPAIR_COST = 3;
+export const REPAIR_COST = 1;
 /** Prisoners know where their consorts were this recently. */
 const PRISONERS_KNOW = 3;
 

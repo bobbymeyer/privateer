@@ -6,6 +6,28 @@ harness, and a simulator to tune the numbers.
 
 It will go up on bobbymeyer.com once it has something to look at.
 
+## playing
+
+`npm run dev` and open the page. You're a privateer out of Plymouth in a
+pinnace with 20 gold. **Bring 150 home to London and the run is won.** Sink,
+and it's over.
+
+- **Sail** by clicking the sea to set a course, then *set sail*. The ship
+  goes a day at a time and stops when it arrives, when a ship comes
+  alongside, or when you sight uncharted land. Drag to pan, wheel or the
+  buttons to zoom.
+- **In port**, the bar sells rounds (rumors) and hires crew; the yard
+  mends the hull (1 gold a point), fits upgrades and sells bigger ships. A
+  port of a nation that wants you won't deal with you until you bribe its
+  officials.
+- **Rumors** show as red rings that fade. Pick one in the list to see the
+  cloud of where its ship could be by now. The cloud is tighter where
+  you've seen the current and wind (blue and dashed grey arrows a step out).
+- **Meeting a ship** at sea opens the fight. Its outcome, the prisoners'
+  talk and the grudge its nation now holds come back to the map.
+
+Each run has a seed in the URL; `?seed=42` plays the same world again.
+
 ## the loop
 
 1. Your ship's cards and the target's cards are shuffled into one deck.
@@ -150,6 +172,42 @@ That's why the guard stations are out in the colonies: Europe's home
 waters are its navies' business. The armadas are exempt, keeping their
 patrols round their own empire's ports.
 
+**What you sail with is what you fight with** (`src/outfit.ts`). Your deck
+is never stored. It's worked out from your ship, its upgrades and your crew:
+
+| ship | cost | hull | berths | adds |
+| --- | --- | --- | --- | --- |
+| pinnace | (you start in one) | 10 | 2 | the nine starting cards, 13 in all |
+| sloop | 40 | 12 | 3 | raking fire |
+| brigantine | 90 | 14 | 4 | broadside, raking fire |
+| frigate | 180 | 18 | 6 | two broadsides, chain shot |
+
+- **Crew**, hired in the bar, one of each, as many as you have berths: a
+  master gunner (double-shotted guns), marksmen (hit and hold), a
+  quartermaster (a prize crew that plunders and questions), a boatswain
+  (all hands: brace 3), a surgeon, a pilot (another bear away), a
+  navigator (a step more sight).
+- **Upgrades**, at the yard, belong to the ship: more guns, a sheathed hull
+  (+2), boarding nets, chase guns. A new ship starts bare.
+
+A bigger ship is sturdier but less nimble. More cards in the deck means
+the flee cards come round more slowly: from an armada, a pinnace gets away
+82% of the time, a brigantine 58%. Hire a pilot.
+
+**Grudges fade and can be bought off.** Standing drifts a point back
+toward zero every 60 days. In any port of a nation that wants you, its
+officials can be bribed a point at a time: 10 gold, times how far below
+zero you are.
+
+**Uncharted islands.** Every run hides eight out in open ocean, in nobody's
+waters, far from ports and from each other. Sight one and the Crown pays
+15 for charting it. After that it's an anchorage: no ship troubles you
+there, and the hull mends a point a day.
+
+**Setting a course** (`src/world/course.ts`): each day's step is the one
+that brings you nearest, and where steps tie, the one that runs best with
+the current and wind you've charted.
+
 **Meeting a ship.** When you share a node with a ship, outside a port, the
 encounter starts (`src/world/meet.ts`). The world waits until it is fought.
 If several ships are there, you meet the one that matters most (by the
@@ -223,6 +281,27 @@ for where ships actually went, `--flow current` or `--flow wind:2` for the
 sea's grain, and `--box w,s,e,n --scale 30` to zoom. Drake's route is traced
 through the graph on every chart.
 
+## balance
+
+`npm run voyage` plays whole runs with a captain bot. In port it repairs,
+buys rounds, hires crew and buys a bigger ship when it can spare the gold.
+At sea it chases the best rumor, sheers off from armadas and from guard
+ships that want it, fights by lookahead, runs when outgunned, and goes
+home with the score. Over 40 runs it **wins 35%**, home around day 500,
+and sinks in most of the rest: merchants account for 12 sinkings in about
+900 fights, armadas and treasure fleets for 10.
+
+Getting there took three changes:
+
+- **A bigger starting hull (6 to 10).** At 6, a merchant fight sank you a
+  quarter of the time: a fine gamble once, but over the 15–25 fights of a
+  run nobody lived. At 10 it's 6%, and each fight costs hull you pay to
+  mend instead.
+- **Repairs at 1 gold a point, not 3.** At 3, mending a merchant fight's
+  damage cost more than the merchant paid.
+- **Outgunned at two to one, not three,** so a fleet or an armada is still
+  something to run from once your hull is bigger.
+
 ## running it
 
 Node 22.12+.
@@ -236,9 +315,11 @@ npm run check                # svelte-check and TypeScript
 npm test                     # the rules (no install needed)
 npm run play                 # one encounter in the terminal, random seed
 npm run play -- --seed 42    # that encounter again
-npm run sim                  # bots × 2000 seeds
+npm run sim                  # card bots × 2000 fights (--target armada, --hull 14)
+npm run voyage               # whole runs with a captain bot (--runs 40 --days 730)
 npm run rumors               # how good a rumor is, by age and knowledge
-npm run world -- ne.geojson  # rebuild the world graph from Natural Earth
+npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
+npm run coast -- ne.geojson  # rebuild the coastline the browser draws (1:50m)
 npm run chart -- out.svg land.geojson [--turns 2000 --flow current --box w,s,e,n --scale 30]
 ```
 
@@ -255,7 +336,8 @@ src/
   setup.ts       the one encounter so far: you and a merchant
   describe.ts    words for events, shared by terminal and browser
   rules.test.ts
-  ui/            Svelte: App, CardView, Gauge
+  outfit.ts      ships, crew, upgrades: what your deck is made of
+  ui/            Svelte: App (the game), SeaChart, Fight, CardView, Gauge
   world/
     data/        world.json: the world graph, from Natural Earth
     passages.ts  the narrow straits, traced by hand
@@ -269,6 +351,8 @@ src/
     rumors.ts    making a rumor, its fading marker, its prediction
     bar.ts       buying rounds, and what the room tells you
     meet.ts      meeting a ship at sea, fighting it, settling up, repairs
+    port.ts      hiring, the yard, bribes, and who will deal with you
+    course.ts    setting a course and sailing it a day at a time
     world.ts     createWorld, advance, observe, hearRumor — pure, like rules.ts
 cli/
   play.ts        the interactive harness
@@ -294,6 +378,11 @@ over 5,000 seeds:
 | careful | 10.7 | 21 | 4% | 10% | 66% | 20% |
 | never flees | 10.1 | 21 | 1% | 13% | 61% | 26% |
 | random keeps | 3.6 | 14 | 41% | 12% | 3% | 45% |
+
+That was a single fight, tuned with a 6-hull ship. For whole runs the
+pinnace now has 10 (see *balance* above), which makes a merchant 81%
+destroyed and 6% sunk for the balanced bot: `npm run sim -- --hull 6` gives
+the table above back.
 
 How we got here, because the cliffs are the useful part:
 

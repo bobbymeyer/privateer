@@ -24,7 +24,7 @@ export const TARGETS: Record<ShipKind, TargetDef> = {
 };
 
 /** Your ship, as it sails into a fight. */
-export const SHIP = { hull: 6, maxHull: 6 };
+export const SHIP = { hull: 10, maxHull: 10 };
 
 export function encounterWith(kind: ShipKind, seed: number, ship: { hull: number; maxHull: number } = SHIP, shipCards: Card[] = buildDeck('ship', SHIP_CARDS)): EncounterState {
   const t = TARGETS[kind];

@@ -34,10 +34,10 @@ export interface ShipClass {
 }
 
 export const SHIP_CLASSES: Record<string, ShipClass> = {
-  pinnace: { name: 'pinnace', cost: 0, hull: 6, berths: 2, cards: {} },
-  sloop: { name: 'sloop', cost: 40, hull: 8, berths: 3, cards: { 'raking-fire': 1 } },
-  brigantine: { name: 'brigantine', cost: 90, hull: 10, berths: 4, cards: { broadside: 1, 'raking-fire': 1 } },
-  frigate: { name: 'frigate', cost: 180, hull: 14, berths: 6, cards: { broadside: 2, 'chain-shot': 1 } },
+  pinnace: { name: 'pinnace', cost: 0, hull: 10, berths: 2, cards: {} },
+  sloop: { name: 'sloop', cost: 40, hull: 12, berths: 3, cards: { 'raking-fire': 1 } },
+  brigantine: { name: 'brigantine', cost: 90, hull: 14, berths: 4, cards: { broadside: 1, 'raking-fire': 1 } },
+  frigate: { name: 'frigate', cost: 180, hull: 18, berths: 6, cards: { broadside: 2, 'chain-shot': 1 } },
 };
 
 export interface CrewRole {

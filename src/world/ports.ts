@@ -185,3 +185,6 @@ const ADJECTIVES: Record<Nation, string> = {
 };
 /** `Spanish`, `Dutch`: for saying whose a ship is. */
 export const adjective = (n: Nation) => ADJECTIVES[n];
+
+/** `a` or `an`, for the word that follows. */
+export const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a');

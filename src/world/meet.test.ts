@@ -73,9 +73,10 @@ test('a fight is settled into the world', () => {
 
 test('damage is carried out of the fight and mended in port, for gold', () => {
   const { w } = setUp();
-  const hurt = { ...w, hull: 2, gold: 9 };
+  // As far as the purse goes: four points' worth.
+  const hurt = { ...w, hull: 2, gold: 4 * REPAIR_COST };
   const mended = repair(sea, hurt);
-  assert.equal(mended.hull, 5);
-  assert.equal(mended.gold, 9 - 3 * REPAIR_COST);
+  assert.equal(mended.hull, 6);
+  assert.equal(mended.gold, 0);
   assert.throws(() => repair(sea, { ...hurt, player: map.adj[w.player].find((n) => !map.nodes[n].port)! }), /in port/);
 });
