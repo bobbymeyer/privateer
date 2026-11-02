@@ -6,14 +6,14 @@
   import { plotCourse, sailToward } from '../world/course.ts';
   import type { NodeId } from '../world/map.ts';
   import { attack, fight, letPass, raid, raidable, repair, REPAIR_COST, YOUR_NATION, type Reckoning } from '../world/meet.ts';
-  import { isEnemy } from '../world/wars.ts';
+  import { CASUS_BELLI, enemiesOf, isEnemy } from '../world/wars.ts';
   import { TARGETS } from '../setup.ts';
   import { SEASON_NAMES } from '../world/ocean.ts';
-  import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, PARDON_COST, recruit, serves } from '../world/port.ts';
-  import { adjective, article } from '../world/ports.ts';
+  import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, isHaven, PARDON_COST, recruit, retire, serves } from '../world/port.ts';
+  import { adjective, article, nationName } from '../world/ports.ts';
   import { markerStrength, predict } from '../world/rumors.ts';
   import type { Sea } from '../world/ships.ts';
-  import { atIsland, createSea, createWorld, GOAL, HOME, knowledge, type WorldState } from '../world/world.ts';
+  import { atIsland, createSea, createWorld, GOAL, HOME, knowledge, pursuitOf, type WorldState } from '../world/world.ts';
   import Fight from './Fight.svelte';
   import Flag from './Flag.svelte';
   import { COLORS } from '../world/colors.ts';
@@ -152,7 +152,7 @@
     if (!sea || !world || focus === null || sailing) return [];
     const r = world.rumors.find((x) => x.id === focus);
     if (!r) return [];
-    const p = predict(sea, r, world.turn, knowledge(world), world.player, world.standing);
+    const p = predict(sea, r, world.turn, knowledge(world), world.player, pursuitOf(world));
     return p.flatMap((v, node) => (v > 0.003 ? [{ node, p: v }] : []));
   });
 
@@ -241,7 +241,11 @@
         {#if port}
           <section>
             <h2><Flag nation={port.nation} />{port.name}, {adjective(port.nation)}</h2>
-            {#if world.pirate && port.nation === YOUR_NATION}
+            {#if isHaven(sea, world)}
+              <p>a pirate's haven: they'll deal with you here, whoever wants you, and you can retire here when you're rich.</p>
+              <button onclick={() => attempt(() => retire(sea!, world!))} disabled={world.gold < GOAL}>retire here ({world.gold} of {GOAL})</button>
+            {/if}
+            {#if world.pirate && port.nation === YOUR_NATION && !isHaven(sea, world)}
               <p>they know you for a pirate here.</p>
               <button onclick={() => attempt(() => buyPardon(sea!, world!), 'pardoned, at a price')}>buy a royal pardon ({PARDON_COST})</button>
             {:else if !serves(sea, world)}
@@ -281,7 +285,7 @@
               <p class="faint">
                 {port.fort ? 'a fortified port: not for a small ship.' : 'an open town.'}
                 the {adjective(port.nation)} will remember it three times over and their guard ships will hunt twice as far.
-                {port.nation === YOUR_NATION ? ' it is your own flag: you would be a pirate.' : isEnemy(port.nation) ? ' they are at war with England: fair game.' : ' they are at peace with England: the Crown will hear of it.'}
+                {port.nation === YOUR_NATION ? ' it is your own flag: you would be a pirate.' : isEnemy(world.wars, port.nation) ? ' they are at war with England: fair game.' : ' they are at peace with England: the Crown will hear of it.'}
               </p>
               <button onclick={() => attempt(() => raid(sea!, world!))}>raid {port.name}</button>
             {/if}
@@ -302,6 +306,18 @@
               </li>
             {/each}
           </ul>
+        </section>
+
+        <section>
+          <h2>at war</h2>
+          <p>
+            {#each enemiesOf(world.wars, YOUR_NATION) as n}<span class="chip"><Flag nation={n} />{nationName(n)}</span>{/each}
+            {#if !enemiesOf(world.wars, YOUR_NATION).length}<span class="faint">England is at peace with everyone.</span>{/if}
+          </p>
+          <p class="faint">their ships and towns are fair game; anyone else's, the Crown hears of.</p>
+          {#each Object.entries(world.tension).filter(([, v]) => v) as [n, v]}
+            <p class="wanted"><Flag nation={n as Nation} />the peace with {nationName(n as Nation)} is strained: {v} of {CASUS_BELLI}</p>
+          {/each}
         </section>
 
         <section>
@@ -334,7 +350,7 @@
           <h2><Flag nation={h.nation} size={18} />{article(flagName)} {flagName} {what} alongside</h2>
           {#if h.nation === YOUR_NATION}
             <p class="wanted">she flies your flag. fire on her and you are a pirate: England will want you, its ports will shut, and London will hang you until you're pardoned.</p>
-          {:else if isEnemy(h.nation)}
+          {:else if isEnemy(world.wars, h.nation)}
             <p>the {flagName} are at war with England: she's fair game, and the Crown will think the better of you for taking her. the {flagName} will remember it, and their guard ships will be out for you.</p>
           {:else}
             <p>the {flagName} are at peace with England. fire on her and the Crown will hear of it, and the {flagName} will remember it{h.nation === 'local' ? '' : ': their guard ships will be out for you'}.</p>
@@ -354,8 +370,14 @@
     {:else if world.sunk || world.won}
       <div class="overlay">
         <div class="sheet">
-          <h2>{world.won ? 'home' : 'lost with all hands'}</h2>
-          <p>{world.won ? `you came home to ${HOME} on day ${world.turn + 1} with ${world.gold}.` : `the sea took you on day ${world.turn + 1}, ${world.gold} in the purse.`}</p>
+          <h2>{world.ending === 'retired' ? 'retired' : world.won ? 'home' : 'lost with all hands'}</h2>
+          <p>
+            {world.ending === 'retired'
+              ? `you retired to ${sea.map.nodes[world.player].port?.name} on day ${world.turn + 1} with ${world.gold}, a pirate rich enough to grow old.`
+              : world.won
+                ? `you came home to ${HOME} on day ${world.turn + 1} with ${world.gold}.`
+                : `the sea took you on day ${world.turn + 1}, ${world.gold} in the purse.`}
+          </p>
           <button onclick={newRun}>a new run</button>
         </div>
       </div>
@@ -386,6 +408,7 @@
   .rumors button { width: 100%; border-color: var(--rule); }
   .rumors button.focused { border-color: var(--theirs); color: var(--theirs); }
   .wanted { color: var(--theirs); }
+  .chip { display: inline-block; margin-right: 0.8rem; }
   .overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.92); display: grid; place-items: start center; overflow: auto; padding: 2rem 16px; }
   .sheet { width: min(44rem, 100%); background: var(--paper); border: 1.5px solid var(--ink); padding: 1.25rem; }
   @media (max-width: 60rem) {

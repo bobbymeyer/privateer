@@ -188,3 +188,12 @@ export const adjective = (n: Nation) => ADJECTIVES[n];
 
 /** `a` or `an`, for the word that follows. */
 export const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a');
+
+const NAMES: Record<Nation, string> = {
+  spain: 'Spain', portugal: 'Portugal', england: 'England', france: 'France', netherlands: 'the Dutch Republic',
+  denmark: 'Denmark', sweden: 'Sweden', hanse: 'the Hanse', italy: 'the Italian states', venice: 'Venice',
+  malta: 'the Knights of Malta', ottoman: 'the Ottomans', barbary: 'the Barbary corsairs', morocco: 'Morocco',
+  persia: 'Persia', oman: 'Oman', mughal: 'the Mughals', china: 'China', japan: 'Japan', local: 'the independent harbours',
+};
+/** `Spain`, `the Dutch Republic`: a nation by name, for the news. */
+export const nationName = (n: Nation) => NAMES[n];

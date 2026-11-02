@@ -17,7 +17,7 @@ import { type NodeId, ring } from './map.ts';
 import { type Roller, pick, roll } from './random.ts';
 import { type SeaKnowledge, legWeight } from './sea.ts';
 import type { Nation } from './ports.ts';
-import { HABITS, type Sea, type Ship, type ShipKind, type Standing, graphFor, hunterGoal, mayEnter, movesOn, onward, tradingPorts } from './ships.ts';
+import { HABITS, NO_PURSUIT, type Pursuit, type Sea, type Ship, type ShipKind, graphFor, mayEnter, movesOn, onward, pursuerGoal, pursues, tradingPorts } from './ships.ts';
 
 export interface Rumor {
   id: number;
@@ -86,12 +86,12 @@ export function makeRumor(sea: Sea, r: Roller, id: number, ship: Ship, turn: num
  * Within that, the observer can only weigh the legs out of a node by what it
  * knows of the sea (`know`). Knowing nothing, every leg looks the same.
  */
-export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge, player: NodeId, standing: Standing = {}): number[] {
+export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge, player: NodeId, pursuit: Pursuit = NO_PURSUIT): number[] {
   const { map, pattern } = sea;
   const g = graphFor(map, rumor.kind);
   const N = map.nodes.length;
-  const hunter = rumor.kind === 'hunter';
-  const huntGoal = hunterGoal(map, rumor, player, standing);
+  const hunter = pursues(rumor.kind);
+  const huntGoal = pursuerGoal(map, rumor, player, pursuit);
   const allowed = (n: NodeId) => mayEnter(map, rumor, n);
 
   // The ports it could be bound for, and from each, the ones it could go on to.

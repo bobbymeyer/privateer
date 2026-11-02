@@ -8,7 +8,7 @@ import { CREW, type Outfit, SHIP_CLASSES, UPGRADES, maxHullOf, sightOf } from '.
 import { adjective, type Nation } from './ports.ts';
 import { YOUR_NATION } from './meet.ts';
 import { type Sea, wantedBy } from './ships.ts';
-import type { WorldState } from './world.ts';
+import { GOAL, type WorldState } from './world.ts';
 
 /** Gold per point of standing raised, times how far below zero you are. */
 export const BRIBE_COST = 10;
@@ -19,11 +19,19 @@ const portHere = (sea: Sea, s: WorldState) => {
   return port;
 };
 
-/** Whether this port will deal with you. Independent harbours deal with anyone; English ones not with a pirate. */
+/**
+ * A pirate's havens: Port Royal, which asks no questions, and the Barbary
+ * coast. They deal with a pirate whoever wants him, and he can retire there.
+ */
+export const PIRATE_HAVENS = ['Port Royal', 'Algiers', 'Tunis', 'Tripoli', 'Salé'];
+export const isHaven = (sea: Sea, s: WorldState) => s.pirate && PIRATE_HAVENS.includes(sea.map.nodes[s.player].port?.name ?? '');
+
+/** Whether this port will deal with you. Independent harbours deal with anyone; English ones not with a pirate, but for Port Royal; a pirate's havens with a pirate. */
 export const serves = (sea: Sea, s: WorldState): boolean => {
   const port = sea.map.nodes[s.player].port;
   if (!port) return false;
   if ((s.sacked[s.player] ?? -1) > s.turn) return false;
+  if (isHaven(sea, s)) return true;
   if (s.pirate && port.nation === YOUR_NATION) return false;
   return port.nation === 'local' || !wantedBy(s.standing, port.nation);
 };
@@ -111,4 +119,16 @@ export function bribe(sea: Sea, s: WorldState): WorldState {
   if (s.pirate && port.nation === YOUR_NATION) throw new Error('no bribe buys off piracy: buy a pardon');
   const paid = pay(s, bribeCost(s, port.nation));
   return { ...paid, standing: { ...s.standing, [port.nation]: (s.standing[port.nation] ?? 0) + 1 } };
+}
+
+/**
+ * Retire, a pirate in one of his havens, with the score: a win, the
+ * pirate's way. London would hang him; Port Royal and the Barbary coast
+ * will let him grow old.
+ */
+export function retire(sea: Sea, s: WorldState): WorldState {
+  const port = portHere(sea, s);
+  if (!isHaven(sea, s)) throw new Error('a pirate retires in a haven: Port Royal, or the Barbary coast');
+  if (s.gold < GOAL) throw new Error(`not yet: ${GOAL} to retire on`);
+  return { ...s, won: true, ending: 'retired', log: [...s.log, { turn: s.turn, text: `you retired to ${port.name} with ${s.gold}, a pirate rich enough to grow old` }] };
 }

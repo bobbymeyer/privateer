@@ -11,7 +11,8 @@ import { buildMap, type NodeId, portNamed, ports } from './map.ts';
 import { type Nation, PORTS, adjective, navyOf } from './ports.ts';
 import { type Rumor, FADED, makeRumor, markerStrength } from './rumors.ts';
 import { buildPattern, type Chart, CURRENT_SEEN, chartKnowledge, type SeaKnowledge, seasonOf, windSeen } from './sea.ts';
-import { type FleetEntry, type Sea, type Ship, type Standing, mayEnter, moveShip, spawnShips } from './ships.ts';
+import { type FleetEntry, type Pursuit, type Sea, type Ship, type Standing, mayEnter, moveShip, spawnShips } from './ships.ts';
+import { type War, drift, isEnemy, openingWars } from './wars.ts';
 import { type Roller, roll } from './random.ts';
 import { type Outfit, START_OUTFIT, maxHullOf } from '../outfit.ts';
 import { type Hail, type Meeting, REFIT_DAYS, type Reckoning, YOUR_NATION, meeting } from './meet.ts';
@@ -50,8 +51,9 @@ export interface WorldState {
   outfit: Outfit;
   /** Uncharted islands, a few to a run, out where nobody sails. */
   islands: { node: NodeId; found: boolean }[];
-  /** Home to London with a score: the run is won. */
+  /** The run is won: home to London with a score, or retired, a rich pirate, to a haven. */
   won: boolean;
+  ending: 'home' | 'retired' | null;
   /** A ship alongside, waiting on your choice. While there is one, the world waits. */
   hail: Hail | null;
   /** You fired on an English ship. England wants you, and London will hang you, until you're pardoned. */
@@ -60,6 +62,10 @@ export interface WorldState {
   sacked: Record<NodeId, number>;
   /** Nations whose towns you've raided, and the turn until which their guard ships hunt twice as far. */
   alarm: Partial<Record<Nation, number>>;
+  /** Who is at war with whom. Opens differently each run, drifts by the season, and you can start a war. */
+  wars: War[];
+  /** How close your attacks on a nation at peace with England have brought the two to war. At CASUS_BELLI, it's war. */
+  tension: Partial<Record<Nation, number>>;
   /** What happened that you'd hear about: navies driving off intruders, and the like. */
   log: { turn: number; text: string }[];
 }
@@ -100,10 +106,19 @@ export const knowledge = (s: WorldState): SeaKnowledge => chartKnowledge(s.chart
  */
 export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Goa', 'Batavia', 'Manila', 'Algiers', 'Port Royal', 'Bridgetown'];
 
+/**
+ * Where enemy privateers fit out: Dunkirkers, Saint-Malo and Tortuga
+ * corsairs, Dutch capers, Salé rovers, Algerines, Spanish privateers out of
+ * Havana and Cartagena. They come for you whenever their nation is at war
+ * with England.
+ */
+export const PRIVATEER_PORTS = ['Dunkirk', 'Saint-Malo', 'Tortuga', 'Amsterdam', 'Willemstad', 'Salé', 'Algiers', 'Havana', 'Cartagena'];
+
 /** A merchant out of every port, a guard ship at every station, and the great courses. */
 export const DEFAULT_FLEET: FleetEntry[] = [
   ...PORTS.map((p): FleetEntry => ({ kind: 'merchant', home: p.name })),
   ...HUNTER_STATIONS.map((home): FleetEntry => ({ kind: 'hunter', home })),
+  ...PRIVATEER_PORTS.map((home): FleetEntry => ({ kind: 'privateer', home })),
   { kind: 'treasure-fleet', route: 'flota' },
   { kind: 'treasure-fleet', route: 'galeones' },
   { kind: 'treasure-fleet', route: 'south sea fleet' },
@@ -151,6 +166,7 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
   const ships = spawnShips(sea, fleet);
   const r: Roller = { rng: (seed ^ 0x0ce4) >>> 0 };
   const islands = placeIslands(sea, r).map((node) => ({ node, found: false }));
+  const wars = openingWars(r);
   return {
     rng: r.rng,
     turn: 0,
@@ -174,10 +190,13 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     outfit: START_OUTFIT,
     islands,
     won: false,
+    ending: null,
     hail: null,
     pirate: false,
     sacked: {},
     alarm: {},
+    wars,
+    tension: {},
   };
 }
 
@@ -192,8 +211,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   }
   const r: Roller = { rng: s.rng };
   const ships = s.ships.map((ship) => ({ ...ship }));
-  const alarmed = (n: Nation) => (s.alarm[n] ?? -1) > s.turn;
-  for (const ship of ships) moveShip(sea, r, ship, s.turn, to, s.standing, alarmed);
+  for (const ship of ships) moveShip(sea, r, ship, s.turn, to, pursuitOf(s));
 
   // Countries protect their waters: a foreign guard ship found inside them
   // is driven off by the navy and laid up at home.
@@ -218,11 +236,20 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   });
   if (atIsland({ ...s, islands }, to)) hull = Math.min(s.maxHull, hull + 1);
 
-  // Grudges fade.
-  const standing =
-    turn % STANDING_DECAY === 0
-      ? Object.fromEntries(Object.entries(s.standing).map(([n, v]) => [n, s.pirate && n === YOUR_NATION ? v! : v! - Math.sign(v!)]))
-      : s.standing;
+  // Grudges fade, and so does the strain your attacks have put on a peace.
+  const fading = turn % STANDING_DECAY === 0;
+  const standing = fading
+    ? Object.fromEntries(Object.entries(s.standing).map(([n, v]) => [n, s.pirate && n === YOUR_NATION ? v! : v! - Math.sign(v!)]))
+    : s.standing;
+  const tension = fading ? Object.fromEntries(Object.entries(s.tension).map(([n, v]) => [n, Math.max(0, v! - 1)])) : s.tension;
+
+  // A season of diplomacy.
+  let wars = s.wars;
+  if (turn % sea.pattern.seasonLength === 0) {
+    const d = drift(s.wars, r);
+    wars = d.wars;
+    for (const text of d.news) log.push({ turn, text });
+  }
 
   const next: WorldState = {
     ...s,
@@ -240,12 +267,23 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     gold,
     hull,
     standing,
+    tension,
+    wars,
   };
   // Home with a score — and no noose waiting.
   if (sea.map.nodes[to].port?.name === HOME && gold >= GOAL && !s.pirate) {
-    return { ...next, won: true, log: [...log, { turn, text: `home to London with ${gold}: the run is won` }] };
+    return { ...next, won: true, ending: 'home', log: [...log, { turn, text: `home to London with ${gold}: the run is won` }] };
   }
   return meeting(sea, next);
+}
+
+/** What pursuers make of you: who wants you, who's alarmed, who's at war with England. */
+export function pursuitOf(s: WorldState): Pursuit {
+  return {
+    standing: s.standing,
+    alarmed: (n) => (s.alarm[n] ?? -1) > s.turn,
+    enemy: (n) => isEnemy(s.wars, n),
+  };
 }
 
 /** A charted island you're lying at: no ship troubles you there, and the hull mends a point a day. */

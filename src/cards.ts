@@ -215,3 +215,14 @@ export const RELIEF = { side: 'target' as const, name: 'the garrison is reinforc
 export const RAID_CARDS: readonly CardDef[] = [
   { key: 'to-the-boats', name: 'back to the boats', text: 'flee 2', effects: [{ kind: 'flee', amount: 2 }], copies: 2 },
 ];
+
+/** An enemy privateer: a raider like you, quick to grapple and to chase, with a little in her hold. */
+export const PRIVATEER_CARDS: readonly CardDef[] = [
+  { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 4 },
+  { key: 'chain-and-bar', name: 'chain and bar', text: 'hurt 1, sails', effects: [{ kind: 'hurt', amount: 1 }, { kind: 'wound', what: 'sails' }], copies: 1 },
+  { key: 'grapnels', name: 'grapnels', text: 'hurt 1, hold 1', effects: [{ kind: 'hurt', amount: 1 }, { kind: 'hold', amount: 1 }], copies: 2 },
+  { key: 'give-chase', name: 'give chase', text: 'chase 2', effects: [{ kind: 'chase', amount: 2 }], copies: 2 },
+  { key: 'crack-on', name: 'crack on sail', text: 'flee 2', effects: [{ kind: 'flee', amount: 2 }], copies: 2 },
+  { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 1 },
+  { key: 'strike', name: 'strike colours', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.8 }], copies: 1 },
+];

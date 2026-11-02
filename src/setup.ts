@@ -3,7 +3,7 @@
  * hull, what's in its hold, and the price on its head.
  */
 
-import { ARMADA_CARDS, type Card, type CardDef, FORTRESS_CARDS, HUNTER_CARDS, MERCHANT_CARDS, RAID_CARDS, RELIEF, SHIP_CARDS, TOWN_CARDS, TREASURE_FLEET_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
+import { ARMADA_CARDS, type Card, type CardDef, FORTRESS_CARDS, HUNTER_CARDS, MERCHANT_CARDS, PRIVATEER_CARDS, RAID_CARDS, RELIEF, SHIP_CARDS, TOWN_CARDS, TREASURE_FLEET_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
 import { type EncounterState, type Reinforcement, createEncounter } from './rules.ts';
 import type { ShipKind } from './world/ships.ts';
 
@@ -31,6 +31,7 @@ export const RELIEF_COUNT = 4;
 
 export const TARGETS: Record<TargetKind, TargetDef> = {
   merchant: { name: 'merchant', hull: 12, cargo: 12, bounty: 4, cards: MERCHANT_CARDS },
+  privateer: { name: 'privateer', hull: 12, cargo: 8, bounty: 6, cards: PRIVATEER_CARDS },
   hunter: { name: 'guard ship', hull: 14, cargo: 3, bounty: 10, cards: HUNTER_CARDS },
   'treasure-ship': { name: 'galleon', hull: 13, cargo: 30, bounty: 6, cards: TREASURE_SHIP_CARDS },
   'treasure-fleet': { name: 'treasure fleet', hull: 24, cargo: 60, bounty: 10, cards: TREASURE_FLEET_CARDS },

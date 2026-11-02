@@ -29,6 +29,7 @@ export const NOTABLE: Record<ShipKind, number> = {
   'treasure-ship': 4,
   armada: 3,
   hunter: 2,
+  privateer: 2,
   merchant: 1,
 };
 

@@ -253,11 +253,23 @@ there, and the hull mends a point a day.
 that brings you nearest, and where steps tie, the one that runs best with
 the current and wind you've charted.
 
-**Who's at war with whom** (`src/world/wars.ts`). A century of wars in one
-table: England against Spain and the Barbary corsairs; Spain against the
-Dutch and the French; the Dutch against Portugal; the Ottomans against
-Venice and Malta; the Barbary states against nearly everyone. For you,
-sailing for England, it decides what's fair game:
+**Who's at war with whom** (`src/world/wars.ts`) is part of the world, and
+it moves:
+
+- **How a run opens:** England is at war with the Barbary corsairs and
+  Morocco, and with one of Spain, France or the Dutch Republic, chosen by
+  the run. The other powers' wars open as the century had them: Spain
+  against the Dutch and the French, the Dutch against Portugal, the
+  Ottomans against Venice and Malta, the corsairs against nearly everyone.
+- **It drifts.** Every season each pair of powers may make peace (12%) or
+  fall out (3%). The corsairs make peace hard and break it easily. The news
+  reports it.
+- **You can start a war.** Attacking a nation at peace with England puts a
+  strain on the peace: 1 for firing on a ship, 1 more for taking her, 3 for
+  a raid, 2 more for a sack. At 6, England and that nation are at war. The
+  strain fades as grudges do.
+
+For you, sailing for England, it decides what's fair game:
 
 | her flag | firing on her | taking her, or sacking the town |
 | --- | --- | --- |
@@ -273,10 +285,15 @@ outside a port. The world waits until you've dealt with it. If several are
 there, one that means you harm comes first, then the one that matters most
 by the bar's notability.
 
-- **She attacks you** if she's hostile: a guard ship or an armada of a
-  nation that wants you, or of one at war with England. The fight is on.
-  Enemy guard ships still only go out of their way to hunt you once their
+- **She attacks you** if she's hostile: a guard ship, an armada or a
+  privateer of a nation that wants you, or of one at war with England. The
+  fight is on. Guard ships only go out of their way to hunt you once their
   nation wants you.
+- **Enemy privateers** fit out of Dunkirk, Saint-Malo, Tortuga, Amsterdam,
+  Willemstad, Salé, Algiers, Havana and Cartagena. Whenever their nation is
+  at war with England they come for you, within 20 days of home. Unlike
+  guard ships they go where they like, other nations' waters included:
+  raiding foreign coasts is the trade.
 - **Anyone else comes alongside, and attacking is your choice.** Let her
   pass and she goes her way, and won't come alongside again for 5 days.
   Fire on her and her nation remembers it, a point off your standing,

@@ -32,9 +32,9 @@ import type { NodeId } from './map.ts';
 import { type Roller, roll } from './random.ts';
 import { serves } from './port.ts';
 import { makeRumor } from './rumors.ts';
-import { adjective, article, type Nation } from './ports.ts';
+import { adjective, article, type Nation, nationName } from './ports.ts';
 import { type Sea, type ShipKind, wantedBy } from './ships.ts';
-import { YOUR_NATION, isEnemy } from './wars.ts';
+import { CASUS_BELLI, YOUR_NATION, declare, isEnemy } from './wars.ts';
 import type { WorldState } from './world.ts';
 
 export { YOUR_NATION } from './wars.ts';
@@ -91,7 +91,7 @@ export interface Reckoning {
  * nation that wants you, or that's at war with England.
  */
 export const hostile = (s: WorldState, ship: { kind: ShipKind; nation: Nation }) =>
-  (ship.kind === 'hunter' || ship.kind === 'armada') && (wantedBy(s.standing, ship.nation) || isEnemy(ship.nation));
+  (ship.kind === 'hunter' || ship.kind === 'armada' || ship.kind === 'privateer') && (wantedBy(s.standing, ship.nation) || isEnemy(s.wars, ship.nation));
 
 /** After a move: a ship here to fight, or to hail? Called by `advance`. */
 export function meeting(sea: Sea, s: WorldState): WorldState {
@@ -112,8 +112,12 @@ function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, force
   return { ...s, rng: r.rng, hail: null, encounter: { ...who, fight, forced } };
 }
 
-/** What a hostile act costs, by whose it was and how bad: standing with them, standing with England, and the log. */
-function reckon(s: WorldState, nation: Nation, theirs: number, crown: { enemy: number; neutral: number }, what: (flag: string) => string): WorldState {
+/**
+ * What a hostile act costs, by whose it was and how bad: standing with
+ * them, standing with England, the strain on a peace (`strain`, for a
+ * nation at peace with England — enough of it and it's war), and the log.
+ */
+function reckon(s: WorldState, nation: Nation, theirs: number, crown: { enemy: number; neutral: number }, what: (flag: string) => string, strain = 0): WorldState {
   const standing = { ...s.standing, [nation]: (s.standing[nation] ?? 0) - theirs };
   const log = [...s.log];
   let pirate = s.pirate;
@@ -121,11 +125,20 @@ function reckon(s: WorldState, nation: Nation, theirs: number, crown: { enemy: n
     standing[nation] = Math.min(standing[nation]!, PIRACY_FLOOR);
     if (!pirate) log.push({ turn: s.turn, text: `${what('English')}: you're a pirate now, and England will hang you if it can` });
     pirate = true;
-  } else if (isEnemy(nation)) {
+  } else if (isEnemy(s.wars, nation)) {
     if (crown.enemy && !s.pirate) standing[YOUR_NATION] = (standing[YOUR_NATION] ?? 0) + crown.enemy;
-  } else if (crown.neutral) {
-    standing[YOUR_NATION] = Math.min(s.pirate ? PIRACY_FLOOR : Infinity, (standing[YOUR_NATION] ?? 0) - crown.neutral);
-    log.push({ turn: s.turn, text: `${what(adjective(nation))}, at peace with England: the Crown will hear of it` });
+  } else if (nation !== 'local') {
+    if (crown.neutral) {
+      standing[YOUR_NATION] = Math.min(s.pirate ? PIRACY_FLOOR : Infinity, (standing[YOUR_NATION] ?? 0) - crown.neutral);
+      log.push({ turn: s.turn, text: `${what(adjective(nation))}, at peace with England: the Crown will hear of it` });
+    }
+    // Strain on the peace. Enough of it and England is at war with them.
+    const t = (s.tension[nation] ?? 0) + strain;
+    if (t >= CASUS_BELLI) {
+      log.push({ turn: s.turn, text: `England and ${nationName(nation)} are at war: your attacks have seen to it` });
+      return { ...s, standing, pirate, log, tension: { ...s.tension, [nation]: 0 }, wars: declare(s.wars, YOUR_NATION, nation) };
+    }
+    return { ...s, standing, pirate, log, tension: { ...s.tension, [nation]: t } };
   }
   return { ...s, standing, pirate, log };
 }
@@ -134,7 +147,7 @@ function reckon(s: WorldState, nation: Nation, theirs: number, crown: { enemy: n
 export function attack(s: WorldState): WorldState {
   const h = s.hail;
   if (!h) throw new Error('there is no ship alongside');
-  const next = reckon(s, h.nation, 1, { enemy: 0, neutral: 1 }, (flag) => `you fired on ${article(flag)} ${flag} ${h.kind.replace('-', ' ')}`);
+  const next = reckon(s, h.nation, 1, { enemy: 0, neutral: 1 }, (flag) => `you fired on ${article(flag)} ${flag} ${h.kind.replace('-', ' ')}`, 1);
   return startFight(next, { shipId: h.shipId, port: null, kind: h.kind, nation: h.nation }, false);
 }
 
@@ -157,7 +170,7 @@ export function raid(sea: Sea, s: WorldState): WorldState {
   if (!port) throw new Error('there is no port here to raid');
   if (s.encounter || s.hail) throw new Error('there is a fight to finish first');
   if (!raidable(sea, s)) throw new Error(`${port.name} was sacked lately: there's nothing left`);
-  let next = reckon(s, port.nation, 3, { enemy: 0, neutral: 2 }, (flag) => `you raided ${port.name}, ${flag}`);
+  let next = reckon(s, port.nation, 3, { enemy: 0, neutral: 2 }, (flag) => `you raided ${port.name}, ${flag}`, 3);
   next = { ...next, alarm: { ...next.alarm, [port.nation]: s.turn + ALARM_DAYS } };
   return startFight(next, { shipId: -1, port: s.player, kind: port.fort ? 'fortress' : 'town', nation: port.nation }, false);
 }
@@ -195,7 +208,7 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   const attacked = !m.forced || hurtHer;
   const what = (flag: string) => (m.port !== null ? `you sacked ${sea.map.nodes[m.port].port!.name}, ${flag}` : `you took ${article(flag)} ${flag} ${m.kind.replace('-', ' ')}`);
   if (m.forced && hurtHer) w = reckon(w, m.nation, taken ? 2 : 1, { enemy: taken ? 1 : 0, neutral: 1 }, what);
-  else if (!m.forced && taken) w = reckon(w, m.nation, m.port !== null ? 2 : 1, { enemy: m.port !== null ? 2 : 1, neutral: 1 }, what);
+  else if (!m.forced && taken) w = reckon(w, m.nation, m.port !== null ? 2 : 1, { enemy: m.port !== null ? 2 : 1, neutral: 1 }, what, m.port !== null ? 2 : 1);
 
   if (m.port !== null) {
     if (taken) {
