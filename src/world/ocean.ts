@@ -132,7 +132,7 @@ export const SEASON_NAMES = ['winter', 'spring', 'summer', 'autumn'];
 export const ROUTES: Record<string, string[]> = {
   flota: ['Cádiz', 'Las Palmas', 'San Juan', 'Veracruz', 'Havana'],
   galeones: ['Cádiz', 'Las Palmas', 'Cartagena', 'Portobelo', 'Cartagena', 'Havana'],
-  'manila galleon': ['Acapulco', 'Manila'],
+  'manila galleon': ['Acapulco', 'Umatac', 'Manila'],
   'south sea fleet': ['Arica', 'Callao', 'Panama', 'Callao'],
   carreira: ['Lisbon', 'Mozambique', 'Goa'],
   retourvloot: ['Amsterdam', 'Cape Town', 'Batavia', 'Cape Town'],

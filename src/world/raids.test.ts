@@ -5,16 +5,18 @@ import { FORTRESS_CARDS, TOWN_CARDS } from '../cards.ts';
 import { act, legalActions } from '../rules.ts';
 import { encounterWith, RELIEF_FROM } from '../setup.ts';
 import { portNamed } from './map.ts';
-import { ALARM_DAYS, SACK_DAYS, attack, fight, raid, raidable } from './meet.ts';
-import { serves } from './port.ts';
+import { ALARM_DAYS, SACK_DAYS, attack, fight, meeting, raid, raidable } from './meet.ts';
+import { isHaven, retire, serves } from './port.ts';
 import { HUNT_RANGE, hunterGoal } from './ships.ts';
-import { WARS, atWar, isEnemy } from './wars.ts';
-import { advance, createSea, createWorld, type WorldState } from './world.ts';
+import { CASUS_BELLI, ENGLAND_OPENS_AGAINST, STANDING_WARS, atWar, declare, drift, enemiesOf, isEnemy, makePeace, openingWars } from './wars.ts';
+import { GOAL, advance, createSea, createWorld, type WorldState } from './world.ts';
 
 const sea = createSea();
 const { map } = sea;
 const at = (name: string) => portNamed(map, name);
-const quiet = (w: WorldState): WorldState => ({ ...w, ships: [], trail: [] });
+/** England at war with Spain and at peace with France, whatever the run opened with. */
+const spanishWar = (w: WorldState): WorldState => ({ ...w, wars: makePeace(declare(w.wars, 'england', 'spain'), 'england', 'france') });
+const quiet = (w: WorldState): WorldState => spanishWar({ ...w, ships: [], trail: [] });
 /** Play a fight out greedily: the keep that leaves the other side worst off, and you best. */
 const fightOut = (w: WorldState) => {
   while (w.encounter) {
@@ -29,15 +31,33 @@ const fightOut = (w: WorldState) => {
   return w;
 };
 
-test('the war table: symmetric, and England against Spain and the corsairs', () => {
-  for (const [a, b] of WARS) assert.ok(atWar(a, b) && atWar(b, a));
-  assert.ok(isEnemy('spain') && isEnemy('barbary'));
-  assert.ok(!isEnemy('france') && !isEnemy('netherlands') && !isEnemy('england'));
+test('a run opens with England against the corsairs and one great power, chosen by the run', () => {
+  const against = new Set<string>();
+  for (let seed = 0; seed < 30; seed++) {
+    const wars = openingWars({ rng: seed * 7 + 1 });
+    for (const [a, b] of STANDING_WARS) assert.ok(atWar(wars, a, b) && atWar(wars, b, a), 'symmetric');
+    assert.ok(isEnemy(wars, 'barbary') && isEnemy(wars, 'morocco'));
+    const great = ENGLAND_OPENS_AGAINST.filter((n) => isEnemy(wars, n));
+    assert.equal(great.length, 1);
+    against.add(great[0]);
+  }
+  assert.equal(against.size, 3, 'Spain, France and the Dutch all come up');
+});
+
+test('the wars drift, season by season', () => {
+  let wars = openingWars({ rng: 1 });
+  const r = { rng: 99 };
+  const seen = new Set<string>();
+  for (let season = 0; season < 40; season++) {
+    wars = drift(wars, r).wars;
+    seen.add(enemiesOf(wars, 'england').sort().join(','));
+  }
+  assert.ok(seen.size > 3, `England's enemies change over ten years: ${[...seen].join(' | ')}`);
 });
 
 /** On turn 1, with a ship of the given kind and flag lying one step off Plymouth (she won't move: it's her destination). */
 function alongside(pick: (s: WorldState['ships'][number]) => boolean, extra: Partial<WorldState> = {}) {
-  let w = advance(sea, createWorld(sea, 1), createWorld(sea, 1).player);
+  let w = spanishWar(advance(sea, spanishWar(createWorld(sea, 1)), createWorld(sea, 1).player));
   const step = map.adj[w.player].find((n) => !map.nodes[n].port)!;
   const ship = w.ships.find(pick)!;
   w = { ...w, ...extra, ships: w.ships.map((s) => (s.id === ship.id ? { ...s, node: step, dest: step } : s)) };
@@ -125,4 +145,48 @@ test('an alarm sends guard ships twice as far', () => {
   })!;
   assert.equal(hunterGoal(map, havana, far.id, { spain: -1 }), havana.home);
   assert.equal(hunterGoal(map, havana, far.id, { spain: -1 }, true), far.id);
+});
+
+test('raid a nation at peace with England often enough, and it is war', () => {
+  let w: WorldState = { ...quiet({ ...createWorld(sea, 1), player: at('La Rochelle') }), gold: 500 };
+  assert.ok(!isEnemy(w.wars, 'france'));
+  w = raid(sea, w);
+  assert.equal(w.tension.france, 3);
+  assert.ok(!isEnemy(w.wars, 'france'), 'not yet');
+  w = raid(sea, { ...w, encounter: null });
+  assert.ok(isEnemy(w.wars, 'france'), `${CASUS_BELLI} strain: war`);
+  assert.match(w.log.at(-1)!.text, /England and France are at war: your attacks have seen to it/);
+  assert.equal(w.tension.france, 0);
+});
+
+test('an enemy privateer attacks on sight; at peace, she only comes alongside', () => {
+  const { w: atWarWorld, ship } = alongside((s) => s.kind === 'privateer' && s.nation === 'spain');
+  assert.equal(atWarWorld.encounter?.shipId, ship.id);
+  assert.equal(atWarWorld.encounter?.kind, 'privateer');
+  // At peace she heads home rather than wait, so meet her where she is.
+  const w = quiet(createWorld(sea, 1));
+  const step = map.adj[w.player].find((n) => !map.nodes[n].port)!;
+  const atPeace: WorldState = { ...w, wars: makePeace(w.wars, 'england', 'spain'), player: step, ships: [{ ...ship, node: step }], trail: [[]] };
+  const met = meeting(sea, atPeace);
+  assert.equal(met.encounter, null);
+  assert.equal(met.hail?.shipId, ship.id);
+});
+
+test('a pirate’s havens deal with him whoever wants him, and he can retire there rich', () => {
+  const pirate: WorldState = { ...quiet(createWorld(sea, 1)), pirate: true, standing: { england: -5, barbary: -4 }, gold: 40 };
+  // Port Royal is English, and England would hang him — but it asks no questions.
+  const royal = { ...pirate, player: at('Port Royal') };
+  assert.ok(isHaven(sea, royal) && serves(sea, royal));
+  assert.equal(serves(sea, { ...pirate, player: at('Bristol') }), false, 'any other English port shuts him out');
+  // The Barbary coast, even when the corsairs want him.
+  const algiers = { ...pirate, player: at('Algiers') };
+  assert.ok(serves(sea, algiers));
+  assert.throws(() => retire(sea, algiers), /not yet/);
+  const rich = retire(sea, { ...algiers, gold: GOAL });
+  assert.ok(rich.won);
+  assert.equal(rich.ending, 'retired');
+  // An honest captain has no haven, and nothing to retire from.
+  const honest = { ...quiet(createWorld(sea, 1)), player: at('Algiers'), gold: GOAL };
+  assert.equal(isHaven(sea, honest), false);
+  assert.throws(() => retire(sea, honest), /haven/);
 });

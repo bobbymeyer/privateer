@@ -123,57 +123,59 @@ test('illegal picks are refused', () => {
   assert.throws(() => act(s, { type: 'keep', picks: [0, 3] }));
 });
 
-const flee = (side: Card['side']) => card(`flee-${side}`, side, [{ kind: 'flee' }]);
+const flee = (side: Card['side'], amount = 2) => card(`flee-${side}`, side, [{ kind: 'flee', amount }]);
 const hold = (side: Card['side'], amount = 1) => card(`hold-${side}`, side, [{ kind: 'hold', amount }]);
-/** Damage landing now, as if a damage card of that size were kept. */
+const chase = (side: Card['side'], amount = 2) => card(`chase-${side}`, side, [{ kind: 'chase', amount }]);
+/** Damage landing now, as if a wound of that size were kept. */
 const hit = (n: number) => card(`hit${n}`, 'target', [{ kind: 'breach', amount: n }]);
 const hurt = (n: number) => card(`hurt${n}`, 'ship', [{ kind: 'breach', amount: n }]);
 
-test('a ship that is not threatened does not run', () => {
+test('a flee card makes way; three is away', () => {
   const s1 = act(stacked([flee('target'), ...blank(2)]), { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.outcome, null);
-  const e = s1.events.find((e) => e.type === 'effect');
-  assert.equal(e?.type === 'effect' && e.note, 'unthreatened');
+  assert.equal(s1.outcome, null, 'two way is not enough');
+  assert.equal(s1.target.way, 2);
+  const s2 = act({ ...s1, hand: [flee('target'), ...blank(2)] }, { type: 'keep', picks: [0, 1] });
+  assert.equal(s2.outcome, 'escaped', 'four is');
 });
 
-test('a threatened target flees, and takes the rest of its hold with it', () => {
-  // Hull 5 → 2 is at half or less.
-  const s1 = act(stacked([card('haul', 'target', [{ kind: 'plunder', amount: 2 }, { kind: 'breach', amount: 3 }]), flee('target'), ...blank(1)]), { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.outcome, 'escaped');
-  assert.equal(s1.payout, 2);
-});
-
-test('threat is checked when the card resolves, so order matters', () => {
-  const hand = [hit(3), flee('target'), ...blank(1)];
-  assert.equal(act(stacked(hand), { type: 'keep', picks: [1, 0] }).outcome, null, 'fled before it was hurt: no');
-  assert.equal(act(stacked(hand), { type: 'keep', picks: [0, 1] }).outcome, 'escaped');
-});
-
-test('you flee the same way, and keep your plunder', () => {
-  const s0 = { ...stacked([hurt(3), flee('ship'), ...blank(1)]), plunder: 4 };
+test('you can run with what you came for, threatened or not', () => {
+  // Plunder aboard, hull untouched: two flee cards and you're away with it.
+  const s0 = { ...stacked([flee('ship'), flee('ship'), ...blank(1)]), plunder: 4 };
   const s1 = act(s0, { type: 'keep', picks: [0, 1] });
   assert.equal(s1.outcome, 'fled');
   assert.equal(s1.payout, 4);
 });
 
-test('hold cancels the other side’s next flee, once', () => {
-  const s0 = stacked([hold('ship'), hit(3), flee('target')], 6);
+test('a ship that has to run takes the rest of her hold with her', () => {
+  const s0 = { ...stacked([card('haul', 'target', [{ kind: 'plunder', amount: 2 }]), flee('target'), ...blank(1)]), target: { ...stacked(blank(3)).target, way: 2 } };
   const s1 = act(s0, { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.target.held, 1);
-  // The flee card went to the bottom; play it through by hand.
-  const s2 = act({ ...s1, hand: [flee('target'), ...blank(2)] }, { type: 'keep', picks: [0, 1] });
-  assert.equal(s2.outcome, null);
-  assert.equal(s2.target.held, 0);
-  const s3 = act({ ...s2, hand: [flee('target'), ...blank(2)] }, { type: 'keep', picks: [0, 1] });
-  assert.equal(s3.outcome, 'escaped');
+  assert.equal(s1.outcome, 'escaped');
+  assert.equal(s1.payout, 2);
 });
 
-test('their hold stops your flee', () => {
-  const s0 = stacked([hold('target'), hurt(3), flee('ship')]);
-  const s1 = act({ ...s0, hand: [s0.hand[0], s0.hand[1], blank(1)[0]] }, { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.ship.held, 1);
-  const s2 = act({ ...s1, hand: [flee('ship'), ...blank(2)] }, { type: 'keep', picks: [0, 1] });
-  assert.equal(s2.outcome, null);
+test('order matters: chase her before she runs, and she falls short', () => {
+  // She has 1 way. Chase first: 1 → 0, then she runs: 2. Not away.
+  // She runs first: 1 → 3. Away, before the chase.
+  const s0 = { ...stacked([chase('ship'), flee('target'), ...blank(1)]), target: { ...stacked(blank(3)).target, way: 1 } };
+  const chasedFirst = act(s0, { type: 'keep', picks: [0, 1] });
+  assert.equal(chasedFirst.outcome, null);
+  assert.equal(chasedFirst.target.way, 2);
+  assert.equal(act(s0, { type: 'keep', picks: [1, 0] }).outcome, 'escaped');
+});
+
+test('chase and hold take way off the other side', () => {
+  const s0 = { ...stacked([chase('ship'), hold('ship'), ...blank(1)], 6), target: { ...stacked(blank(3)).target, way: 2 } };
+  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
+  assert.equal(s1.target.way, 0, 'chase 2 took it all; hold had nothing left to take');
+  const s2 = act({ ...s1, hand: [flee('target'), ...blank(2)] }, { type: 'keep', picks: [0, 1] });
+  assert.equal(s2.outcome, null, 'she has to start again');
+});
+
+test('their hold takes your way', () => {
+  const s0 = { ...stacked([hold('target', 2), flee('ship'), ...blank(1)]), ship: { hull: 5, maxHull: 5, brace: 0, way: 2 } };
+  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
+  assert.equal(s1.outcome, null, 'held to 0, then 2: not away');
+  assert.equal(s1.ship.way, 2);
 });
 
 test('prisoners give up rumors, which go down with you if you sink', () => {
@@ -189,7 +191,7 @@ const damageIn = (cards: Card[], side: Card['side']) =>
   cards.filter((c) => c.damage && c.side === side).length;
 
 test('shot strikes the hull at once; brace soaks yours', () => {
-  const s0 = { ...stacked([card('broadside', 'ship', [{ kind: 'hit', amount: 3 }]), card('return', 'target', [{ kind: 'hurt', amount: 2 }]), ...blank(1)]), ship: { hull: 5, maxHull: 5, brace: 1, held: 0 } };
+  const s0 = { ...stacked([card('broadside', 'ship', [{ kind: 'hit', amount: 3 }]), card('return', 'target', [{ kind: 'hurt', amount: 2 }]), ...blank(1)]), ship: { hull: 5, maxHull: 5, brace: 1, way: 0 } };
   const s1 = act(s0, { type: 'keep', picks: [0, 1] });
   assert.equal(s1.target.hull, 2);
   assert.equal(s1.ship.hull, 4, 'one of the two braced');
@@ -224,7 +226,7 @@ test('sent to the bottom, a wound comes round again; two in a hand, one gets thr
 });
 
 test('shot-away sails: no hull, but no running till they are dealt with', () => {
-  const flee = card('flee', 'ship', [{ kind: 'flee' }]);
+  const flee = card('flee', 'ship', [{ kind: 'flee', amount: 3 }]);
   const hurt3 = card('hurt3', 'ship', [{ kind: 'breach', amount: 3 }]);
   // Threatened (hull 2 of 5), sails shot away and still in the deck: the flee fails.
   const rigged = { ...stacked([hurt3, flee, ...blank(1)]), deck: [woundCard('ship', 'sails', 'sails'), ...blank(5)] };

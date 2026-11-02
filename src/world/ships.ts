@@ -4,12 +4,13 @@
  */
 
 import { type Graph, type NodeId, type SeaMap, portNamed, ports } from './map.ts';
+import { distanceNm } from './geo.ts';
 import { ROUTES } from './ocean.ts';
 import type { Nation } from './ports.ts';
 import { type Roller, roll, weighted } from './random.ts';
 import { type SeaPattern, legWeight } from './sea.ts';
 
-export type ShipKind = 'merchant' | 'hunter' | 'treasure-ship' | 'treasure-fleet' | 'armada';
+export type ShipKind = 'merchant' | 'hunter' | 'privateer' | 'treasure-ship' | 'treasure-fleet' | 'armada' | 'monster';
 
 export interface Ship {
   id: number;
@@ -54,6 +55,10 @@ export const HABITS: Record<ShipKind, KindHabits> = {
   merchant: { slow: false, drift: 0.2, deep: false, pull: 1 },
   // Guard ships: small, weatherly, able to work to windward.
   hunter: { slow: false, drift: 0.15, deep: false, pull: 0.4 },
+  // Enemy privateers: fast, weatherly raiders out of their own ports.
+  privateer: { slow: false, drift: 0.2, deep: false, pull: 0.5 },
+  // A sea monster goes where the current takes it, but never far from its own sea.
+  monster: { slow: false, drift: 0.85, deep: false, pull: 1 },
   'treasure-ship': { slow: false, drift: 0.1, deep: true, pull: 1 },
   'treasure-fleet': { slow: true, drift: 0.1, deep: true, pull: 1 },
   armada: { slow: true, drift: 0.3, deep: true, pull: 1 },
@@ -63,6 +68,24 @@ export const HABITS: Record<ShipKind, KindHabits> = {
 export const TRADE_RANGE = 30;
 /** Hunters chase you while you are within this many days of their station. */
 export const HUNT_RANGE = 25;
+/** Privateers chase you while you are within this many days of their home port. */
+export const PRIVATEER_RANGE = 20;
+
+/** What a pursuer needs to know of the world to decide whether to come after you. */
+export interface Pursuit {
+  /** How each nation regards you: a guard ship comes once its nation wants you. */
+  standing: Standing;
+  /** A nation whose towns you've raided lately: its guard ships hunt twice as far. */
+  alarmed: (n: Nation) => boolean;
+  /** A nation at war with England: its privateers come for you. */
+  enemy: (n: Nation) => boolean;
+}
+export const NO_PURSUIT: Pursuit = { standing: {}, alarmed: () => false, enemy: () => false };
+/** A sea monster wanders no farther than this many days from the heart of its sea. */
+export const MONSTER_RANGE = 12;
+/** And past that, how often it still goes where the sea takes it rather than home. */
+export const MONSTER_HOMING_DRIFT = 0.2;
+
 /** Merchants trade mostly with their own flag: this much likelier. */
 export const HOME_TRADE = 3;
 
@@ -95,8 +118,28 @@ export function hunterGoal(map: SeaMap, hunter: { home: NodeId; nation: Nation }
 }
 
 /**
+ * Where a privateer is bound: after you, if her nation is at war with
+ * England and you're in her range; else home. Unlike a guard ship she goes
+ * where she likes — raiding other nations' coasts is the trade.
+ */
+export function privateerGoal(map: SeaMap, ship: { home: NodeId; nation: Nation }, player: NodeId, enemy: boolean): NodeId {
+  if (!enemy) return ship.home;
+  return map.distTo(ship.home)[player] <= PRIVATEER_RANGE ? player : ship.home;
+}
+
+/** Whether this kind goes after you at all. */
+export const pursues = (kind: ShipKind) => kind === 'hunter' || kind === 'privateer';
+
+/** Where a pursuer is bound, by kind. */
+export function pursuerGoal(map: SeaMap, ship: { kind: ShipKind; home: NodeId; nation: Nation }, player: NodeId, p: Pursuit): NodeId {
+  return ship.kind === 'privateer'
+    ? privateerGoal(map, ship, player, p.enemy(ship.nation))
+    : hunterGoal(map, ship, player, p.standing, p.alarmed(ship.nation));
+}
+
+/**
  * Countries protect their waters: a guard ship stays out of any other
- * nation's. Everyone else may go where they like.
+ * nation's. Everyone else may go where they like, privateers included.
  */
 export const mayEnter = (map: SeaMap, ship: { kind: ShipKind; nation: Nation }, node: NodeId) =>
   ship.kind !== 'hunter' || map.nodes[node].waters === null || map.nodes[node].waters === ship.nation;
@@ -122,15 +165,18 @@ export function onward(g: Graph, from: NodeId, dest: NodeId, allowed: (n: NodeId
  * One turn of movement. `hunted` is where you are; `standing`, who wants you.
  * Mutates `ship`; the caller has already copied it.
  */
-export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: NodeId, standing: Standing = {}, alarmed: (n: Nation) => boolean = () => false): void {
+export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: NodeId, pursuit: Pursuit = NO_PURSUIT): void {
   const { map, pattern } = sea;
   if (ship.laidUp > turn) return;
   if (!movesOn(ship.kind, turn)) return;
   const g = graphFor(map, ship.kind);
 
   const allowed = (n: NodeId) => mayEnter(map, ship, n);
-  if (ship.kind === 'hunter') {
-    ship.dest = hunterGoal(map, ship, hunted, standing, alarmed(ship.nation));
+  if (ship.kind === 'monster') {
+    // Drifting with the current, and back toward its own sea if it strays.
+    ship.dest = map.distTo(ship.home)[ship.node] > MONSTER_RANGE ? ship.home : null;
+  } else if (pursues(ship.kind)) {
+    ship.dest = pursuerGoal(map, ship, hunted, pursuit);
     if (ship.node === hunted && ship.dest === hunted) return; // found you
   } else if (ship.dest === null || ship.node === ship.dest) {
     // In port: a turn to load, and the next port picked.
@@ -146,7 +192,9 @@ export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: 
   }
 
   const weightOf = (m: NodeId) => legWeight(map, pattern, ship.node, m, turn);
-  if (ship.dest !== ship.node && roll(r) >= HABITS[ship.kind].drift) {
+  // A monster out of its sea turns for home in earnest.
+  const drift = ship.kind === 'monster' && ship.dest !== null ? MONSTER_HOMING_DRIFT : HABITS[ship.kind].drift;
+  if (ship.dest !== null && ship.dest !== ship.node && roll(r) >= drift) {
     const legs = onward(g, ship.node, ship.dest, allowed);
     if (legs.length) {
       ship.node = legs[weighted(r, legs.map(([m, f]) => f * weightOf(m) ** HABITS[ship.kind].pull))][0];
@@ -163,14 +211,33 @@ export interface FleetEntry {
   /** The port it fits out from. Route ships start at their route's first port. */
   home?: string;
   route?: keyof typeof ROUTES;
+  /** For a monster: the heart of its sea, in longitude and latitude, and the sea's name. */
+  at?: [number, number];
+  sea?: string;
 }
 
 export function spawnShips(sea: Sea, fleet: FleetEntry[]): Ship[] {
   const { map } = sea;
   return fleet.map((entry, id) => {
+    if (entry.at) {
+      const home = nearestOpen(map, entry.at);
+      return { id, kind: entry.kind, node: home, dest: null, route: null, routeName: entry.sea ?? null, leg: 0, home, laidUp: 0, nation: 'local' as Nation };
+    }
     const route = entry.route ? ROUTES[entry.route].map((name) => portNamed(map, name)) : null;
     const home = route ? route[0] : portNamed(map, entry.home ?? 'Havana');
     const nation = map.nodes[home].port!.nation;
     return { id, kind: entry.kind, node: home, dest: route ? route[1] : null, route, routeName: entry.route ?? null, leg: route ? 1 : 0, home, laidUp: 0, nation };
   });
+}
+
+/** The open-water node nearest a point: where a monster keeps. */
+function nearestOpen(map: SeaMap, at: [number, number]): NodeId {
+  let best = 0;
+  let bestD = Infinity;
+  for (const n of map.nodes) {
+    if (n.kind !== 'ocean' || n.port) continue;
+    const d = distanceNm(at, [n.lon, n.lat]);
+    if (d < bestD) [best, bestD] = [n.id, d];
+  }
+  return best;
 }

@@ -33,6 +33,7 @@ export const COLORS: Record<Nation, Colors> = {
   mughal: { field: '#14532d', border: '#d4a017' },
   china: { field: '#d4a017', border: '#c8102e' },
   japan: { field: '#c8102e', border: '#ffffff' },
+  native: { field: '#5b3a29', border: '#e9d8a6' },
 };
 
 export const colorsOf = (n: Nation) => COLORS[n];

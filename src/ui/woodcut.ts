@@ -12,6 +12,14 @@ export const SHIP = {
   pennant: 'M3,-11 L8,-10 L3,-9 Z',
 };
 
+/** A sea monster, as the chart-makers drew them: a serpent's coils breaking the water, and its head. */
+export const SERPENT = {
+  coils: 'M-11,4 C-10,-3 -6,-3 -5,4 M-3,4 C-2,-5 3,-5 4,4',
+  head: 'M6,4 C6,-4 9,-8 12,-6 C13,-5 12,-3 10,-3.5 C9,-2 9,1 9,4 Z',
+  waves: 'M-13,4 Q-11.5,2.5 -10,4 T-7,4 T-4,4 T-1,4 T2,4 T5,4 T8,4 T11,4 T14,4',
+  eye: 'M10.6,-5.4 h0.1',
+};
+
 /** A fortified port: a crenellated tower with a gate. */
 export const TOWER = {
   body: 'M-5,6 V-3 H-6.5 V-8 H-4 V-6 H-1.5 V-8 H1.5 V-6 H4 V-8 H6.5 V-3 H5 V6 Z',
@@ -48,21 +56,7 @@ export function windRose(r: number): { ink: string; paper: string; ring: number 
 }
 
 /** The seas by their names on charts of the time, where to letter them, and how big (degrees). */
-export const SEA_NAMES: { name: string; at: [number, number]; size: number }[] = [
-  { name: 'Mar del Nort', at: [-42, 33], size: 3 },
-  { name: 'Oceanus Æthiopicus', at: [-14, -22], size: 3 },
-  { name: 'Mar del Sur', at: [-118, -12], size: 3.4 },
-  { name: 'Mare Pacificum', at: [-165, 22], size: 3.4 },
-  { name: 'Oceanus Indicus', at: [78, -18], size: 3.2 },
-  { name: 'Mare Magellanicum', at: [-55, -50], size: 2.2 },
-  { name: 'Mar de las Antillas', at: [-74, 14.5], size: 1.4 },
-  { name: 'Golfo de Mexico', at: [-91, 25], size: 1.3 },
-  { name: 'Mare Mediterraneum', at: [17, 34.3], size: 1.3 },
-  { name: 'Mare Germanicum', at: [3, 56.5], size: 1 },
-  { name: 'Mare Arabicum', at: [63, 14], size: 1.5 },
-  { name: 'Sinus Gangeticus', at: [88, 15], size: 1.3 },
-  { name: 'Mare Sinense', at: [114, 13], size: 1.3 },
-];
+export { SEA_NAMES } from '../world/seas.ts';
 
 /** Where the wind roses sit, from which the rhumb lines fan across each ocean. */
 export const ROSES: [number, number][] = [

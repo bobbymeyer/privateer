@@ -29,6 +29,12 @@ and it's over.
   corsairs are fair game; anyone else's ships, the Crown hears of; an
   English ship makes you a pirate.
 - **Raiding a port**: in port, you can raid it instead of trading.
+- **Keep the crew in heart.** Morale runs out of ten. A long stretch with
+  no prize sours them, and at nothing it's mutiny. A prize, a round in the
+  bar, fresh water at an island and a good omen all put it up.
+- **Islanders** in Guam, Hawaii, Tahiti, Tonga, the Marquesas and Rapa Nui
+  trade water, fruit and timber, not drink or ships. Sometimes they put out
+  war canoes instead.
 
 Each run has a seed in the URL; `?seed=42` plays the same world again.
 
@@ -88,12 +94,13 @@ Every action and decision in combat is a card. There is no stop button.
   armada's broadside leave leaks. A fort fires heated shot. A guard ship
   fires chain and bar at your rigging, to stop you running.
 
-- **flee** — the card's own side breaks away. It only works when that side
-  is *threatened*, meaning its hull is at half or less; otherwise the card does
-  nothing. A ship that isn't in danger doesn't run. You get away the same
-  way the merchant does.
-- **hold** — cancels the other side's next flee: grapnels, boarders,
-  marksmen in the tops, a fleet cutting off your retreat.
+- **way** — a side gets away by making way: three of it and she's away.
+  A flee card makes 2, so it takes two, unless the other side takes way back
+  in between. Anyone may run at any time, you included, with plunder in the
+  hold; shot-away sails stop it.
+- **chase** and **hold** take way off the other side: give chase, crowd on
+  sail, grapnels, boarders, marksmen in the tops, a fleet cutting off your
+  retreat, an armada with the weather gauge. Whoever hunts carries them.
 
 Threat is checked when the card resolves, so order matters. If you play a
 merchant's flee card before you hurt it, it does nothing. Play it after your
@@ -252,11 +259,23 @@ there, and the hull mends a point a day.
 that brings you nearest, and where steps tie, the one that runs best with
 the current and wind you've charted.
 
-**Who's at war with whom** (`src/world/wars.ts`). A century of wars in one
-table: England against Spain and the Barbary corsairs; Spain against the
-Dutch and the French; the Dutch against Portugal; the Ottomans against
-Venice and Malta; the Barbary states against nearly everyone. For you,
-sailing for England, it decides what's fair game:
+**Who's at war with whom** (`src/world/wars.ts`) is part of the world, and
+it moves:
+
+- **How a run opens:** England is at war with the Barbary corsairs and
+  Morocco, and with one of Spain, France or the Dutch Republic, chosen by
+  the run. The other powers' wars open as the century had them: Spain
+  against the Dutch and the French, the Dutch against Portugal, the
+  Ottomans against Venice and Malta, the corsairs against nearly everyone.
+- **It drifts.** Every season each pair of powers may make peace (12%) or
+  fall out (3%). The corsairs make peace hard and break it easily. The news
+  reports it.
+- **You can start a war.** Attacking a nation at peace with England puts a
+  strain on the peace: 1 for firing on a ship, 1 more for taking her, 3 for
+  a raid, 2 more for a sack. At 6, England and that nation are at war. The
+  strain fades as grudges do.
+
+For you, sailing for England, it decides what's fair game:
 
 | her flag | firing on her | taking her, or sacking the town |
 | --- | --- | --- |
@@ -272,15 +291,54 @@ outside a port. The world waits until you've dealt with it. If several are
 there, one that means you harm comes first, then the one that matters most
 by the bar's notability.
 
-- **She attacks you** if she's hostile: a guard ship or an armada of a
-  nation that wants you, or of one at war with England. The fight is on.
-  Enemy guard ships still only go out of their way to hunt you once their
+- **She attacks you** if she's hostile: a guard ship, an armada or a
+  privateer of a nation that wants you, or of one at war with England. The
+  fight is on. Guard ships only go out of their way to hunt you once their
   nation wants you.
+- **Enemy privateers** fit out of Dunkirk, Saint-Malo, Tortuga, Amsterdam,
+  Willemstad, Salé, Algiers, Havana and Cartagena. Whenever their nation is
+  at war with England they come for you, within 20 days of home. Unlike
+  guard ships they go where they like, other nations' waters included:
+  raiding foreign coasts is the trade.
 - **Anyone else comes alongside, and attacking is your choice.** Let her
   pass and she goes her way, and won't come alongside again for 5 days.
   Fire on her and her nation remembers it, a point off your standing,
   however the fight goes, since you fired first; sinking her costs a point
   more.
+
+**Events at sea** (`src/world/events.ts`), once a day while nobody is
+fighting:
+
+- **Morale** starts at 7 of 10. From 30 days after the last prize, the crew
+  lose a point every 10 days. At nothing it's **mutiny**: a hand of note is
+  hanged as a ringleader or deserts at the next landfall, taking his cards
+  out of your deck with him. With nobody of note aboard, the strongroom is
+  broken open and 30% of the gold goes. Afterwards morale is 4 and the
+  clock starts again.
+- **What puts it up**: a prize with a payout, +3 (+4 for a sacked town); the
+  first round bought in a port, +1; trading with islanders, +3; each day at
+  anchor off a charted island, +1; a good omen, +2.
+- **Good omens**, about one day in 45 at sea: birds over the bow, a spring on
+  an island, Saint Elmo's fire, porpoises under the bow.
+- **Storms**, about one day in 120 at sea. Three times as often in the
+  Antilles in autumn and in the Indian seas in the summer monsoon, and
+  twice as often past forty degrees. A storm costs 1 to 3 hull, never the
+  last point, or a tenth to a quarter of the gold, 30 at most, thrown over
+  the side. (At first it was one day in 80 and up to two fifths of the
+  purse, and the captain bot's wins fell from 43% to 27%; as now, 33% over
+  30 runs, about 5 storms and 10 omens a run, and no mutinies: the bot
+  takes a prize often enough to keep its crew.)
+- **Islanders**: Umatac on Guam (Spanish, the galleon's watering stop on
+  the way to Manila), and native harbours at Kealakekua, Matavai, Nuku'alofa,
+  Nuku Hiva and Rapa Nui. Native ports have no bar, yard or hands to hire,
+  but trade provisions, 3 gold for +3 morale and +2 hull, once a day. Coming
+  in, 30% of the time the canoes come out to fight instead (70% if you've
+  raided them). Beating them off costs you no standing; raiding their town
+  does.
+- **Sea monsters**: one in each named sea on the chart. A monster drifts
+  where the current takes it, turns for home once it's more than 12 days
+  out, and attacks whoever it meets. It's nobody's, so fighting it costs no
+  standing, and its bounty pays (ambergris, and a story for the bar).
 
 **Raiding a port.** In port, raid it instead of trading. The fight is the
 same game against the town's defences, from `src/setup.ts`:
@@ -472,6 +530,8 @@ src/
     meet.ts      meeting a ship at sea, fighting it, settling up, repairs
     port.ts      hiring, the yard, bribes, and who will deal with you
     wars.ts      who's at war with whom, and so what's fair game
+    events.ts    a day at sea: morale and mutiny, storms, omens
+    seas.ts      the named seas, where the chart letters them and the monsters keep
     course.ts    setting a course and sailing it a day at a time
     world.ts     createWorld, advance, observe, hearRumor — pure, like rules.ts
 cli/

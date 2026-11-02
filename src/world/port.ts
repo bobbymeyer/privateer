@@ -8,7 +8,8 @@ import { CREW, type Outfit, SHIP_CLASSES, UPGRADES, maxHullOf, sightOf } from '.
 import { adjective, type Nation } from './ports.ts';
 import { YOUR_NATION } from './meet.ts';
 import { type Sea, wantedBy } from './ships.ts';
-import type { WorldState } from './world.ts';
+import { GOAL, type WorldState } from './world.ts';
+import { MORALE_MAX } from './events.ts';
 
 /** Gold per point of standing raised, times how far below zero you are. */
 export const BRIBE_COST = 10;
@@ -19,14 +20,54 @@ const portHere = (sea: Sea, s: WorldState) => {
   return port;
 };
 
-/** Whether this port will deal with you. Independent harbours deal with anyone; English ones not with a pirate. */
+/**
+ * A pirate's havens: Port Royal, which asks no questions, and the Barbary
+ * coast. They deal with a pirate whoever wants him, and he can retire there.
+ */
+export const PIRATE_HAVENS = ['Port Royal', 'Algiers', 'Tunis', 'Tripoli', 'Salé'];
+export const isHaven = (sea: Sea, s: WorldState) => s.pirate && PIRATE_HAVENS.includes(sea.map.nodes[s.player].port?.name ?? '');
+
+/** Whether this port will deal with you. Independent harbours deal with anyone; English ones not with a pirate, but for Port Royal; a pirate's havens with a pirate. */
 export const serves = (sea: Sea, s: WorldState): boolean => {
   const port = sea.map.nodes[s.player].port;
   if (!port) return false;
   if ((s.sacked[s.player] ?? -1) > s.turn) return false;
+  if (isHaven(sea, s)) return true;
   if (s.pirate && port.nation === YOUR_NATION) return false;
+  // Islanders trade, but in kind: no bar, no hands to hire, no yard.
+  if (port.nation === 'native') return false;
   return port.nation === 'local' || !wantedBy(s.standing, port.nation);
 };
+
+/** What water, fruit and fresh meat cost from islanders, in trade goods. */
+export const PROVISION_COST = 3;
+/** And what they do for the crew, and for the ship. */
+export const PROVISION_CHEER = 3;
+export const PROVISION_HULL = 2;
+
+/** Whether the islanders here will trade with you today. */
+export const provisions = (sea: Sea, s: WorldState) =>
+  sea.map.nodes[s.player].port?.nation === 'native' && !wantedBy(s.standing, 'native') && s.rounds === 0 && !s.encounter;
+
+/**
+ * Trade with islanders for water, fruit and fresh meat, and timber for the
+ * ship: the crew's spirits up, a little hull mended. Once a day — a day's
+ * trading is counted, like a night in the bar, in `rounds`.
+ */
+export function provision(sea: Sea, s: WorldState): WorldState {
+  const port = portHere(sea, s);
+  if (port.nation !== 'native') throw new Error('provisions are traded for with islanders');
+  if (wantedBy(s.standing, 'native')) throw new Error(`the ${port.name} islanders won't trade with you`);
+  if (s.rounds > 0) throw new Error("you've traded here today");
+  const paid = pay(s, PROVISION_COST);
+  return {
+    ...paid,
+    rounds: s.rounds + 1,
+    morale: Math.min(MORALE_MAX, s.morale + PROVISION_CHEER),
+    hull: Math.min(s.maxHull, s.hull + PROVISION_HULL),
+    log: [...s.log, { turn: s.turn, text: `water, fruit and timber from the islanders at ${port.name}` }],
+  };
+}
 
 /** A royal pardon for piracy: bought in an English port, and dear. */
 export const PARDON_COST = 80;
@@ -57,7 +98,7 @@ const pay = (s: WorldState, cost: number): WorldState => {
 };
 
 /** The outfit changed: hull and sight follow it. A bigger ship comes with its hull whole; damage stays with the old one. */
-function refit(s: WorldState, outfit: Outfit, freshHull = false): WorldState {
+export function refit(s: WorldState, outfit: Outfit, freshHull = false): WorldState {
   const maxHull = maxHullOf(outfit);
   const hull = freshHull ? maxHull : Math.min(maxHull, s.hull + (maxHull - s.maxHull));
   return { ...s, outfit, maxHull, hull, sight: sightOf(outfit) };
@@ -111,4 +152,16 @@ export function bribe(sea: Sea, s: WorldState): WorldState {
   if (s.pirate && port.nation === YOUR_NATION) throw new Error('no bribe buys off piracy: buy a pardon');
   const paid = pay(s, bribeCost(s, port.nation));
   return { ...paid, standing: { ...s.standing, [port.nation]: (s.standing[port.nation] ?? 0) + 1 } };
+}
+
+/**
+ * Retire, a pirate in one of his havens, with the score: a win, the
+ * pirate's way. London would hang him; Port Royal and the Barbary coast
+ * will let him grow old.
+ */
+export function retire(sea: Sea, s: WorldState): WorldState {
+  const port = portHere(sea, s);
+  if (!isHaven(sea, s)) throw new Error('a pirate retires in a haven: Port Royal, or the Barbary coast');
+  if (s.gold < GOAL) throw new Error(`not yet: ${GOAL} to retire on`);
+  return { ...s, won: true, ending: 'retired', log: [...s.log, { turn: s.turn, text: `you retired to ${port.name} with ${s.gold}, a pirate rich enough to grow old` }] };
 }

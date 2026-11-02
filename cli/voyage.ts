@@ -21,10 +21,10 @@ import { sailToward } from '../src/world/course.ts';
 import { type NodeId, portNamed, ports } from '../src/world/map.ts';
 import { attack, fight, letPass, raid, raidable, repair, REPAIR_COST } from '../src/world/meet.ts';
 import { isEnemy } from '../src/world/wars.ts';
-import { buyShip, recruit, serves } from '../src/world/port.ts';
+import { buyShip, PROVISION_COST, provision, provisions, recruit, serves } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
-import { createSea, createWorld, GOAL, HOME, knowledge, type WorldState } from '../src/world/world.ts';
+import { createSea, createWorld, GOAL, HOME, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
 
 const arg = (name: string, fallback: string) => {
@@ -39,11 +39,12 @@ const { map } = sea;
 const london = portNamed(map, HOME);
 const harbours = ports(map);
 
-const WORTH: Record<ShipKind, number> = { 'treasure-ship': 3, merchant: 2, 'treasure-fleet': 1.5, hunter: 0, armada: 0 };
+const WORTH: Record<ShipKind, number> = { 'treasure-ship': 3, merchant: 2, 'treasure-fleet': 1.5, hunter: 0, privateer: 0.5, armada: 0, monster: 0 };
 const HIRE_ORDER = ['quartermaster', 'gunner', 'pilot', 'boatswain', 'marksmen', 'surgeon', 'navigator'];
 const fightBot = (outgunned: boolean) => lookahead({ hull: 0.6, damage: 0.4, fled: outgunned ? 100 : 0 });
 
 function inPort(w: WorldState): WorldState {
+  if (provisions(sea, w) && w.gold >= PROVISION_COST && (w.morale <= 7 || w.hull < w.maxHull)) w = provision(sea, w);
   if (!serves(sea, w)) return w;
   if (w.hull < w.maxHull && w.gold >= REPAIR_COST) w = repair(sea, w);
   for (let i = 0; i < 2 && w.gold >= ROUND_COST + 10; i++) w = buyRound(sea, w).world;
@@ -62,11 +63,11 @@ function inPort(w: WorldState): WorldState {
   return w;
 }
 
-/** A ship in sight you'd rather not meet: an armada, or a guard ship whose nation wants you. */
+/** A ship in sight you'd rather not meet: an armada, a sea monster, or a guard ship whose nation wants you. */
 function danger(w: WorldState): NodeId | null {
   const d = map.distTo(w.player);
   const bad = w.ships.find(
-    (s) => s.laidUp <= w.turn && d[s.node] <= w.sight + 1 && (s.kind === 'armada' || (s.kind === 'hunter' && wantedBy(w.standing, s.nation))),
+    (s) => s.laidUp <= w.turn && d[s.node] <= w.sight + 1 && (s.kind === 'armada' || s.kind === 'monster' || (s.kind === 'hunter' && wantedBy(w.standing, s.nation))),
   );
   return bad ? bad.node : null;
 }
@@ -87,10 +88,10 @@ function choose(w: WorldState): NodeId {
   }
   let best: { node: NodeId; value: number } | null = null;
   for (const r of w.rumors) {
-    if (!isEnemy(r.nation)) continue; // only enemies are fair game
+    if (!isEnemy(w.wars, r.nation)) continue; // only enemies are fair game
     const value = WORTH[r.kind] * markerStrength(r, w.turn);
     if (value <= 0.3 || (best && value <= best.value)) continue;
-    const p = predict(sea, r, w.turn, knowledge(w), w.player, w.standing);
+    const p = predict(sea, r, w.turn, knowledge(w), w.player, pursuitOf(w));
     const node = p.indexOf(Math.max(...p));
     if (d[node] <= 25) best = { node, value };
   }
@@ -99,7 +100,7 @@ function choose(w: WorldState): NodeId {
   if (w.hull >= w.maxHull * 0.9) {
     const big = SHIP_CLASSES[w.outfit.ship].hull >= 14;
     const towns = harbours
-      .filter((p) => isEnemy(map.nodes[p].port!.nation) && (big || !map.nodes[p].port!.fort) && (w.sacked[p] ?? -1) < w.turn && d[p] <= 30)
+      .filter((p) => isEnemy(w.wars, map.nodes[p].port!.nation) && (big || !map.nodes[p].port!.fort) && (w.sacked[p] ?? -1) < w.turn && d[p] <= 30)
       .sort((a, b) => d[a] - d[b]);
     if (towns.length) return towns[0];
   }
@@ -134,6 +135,9 @@ const ends: Record<string, number> = {};
 const killedBy: Record<string, number> = {};
 let passed = 0;
 let raids = 0;
+let mutinies = 0;
+let storms = 0;
+let omens = 0;
 const hullIn: Record<string, string[]> = {};
 for (let seed = 0; seed < RUNS; seed++) {
   let w = createWorld(sea, seed);
@@ -145,7 +149,7 @@ for (let seed = 0; seed < RUNS; seed++) {
       // An enemy port, on a sound hull: raid it. A fortified one only in a ship that can take it.
       const port = map.nodes[w.player].port!;
       const able = !port.fort || SHIP_CLASSES[w.outfit.ship].hull >= 14;
-      if (isEnemy(port.nation) && raidable(sea, w) && able && w.hull >= w.maxHull * 0.9 && w.gold < GOAL) {
+      if (isEnemy(w.wars, port.nation) && raidable(sea, w) && able && w.hull >= w.maxHull * 0.9 && w.gold < GOAL) {
         w = fightItOut(raid(sea, w));
         raids++;
       } else w = inPort(w);
@@ -160,7 +164,7 @@ for (let seed = 0; seed < RUNS; seed++) {
     // A ship alongside: foreign prizes worth the risk, on a sound hull; never your own flag.
     if (w.hail) {
       const h = w.hail;
-      const worth = (h.kind === 'merchant' || h.kind === 'treasure-ship') && isEnemy(h.nation);
+      const worth = (h.kind === 'merchant' || h.kind === 'treasure-ship') && isEnemy(w.wars, h.nation);
       w = worth && w.hull >= w.maxHull * 0.6 ? attack(w) : letPass(w);
       if (!w.encounter) passed++;
     }
@@ -169,6 +173,9 @@ for (let seed = 0; seed < RUNS; seed++) {
       dest = null;
     }
   }
+  mutinies += w.log.filter((l) => l.text.startsWith('mutiny')).length;
+  storms += w.log.filter((l) => l.text.startsWith('a storm')).length;
+  omens += w.log.filter((l) => l.text.startsWith('a good omen')).length;
   results.push({ won: w.won, sunk: w.sunk, day: w.turn, gold: w.gold, fights, ship: w.outfit.ship });
 }
 
@@ -184,3 +191,4 @@ console.log('ships at the end', results.reduce((t, r) => ((t[r.ship] = (t[r.ship
 console.log('sunk by', killedBy, '· hull going in', hullIn);
 console.log(`let pass ${(passed / RUNS).toFixed(1)} a run`);
 console.log(`raids ${(raids / RUNS).toFixed(1)} a run`);
+console.log(`mutinies ${(mutinies / RUNS).toFixed(1)}, storms ${(storms / RUNS).toFixed(1)}, omens ${(omens / RUNS).toFixed(1)} a run`);

@@ -3,7 +3,7 @@
 import type { Effect } from './cards.ts';
 import type { EffectNote, GameEvent, Outcome } from './rules.ts';
 
-const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold' | 'hit' | 'hurt' | 'breach' | 'interrogate' | 'recall' | 'wound'>, string> = {
+const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold' | 'chase' | 'hit' | 'hurt' | 'breach' | 'interrogate' | 'recall' | 'wound'>, string> = {
   plunder: 'hauls aboard',
   repair: 'repairs',
   brace: 'braces for',
@@ -14,10 +14,8 @@ const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold' | 'hit' | 'hurt' | 'b
 export function describeEffect(e: Effect, applied: number, note?: EffectNote, mine = true): string {
   if (e.kind === 'flee') {
     const who = mine ? 'you' : 'the target';
-    if (note === 'unthreatened') return `${who} ${mine ? 'are' : 'is'} not threatened enough to run`;
-    if (note === 'held') return `${who} ${mine ? 'try' : 'tries'} to run, but ${mine ? 'are' : 'is'} held`;
     if (note === 'rigging') return `${who} ${mine ? 'try' : 'tries'} to run, but the sails are shot away`;
-    return `${who} break${mine ? '' : 's'} away`;
+    return `${who} ${mine ? 'make' : 'makes'} ${applied} way${applied > e.amount ? ', running hard' : ''}`;
   }
   if (e.kind === 'hit') return `hits the target for ${applied}`;
   if (e.kind === 'hurt') return `hurts you for ${applied}${applied < e.amount ? ` (${e.amount - applied} braced)` : ''}`;
@@ -28,7 +26,8 @@ export function describeEffect(e: Effect, applied: number, note?: EffectNote, mi
   }
   if (e.kind === 'recall') return applied ? `brings ${applied} spent ${applied === 1 ? 'card' : 'cards'} back under the deck` : 'nothing spent to bring back';
   if (e.kind === 'interrogate') return `prisoners talk: a rumor, ${Math.round(e.reliability * 100)}% reliable`;
-  if (e.kind === 'hold') return `${mine ? 'holds the target' : 'holds you'} for ${applied}`;
+  if (e.kind === 'chase') return applied ? `${mine ? 'you give chase' : 'she gives chase'}: ${applied} way off ${mine ? 'her' : 'you'}` : `${mine ? 'you give chase' : 'she gives chase'}, but ${mine ? 'she' : 'you'} had made no way`;
+  if (e.kind === 'hold') return applied ? `${mine ? 'holds her' : 'holds you'}: ${applied} way lost` : `${mine ? 'holds her' : 'holds you'}, though no way had been made`;
   const amount = e.amount;
   const short = applied !== amount ? ` (of ${amount})` : '';
   return `${VERB[e.kind]} ${applied}${short}`;
