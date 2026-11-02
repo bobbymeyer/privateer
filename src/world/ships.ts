@@ -87,10 +87,11 @@ export function tradingPorts(map: SeaMap, node: NodeId): NodeId[] {
  * you're within its range, and you're not in another nation's protected
  * waters — which a guard ship won't enter.
  */
-export function hunterGoal(map: SeaMap, hunter: { home: NodeId; nation: Nation }, player: NodeId, standing: Standing): NodeId {
+export function hunterGoal(map: SeaMap, hunter: { home: NodeId; nation: Nation }, player: NodeId, standing: Standing, alarmed = false): NodeId {
   if (!wantedBy(standing, hunter.nation)) return hunter.home;
   if (!mayEnter(map, { kind: 'hunter', nation: hunter.nation }, player)) return hunter.home;
-  return map.distTo(hunter.home)[player] <= HUNT_RANGE ? player : hunter.home;
+  // A raid raises the alarm: for a while they hunt twice as far.
+  return map.distTo(hunter.home)[player] <= HUNT_RANGE * (alarmed ? 2 : 1) ? player : hunter.home;
 }
 
 /**
@@ -121,7 +122,7 @@ export function onward(g: Graph, from: NodeId, dest: NodeId, allowed: (n: NodeId
  * One turn of movement. `hunted` is where you are; `standing`, who wants you.
  * Mutates `ship`; the caller has already copied it.
  */
-export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: NodeId, standing: Standing = {}): void {
+export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: NodeId, standing: Standing = {}, alarmed: (n: Nation) => boolean = () => false): void {
   const { map, pattern } = sea;
   if (ship.laidUp > turn) return;
   if (!movesOn(ship.kind, turn)) return;
@@ -129,7 +130,7 @@ export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: 
 
   const allowed = (n: NodeId) => mayEnter(map, ship, n);
   if (ship.kind === 'hunter') {
-    ship.dest = hunterGoal(map, ship, hunted, standing);
+    ship.dest = hunterGoal(map, ship, hunted, standing, alarmed(ship.nation));
     if (ship.node === hunted && ship.dest === hunted) return; // found you
   } else if (ship.dest === null || ship.node === ship.dest) {
     // In port: a turn to load, and the next port picked.

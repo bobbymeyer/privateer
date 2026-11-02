@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { describeEvent, OUTCOME_TEXT } from '../describe.ts';
+  import { describeEvent, OUTCOME_TEXT, RAID_OUTCOME_TEXT } from '../describe.ts';
   import { threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
   import type { Reckoning } from '../world/meet.ts';
-  import { adjective, article } from '../world/ports.ts';
+  import { adjective } from '../world/ports.ts';
   import CardView from './CardView.svelte';
   import Gauge from './Gauge.svelte';
 
@@ -10,7 +10,8 @@
     fight,
     lastRound,
     reckoning = null,
-    flag,
+    title,
+    isRaid = false,
     onact,
     oncontinue,
   }: {
@@ -18,8 +19,10 @@
     lastRound: GameEvent[];
     /** Set once the fight is over and settled. */
     reckoning?: Reckoning | null;
-    /** Whose ship it is. */
-    flag: string;
+    /** What you're fighting, as a heading: an English merchant, the raid on Maracaibo. */
+    title: string;
+    /** A raid on a port, rather than a ship. */
+    isRaid?: boolean;
     onact: (a: Action) => void;
     oncontinue: () => void;
   } = $props();
@@ -42,6 +45,8 @@
 
   function onkeydown(e: KeyboardEvent) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // The fight has the keys: none go through to whatever button is focused behind it.
+    if (['1', '2', '3', 'Enter', ' '].includes(e.key)) e.preventDefault();
     if (fight.outcome) {
       if (e.key === 'Enter') oncontinue();
       return;
@@ -59,7 +64,7 @@
 
 <section class="fight" aria-label="encounter">
   <header>
-    <h2>{article(flag)} {flag} {fight.target.name}</h2>
+    <h2>{title}</h2>
     <p class="meta">round {fight.round} · {fight.deck.length} in the deck</p>
   </header>
 
@@ -86,7 +91,7 @@
 
   {#if fight.outcome}
     <div class="outcome">
-      <h3>{OUTCOME_TEXT[fight.outcome]}</h3>
+      <h3>{(isRaid ? RAID_OUTCOME_TEXT : OUTCOME_TEXT)[fight.outcome]}</h3>
       <p>you come away with {fight.payout}</p>
       {#if reckoning?.heard}<p>prisoners talked: {reckoning.heard} {reckoning.heard === 1 ? 'rumor' : 'rumors'}</p>{/if}
       {#if reckoning?.attacked}<p>the {adjective(reckoning.nation)} will remember this</p>{/if}

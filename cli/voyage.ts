@@ -19,7 +19,8 @@ import { threatened } from '../src/rules.ts';
 import { buyRound, ROUND_COST } from '../src/world/bar.ts';
 import { sailToward } from '../src/world/course.ts';
 import { type NodeId, portNamed, ports } from '../src/world/map.ts';
-import { attack, fight, letPass, repair, REPAIR_COST, YOUR_NATION } from '../src/world/meet.ts';
+import { attack, fight, letPass, raid, raidable, repair, REPAIR_COST } from '../src/world/meet.ts';
+import { isEnemy } from '../src/world/wars.ts';
 import { buyShip, recruit, serves } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
@@ -86,6 +87,7 @@ function choose(w: WorldState): NodeId {
   }
   let best: { node: NodeId; value: number } | null = null;
   for (const r of w.rumors) {
+    if (!isEnemy(r.nation)) continue; // only enemies are fair game
     const value = WORTH[r.kind] * markerStrength(r, w.turn);
     if (value <= 0.3 || (best && value <= best.value)) continue;
     const p = predict(sea, r, w.turn, knowledge(w), w.player, w.standing);
@@ -93,9 +95,37 @@ function choose(w: WorldState): NodeId {
     if (d[node] <= 25) best = { node, value };
   }
   if (best) return best.node;
-  // Nothing worth chasing: a port within a fortnight, for the bar.
+  // Nothing worth chasing: an enemy town worth raiding, if the hull's sound.
+  if (w.hull >= w.maxHull * 0.9) {
+    const big = SHIP_CLASSES[w.outfit.ship].hull >= 14;
+    const towns = harbours
+      .filter((p) => isEnemy(map.nodes[p].port!.nation) && (big || !map.nodes[p].port!.fort) && (w.sacked[p] ?? -1) < w.turn && d[p] <= 30)
+      .sort((a, b) => d[a] - d[b]);
+    if (towns.length) return towns[0];
+  }
+  // Else a port within a fortnight, for the bar.
   const near = harbours.filter((p) => p !== w.player && d[p] <= 14 && serves(sea, { ...w, player: p }));
   return near.length ? near[(w.turn * 7) % near.length] : london;
+}
+
+/** Fight the encounter at hand to its end, keeping the tallies. */
+let fights = 0;
+function fightItOut(w: WorldState): WorldState {
+  if (!w.encounter) return w;
+  const enteredWith = `${w.hull}/${w.maxHull}`;
+  fights++;
+  met[w.encounter.kind] = (met[w.encounter.kind] ?? 0) + 1;
+  while (w.encounter) {
+    const f = w.encounter.fight;
+    w = fight(sea, w, fightBot(threatened(f.ship, f.target))(f));
+  }
+  const r = w.reckoning!;
+  ends[r.outcome] = (ends[r.outcome] ?? 0) + 1;
+  if (w.sunk) {
+    killedBy[r.kind] = (killedBy[r.kind] ?? 0) + 1;
+    hullIn[r.kind] = [...(hullIn[r.kind] ?? []), enteredWith];
+  }
+  return w;
 }
 
 const results: { won: boolean; sunk: boolean; day: number; gold: number; fights: number; ship: string }[] = [];
@@ -103,14 +133,24 @@ const met: Record<string, number> = {};
 const ends: Record<string, number> = {};
 const killedBy: Record<string, number> = {};
 let passed = 0;
+let raids = 0;
 const hullIn: Record<string, string[]> = {};
 for (let seed = 0; seed < RUNS; seed++) {
   let w = createWorld(sea, seed);
   let dest: NodeId | null = null;
-  let fights = 0;
+  fights = 0;
   let since = 0;
   while (w.turn < DAYS && !w.sunk && !w.won) {
-    if (map.nodes[w.player].port) w = inPort(w);
+    if (map.nodes[w.player].port) {
+      // An enemy port, on a sound hull: raid it. A fortified one only in a ship that can take it.
+      const port = map.nodes[w.player].port!;
+      const able = !port.fort || SHIP_CLASSES[w.outfit.ship].hull >= 14;
+      if (isEnemy(port.nation) && raidable(sea, w) && able && w.hull >= w.maxHull * 0.9 && w.gold < GOAL) {
+        w = fightItOut(raid(sea, w));
+        raids++;
+      } else w = inPort(w);
+      if (w.sunk) break;
+    }
     if (dest === null || since > 10 || w.player === dest || danger(w) !== null) ((dest = choose(w)), (since = 0));
     if (dest === w.player) dest = harbours[(seed + w.turn) % harbours.length];
     const out = sailToward(sea, w, dest);
@@ -120,21 +160,12 @@ for (let seed = 0; seed < RUNS; seed++) {
     // A ship alongside: foreign prizes worth the risk, on a sound hull; never your own flag.
     if (w.hail) {
       const h = w.hail;
-      const worth = (h.kind === 'merchant' || h.kind === 'treasure-ship') && h.nation !== YOUR_NATION;
+      const worth = (h.kind === 'merchant' || h.kind === 'treasure-ship') && isEnemy(h.nation);
       w = worth && w.hull >= w.maxHull * 0.6 ? attack(w) : letPass(w);
       if (!w.encounter) passed++;
     }
     if (w.encounter) {
-      const enteredWith = `${w.hull}/${w.maxHull}`;
-      fights++;
-      met[w.encounter.kind] = (met[w.encounter.kind] ?? 0) + 1;
-      while (w.encounter) {
-        const f = w.encounter.fight;
-        w = fight(sea, w, fightBot(threatened(f.ship, f.target))(f));
-      }
-      ends[w.reckoning!.outcome] = (ends[w.reckoning!.outcome] ?? 0) + 1;
-      if (w.sunk) killedBy[w.reckoning!.kind] = (killedBy[w.reckoning!.kind] ?? 0) + 1;
-      if (w.sunk) hullIn[w.reckoning!.kind] = [...(hullIn[w.reckoning!.kind] ?? []), enteredWith];
+      w = fightItOut(w);
       dest = null;
     }
   }
@@ -152,3 +183,4 @@ console.log(`fights ${mean(results.map((r) => r.fights)).toFixed(1)} a run · me
 console.log('ships at the end', results.reduce((t, r) => ((t[r.ship] = (t[r.ship] ?? 0) + 1), t), {} as Record<string, number>));
 console.log('sunk by', killedBy, '· hull going in', hullIn);
 console.log(`let pass ${(passed / RUNS).toFixed(1)} a run`);
+console.log(`raids ${(raids / RUNS).toFixed(1)} a run`);

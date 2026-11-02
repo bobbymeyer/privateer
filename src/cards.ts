@@ -147,3 +147,33 @@ export const ARMADA_CARDS: readonly CardDef[] = [
   { key: 'weather-gauge', name: 'the weather gauge', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 2 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
 ];
+
+// Towns, for raids. A town cannot run, so no flee cards; its people carry
+// what they can inland while you fight, so the longer the raid, the less
+// there is to take; and if it goes on, help comes (see RELIEF).
+
+/** An open town: a battery or two, the walls, and the townsfolk. */
+export const TOWN_CARDS: readonly CardDef[] = [
+  { key: 'battery', name: 'shore battery', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 2 },
+  { key: 'musketry', name: 'musketry from the walls', text: 'hurt 1', effects: [{ kind: 'hurt', amount: 1 }], copies: 3 },
+  { key: 'inland', name: 'valuables carried inland', text: 'jettison 3', effects: [{ kind: 'jettison', amount: 3 }], copies: 2 },
+  { key: 'barricades', name: 'barricades', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 2 },
+  { key: 'ransom', name: 'the town treats', text: 'plunder 4, interrogate', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'interrogate', reliability: 0.8 }], copies: 1 },
+];
+
+/** A fortified port: the fort's great guns, and walls to mend. Not for a pinnace. */
+export const FORTRESS_CARDS: readonly CardDef[] = [
+  { key: 'great-guns', name: "the fort's great guns", text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 2 },
+  { key: 'battery', name: 'shore battery', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 3 },
+  { key: 'musketry', name: 'musketry from the walls', text: 'hurt 1', effects: [{ kind: 'hurt', amount: 1 }], copies: 2 },
+  { key: 'inland', name: 'valuables carried inland', text: 'jettison 4', effects: [{ kind: 'jettison', amount: 4 }], copies: 2 },
+  { key: 'walls', name: 'mend the walls', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
+];
+
+/** Help for a town under attack, arriving if the raid goes on too long. */
+export const RELIEF = { side: 'target' as const, name: 'the garrison is reinforced', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }] as Effect[] };
+
+/** A raiding party can always fall back to the boats: in a raid, these go into your deck. */
+export const RAID_CARDS: readonly CardDef[] = [
+  { key: 'to-the-boats', name: 'back to the boats', text: 'flee', effects: [{ kind: 'flee' }], copies: 2 },
+];

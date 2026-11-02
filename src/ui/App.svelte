@@ -5,7 +5,9 @@
   import { buyRound, ROUND_COST } from '../world/bar.ts';
   import { plotCourse, sailToward } from '../world/course.ts';
   import type { NodeId } from '../world/map.ts';
-  import { attack, fight, letPass, repair, REPAIR_COST, YOUR_NATION, type Reckoning } from '../world/meet.ts';
+  import { attack, fight, letPass, raid, raidable, repair, REPAIR_COST, YOUR_NATION, type Reckoning } from '../world/meet.ts';
+  import { isEnemy } from '../world/wars.ts';
+  import { TARGETS } from '../setup.ts';
   import { SEASON_NAMES } from '../world/ocean.ts';
   import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, PARDON_COST, recruit, serves } from '../world/port.ts';
   import { adjective, article } from '../world/ports.ts';
@@ -86,12 +88,16 @@
   let shown: EncounterState | null = $state.raw(null);
   let lastRound: GameEvent[] = $state.raw([]);
   let reckoning: Reckoning | null = $state.raw(null);
-  let flag = $state('');
+  let title = $state('');
+  let isRaid = $state(false);
 
   $effect(() => {
     if (world?.encounter && !shown) {
       shown = world.encounter.fight;
-      flag = adjective(world.ships[world.encounter.shipId].nation);
+      const m = world.encounter;
+      const flagName = adjective(m.nation);
+      isRaid = m.port !== null;
+      title = m.port !== null ? `the raid on ${sea!.map.nodes[m.port].port!.name}, ${flagName}` : `${article(flagName)} ${flagName} ${TARGETS[m.kind].name}`;
       lastRound = [];
       reckoning = null;
     }
@@ -260,6 +266,17 @@
                 <button onclick={() => attempt(() => bribe(sea!, world!), 'the right palms are greased')}>bribe the officials ({bribeCost(world, port.nation)})</button>
               {/if}
             {/if}
+            <h3>a raid</h3>
+            {#if !raidable(sea, world)}
+              <p class="faint">sacked lately: there's nothing left here.</p>
+            {:else}
+              <p class="faint">
+                {port.fort ? 'a fortified port: not for a small ship.' : 'an open town.'}
+                the {adjective(port.nation)} will remember it three times over and their guard ships will hunt twice as far.
+                {port.nation === YOUR_NATION ? ' it is your own flag: you would be a pirate.' : isEnemy(port.nation) ? ' they are at war with England: fair game.' : ' they are at peace with England: the Crown will hear of it.'}
+              </p>
+              <button onclick={() => attempt(() => raid(sea!, world!))}>raid {port.name}</button>
+            {/if}
             {#if said}<p class="said">{said}</p>{/if}
           </section>
         {/if}
@@ -309,8 +326,10 @@
           <h2>{article(flagName)} {flagName} {what} alongside</h2>
           {#if h.nation === YOUR_NATION}
             <p class="wanted">she flies your flag. fire on her and you are a pirate: England will want you, its ports will shut, and London will hang you until you're pardoned.</p>
+          {:else if isEnemy(h.nation)}
+            <p>the {flagName} are at war with England: she's fair game, and the Crown will think the better of you for taking her. the {flagName} will remember it, and their guard ships will be out for you.</p>
           {:else}
-            <p>fire on her and the {flagName} will remember it, whatever comes of the fight{h.nation === 'local' ? '' : ': their guard ships will be out for you'}.</p>
+            <p>the {flagName} are at peace with England. fire on her and the Crown will hear of it, and the {flagName} will remember it{h.nation === 'local' ? '' : ': their guard ships will be out for you'}.</p>
           {/if}
           <div class="row">
             <button onclick={() => (world = attack(world!))}>attack</button>
@@ -321,7 +340,7 @@
     {:else if shown}
       <div class="overlay">
         <div class="sheet">
-          <Fight fight={shown} {lastRound} {reckoning} {flag} {onact} {oncontinue} />
+          <Fight fight={shown} {lastRound} {reckoning} {title} {isRaid} {onact} {oncontinue} />
         </div>
       </div>
     {:else if world.sunk || world.won}

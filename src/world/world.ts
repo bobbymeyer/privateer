@@ -8,7 +8,7 @@
 
 import type { RngState } from '../rng.ts';
 import { buildMap, type NodeId, portNamed, ports } from './map.ts';
-import { PORTS, adjective, navyOf } from './ports.ts';
+import { type Nation, PORTS, adjective, navyOf } from './ports.ts';
 import { type Rumor, FADED, makeRumor, markerStrength } from './rumors.ts';
 import { buildPattern, type Chart, CURRENT_SEEN, chartKnowledge, type SeaKnowledge, seasonOf, windSeen } from './sea.ts';
 import { type FleetEntry, type Sea, type Ship, type Standing, mayEnter, moveShip, spawnShips } from './ships.ts';
@@ -56,6 +56,10 @@ export interface WorldState {
   hail: Hail | null;
   /** You fired on an English ship. England wants you, and London will hang you, until you're pardoned. */
   pirate: boolean;
+  /** Ports sacked, and the turn until which they have nothing for anybody. */
+  sacked: Record<NodeId, number>;
+  /** Nations whose towns you've raided, and the turn until which their guard ships hunt twice as far. */
+  alarm: Partial<Record<Nation, number>>;
   /** What happened that you'd hear about: navies driving off intruders, and the like. */
   log: { turn: number; text: string }[];
 }
@@ -172,6 +176,8 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     won: false,
     hail: null,
     pirate: false,
+    sacked: {},
+    alarm: {},
   };
 }
 
@@ -186,7 +192,8 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   }
   const r: Roller = { rng: s.rng };
   const ships = s.ships.map((ship) => ({ ...ship }));
-  for (const ship of ships) moveShip(sea, r, ship, s.turn, to, s.standing);
+  const alarmed = (n: Nation) => (s.alarm[n] ?? -1) > s.turn;
+  for (const ship of ships) moveShip(sea, r, ship, s.turn, to, s.standing, alarmed);
 
   // Countries protect their waters: a foreign guard ship found inside them
   // is driven off by the navy and laid up at home.

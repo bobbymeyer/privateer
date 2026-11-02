@@ -14,7 +14,8 @@
 import { type Action, type EncounterState, type Outcome, act, legalActions } from '../src/rules.ts';
 import { lookahead } from './bots.ts';
 import { TARGETS, encounterWith } from '../src/setup.ts';
-import type { ShipKind } from '../src/world/ships.ts';
+import type { TargetKind } from '../src/setup.ts';
+import { SHIP_CLASSES, deckOf, maxHullOf } from '../src/outfit.ts';
 
 type Bot = { name: string; choose: (s: EncounterState) => Action };
 
@@ -35,15 +36,20 @@ const bots: Bot[] = [
 ];
 
 const targetFlag = process.argv.indexOf('--target');
-const target = (targetFlag >= 0 ? process.argv[targetFlag + 1] : 'merchant') as ShipKind;
+const target = (targetFlag >= 0 ? process.argv[targetFlag + 1] : 'merchant') as TargetKind;
 if (!TARGETS[target]) throw new Error(`no target ${target}; try ${Object.keys(TARGETS).join(', ')}`);
+// --ship sails a ship class with its own deck and hull; --hull overrides the hull alone.
+const shipFlag = process.argv.indexOf('--ship');
+const outfit = { ship: shipFlag >= 0 ? process.argv[shipFlag + 1] : 'pinnace', upgrades: [], crew: [] };
+if (!SHIP_CLASSES[outfit.ship]) throw new Error(`no ship ${outfit.ship}; try ${Object.keys(SHIP_CLASSES).join(', ')}`);
+const deck = deckOf(outfit);
 const hullFlag = process.argv.indexOf('--hull');
-const hull = hullFlag >= 0 ? Number(process.argv[hullFlag + 1]) : 10;
+const hull = hullFlag >= 0 ? Number(process.argv[hullFlag + 1]) : maxHullOf(outfit);
 const flag = process.argv.indexOf('--runs');
 const runs = flag >= 0 ? Number(process.argv[flag + 1]) : 2000;
 const outcomes: Outcome[] = ['fled', 'escaped', 'destroyed', 'sunk', 'parted'];
 
-console.log(`${runs} encounters per bot against a ${TARGETS[target].name}, seeds 0..${runs - 1}\n`);
+console.log(`${runs} encounters per bot, a ${outfit.ship} (hull ${hull}, ${deck.length} cards) against a ${TARGETS[target].name}\n`);
 console.log(['bot'.padEnd(22), 'payout', 'rounds', ...outcomes.map((o) => o.padStart(9))].join(' '));
 
 for (const bot of bots) {
@@ -51,7 +57,7 @@ for (const bot of bots) {
   let rounds = 0;
   const counts = Object.fromEntries(outcomes.map((o) => [o, 0])) as Record<Outcome, number>;
   for (let seed = 0; seed < runs; seed++) {
-    let s = encounterWith(target, seed, { hull, maxHull: hull });
+    let s = encounterWith(target, seed, { hull, maxHull: hull }, deck);
     while (!s.outcome) s = act(s, bot.choose(s));
     payout += s.payout;
     rounds += s.round;

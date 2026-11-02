@@ -1,26 +1,43 @@
 /**
+ * Meeting a ship, and raiding a port.
+ *
  * When you share a node with a ship, outside a port, one of two things.
- * If she's hostile — a guard ship or an armada of a nation that wants you —
- * she attacks, and the fight is on. Anyone else comes alongside, and
- * attacking her is your choice; let her pass and she goes her way.
+ * If she's hostile — a guard ship or an armada of a nation that wants you,
+ * or is at war with England — she attacks, and the fight is on. Anyone else
+ * comes alongside, and attacking her is your choice; let her pass and she
+ * goes her way.
+ *
+ * In a port, you may raid it. A town can't run, but its people carry what
+ * they can inland, and if the raid goes on, the garrison's relief comes.
+ *
+ * Whether it's fair game is the war table's business (wars.ts):
+ * - an enemy of England's: fair game, and the Crown approves when you
+ *   take or sack one;
+ * - a nation at peace with England: the Crown hears of it, and your
+ *   standing with England suffers;
+ * - England itself: piracy.
+ * Either way the nation you hit remembers, and a port more than a ship.
  *
  * The world waits while a fight is fought, card by card, and afterwards it
  * is settled: gold into the purse, the damage kept, the prisoners
- * questioned, and the other ship sunk, parted from, or the end of you.
- *
- * You sail for England. Attacking an English ship is piracy.
+ * questioned, and the ship sunk or the town sacked, parted from, or the
+ * end of you.
  */
 
 import { act, type Action, type EncounterState, type Outcome } from '../rules.ts';
 import { deckOf } from '../outfit.ts';
-import { encounterWith } from '../setup.ts';
+import { encounterWith, type TargetKind } from '../setup.ts';
 import { NOTABLE, sighting } from './bar.ts';
+import type { NodeId } from './map.ts';
 import { type Roller, roll } from './random.ts';
 import { serves } from './port.ts';
 import { makeRumor } from './rumors.ts';
-import type { Nation } from './ports.ts';
+import { adjective, article, type Nation } from './ports.ts';
 import { type Sea, type ShipKind, wantedBy } from './ships.ts';
+import { YOUR_NATION, isEnemy } from './wars.ts';
 import type { WorldState } from './world.ts';
+
+export { YOUR_NATION } from './wars.ts';
 
 /** After parting, a ship won't engage you again for this many days. */
 export const PARTED_DAYS = 5;
@@ -30,10 +47,20 @@ export const REFIT_DAYS = 60;
 export const REPAIR_COST = 1;
 /** Prisoners know where their consorts were this recently. */
 const PRISONERS_KNOW = 3;
+/** A sacked town has nothing for anybody for this long. */
+export const SACK_DAYS = 120;
+/** After a raid, the nation's guard ships hunt twice as far for this long. */
+export const ALARM_DAYS = 30;
+/** Attack your own flag and its standing falls at least this far, and stays there till you're pardoned. */
+export const PIRACY_FLOOR = -3;
 
 export interface Meeting {
+  /** The ship you're fighting, or -1 for a port. */
   shipId: number;
-  kind: ShipKind;
+  /** The port you're raiding, or null for a ship. */
+  port: NodeId | null;
+  kind: TargetKind;
+  nation: Nation;
   fight: EncounterState;
   /** She attacked you, rather than you her. */
   forced: boolean;
@@ -46,28 +73,27 @@ export interface Hail {
   nation: Nation;
 }
 
-/** The flag you sail under. */
-export const YOUR_NATION: Nation = 'england';
-/** Attack your own flag's ships and its standing falls at least this far, and stays there till you're pardoned. */
-export const PIRACY_FLOOR = -3;
-
-/** A ship that will attack you on sight: a guard ship or an armada of a nation that wants you. */
-export const hostile = (s: WorldState, ship: { kind: ShipKind; nation: Nation }) =>
-  (ship.kind === 'hunter' || ship.kind === 'armada') && wantedBy(s.standing, ship.nation);
-
 export interface Reckoning {
   shipId: number;
-  kind: ShipKind;
+  port: NodeId | null;
+  kind: TargetKind;
   nation: Nation;
   outcome: Outcome;
   payout: number;
-  /** You damaged it or took from it, and its nation will remember. */
+  /** You fired first, or did her harm: her nation will remember. */
   attacked: boolean;
   /** Rumors got from prisoners. */
   heard: number;
 }
 
-/** After a move: is there a ship here to fight? Called by `advance`. */
+/**
+ * A ship that will attack you on sight: a guard ship or an armada of a
+ * nation that wants you, or that's at war with England.
+ */
+export const hostile = (s: WorldState, ship: { kind: ShipKind; nation: Nation }) =>
+  (ship.kind === 'hunter' || ship.kind === 'armada') && (wantedBy(s.standing, ship.nation) || isEnemy(ship.nation));
+
+/** After a move: a ship here to fight, or to hail? Called by `advance`. */
 export function meeting(sea: Sea, s: WorldState): WorldState {
   if (s.encounter || s.hail || s.sunk || sea.map.nodes[s.player].port || s.islands.some((i) => i.found && i.node === s.player)) return s;
   const here = s.ships.filter((x) => x.node === s.player && x.laidUp <= s.turn && (s.parted[x.id] ?? -1) < s.turn);
@@ -76,35 +102,40 @@ export function meeting(sea: Sea, s: WorldState): WorldState {
   here.sort((a, b) => Number(hostile(s, b)) - Number(hostile(s, a)) || NOTABLE[b.kind] - NOTABLE[a.kind] || a.id - b.id);
   const other = here[0];
   if (!hostile(s, other)) return { ...s, hail: { shipId: other.id, kind: other.kind, nation: other.nation } };
-  return startFight(s, other.id, true);
+  return startFight(s, { shipId: other.id, port: null, kind: other.kind, nation: other.nation }, true);
 }
 
-function startFight(s: WorldState, shipId: number, forced: boolean): WorldState {
-  const other = s.ships[shipId];
+function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean): WorldState {
   const r: Roller = { rng: s.rng };
   const seed = Math.floor(roll(r) * 2 ** 31);
-  const fight = encounterWith(other.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit));
-  return { ...s, rng: r.rng, hail: null, encounter: { shipId, kind: other.kind, fight, forced } };
+  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit));
+  return { ...s, rng: r.rng, hail: null, encounter: { ...who, fight, forced } };
 }
 
-/**
- * Attack the ship alongside. Her nation will remember it whatever comes of
- * the fight: you fired first. An English ship makes you a pirate.
- */
+/** What a hostile act costs, by whose it was and how bad: standing with them, standing with England, and the log. */
+function reckon(s: WorldState, nation: Nation, theirs: number, crown: { enemy: number; neutral: number }, what: (flag: string) => string): WorldState {
+  const standing = { ...s.standing, [nation]: (s.standing[nation] ?? 0) - theirs };
+  const log = [...s.log];
+  let pirate = s.pirate;
+  if (nation === YOUR_NATION) {
+    standing[nation] = Math.min(standing[nation]!, PIRACY_FLOOR);
+    if (!pirate) log.push({ turn: s.turn, text: `${what('English')}: you're a pirate now, and England will hang you if it can` });
+    pirate = true;
+  } else if (isEnemy(nation)) {
+    if (crown.enemy && !s.pirate) standing[YOUR_NATION] = (standing[YOUR_NATION] ?? 0) + crown.enemy;
+  } else if (crown.neutral) {
+    standing[YOUR_NATION] = Math.min(s.pirate ? PIRACY_FLOOR : Infinity, (standing[YOUR_NATION] ?? 0) - crown.neutral);
+    log.push({ turn: s.turn, text: `${what(adjective(nation))}, at peace with England: the Crown will hear of it` });
+  }
+  return { ...s, standing, pirate, log };
+}
+
+/** Attack the ship alongside. Her nation remembers it whatever comes of the fight: you fired first. */
 export function attack(s: WorldState): WorldState {
   const h = s.hail;
   if (!h) throw new Error('there is no ship alongside');
-  const standing = { ...s.standing, [h.nation]: (s.standing[h.nation] ?? 0) - 1 };
-  let next: WorldState = { ...s, standing };
-  if (h.nation === YOUR_NATION) {
-    standing[h.nation] = Math.min(standing[h.nation]!, PIRACY_FLOOR);
-    next = {
-      ...next,
-      pirate: true,
-      log: [...s.log, { turn: s.turn, text: `you fired on an English ${h.kind.replace('-', ' ')}: you're a pirate now, and England will hang you if it can` }],
-    };
-  }
-  return startFight(next, h.shipId, false);
+  const next = reckon(s, h.nation, 1, { enemy: 0, neutral: 1 }, (flag) => `you fired on ${article(flag)} ${flag} ${h.kind.replace('-', ' ')}`);
+  return startFight(next, { shipId: h.shipId, port: null, kind: h.kind, nation: h.nation }, false);
 }
 
 /** Let the ship alongside go her way. She won't come alongside again for a few days. */
@@ -112,6 +143,23 @@ export function letPass(s: WorldState): WorldState {
   const h = s.hail;
   if (!h) throw new Error('there is no ship alongside');
   return { ...s, hail: null, parted: { ...s.parted, [h.shipId]: s.turn + PARTED_DAYS } };
+}
+
+/** Whether this port can be raided now: not one sacked lately. */
+export const raidable = (sea: Sea, s: WorldState) => !!sea.map.nodes[s.player].port && (s.sacked[s.player] ?? -1) < s.turn;
+
+/**
+ * Raid the port you're in. A fortified port is a fortress; any other, a
+ * town. Its nation remembers three times over, and raises the alarm.
+ */
+export function raid(sea: Sea, s: WorldState): WorldState {
+  const port = sea.map.nodes[s.player].port;
+  if (!port) throw new Error('there is no port here to raid');
+  if (s.encounter || s.hail) throw new Error('there is a fight to finish first');
+  if (!raidable(sea, s)) throw new Error(`${port.name} was sacked lately: there's nothing left`);
+  let next = reckon(s, port.nation, 3, { enemy: 0, neutral: 2 }, (flag) => `you raided ${port.name}, ${flag}`);
+  next = { ...next, alarm: { ...next.alarm, [port.nation]: s.turn + ALARM_DAYS } };
+  return startFight(next, { shipId: -1, port: s.player, kind: port.fort ? 'fortress' : 'town', nation: port.nation }, false);
 }
 
 /** One keep in the fight at hand; settled when it ends. */
@@ -128,7 +176,7 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   const outcome = f.outcome!;
   const r: Roller = { rng: s.rng };
 
-  // Prisoners talk about their consorts.
+  // Prisoners talk about the ships they know of.
   const rumors = [...s.rumors];
   let next = s.nextRumor;
   for (const reliability of f.intel) {
@@ -137,35 +185,42 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     rumors.push(makeRumor(sea, r, next++, { ...seen.ship, node: seen.at }, s.turn - seen.age, reliability));
   }
 
-  const ships = s.ships.map((x) => {
-    if (x.id !== m.shipId || outcome !== 'destroyed') return x;
-    // Gone to the bottom, or taken: laid up at home, then out again.
-    return { ...x, node: x.home, laidUp: s.turn + REFIT_DAYS, dest: x.route ? x.route[1] : null, leg: x.route ? 1 : 0 };
-  });
-  const parted = outcome === 'destroyed' || outcome === 'sunk' ? s.parted : { ...s.parted, [m.shipId]: s.turn + PARTED_DAYS };
+  let w: WorldState = { ...s, rng: r.rng, rumors, nextRumor: next };
 
   // A nation remembers. If you attacked, that was counted when you fired;
-  // a sinking costs a point more. If she attacked you, what you did in
-  // your own defence still counts: damage or plunder a point, a sinking two.
-  const nation = s.ships[m.shipId].nation;
-  const hurtHer = outcome === 'destroyed' || f.plunder > 0 || f.target.hull < f.target.maxHull;
+  // taking her, or sacking the town, counts again. If she attacked you,
+  // what you did in your own defence still counts.
+  const taken = outcome === 'destroyed';
+  const hurtHer = taken || f.plunder > 0 || f.target.hull < f.target.maxHull;
   const attacked = !m.forced || hurtHer;
-  const cost = m.forced ? (hurtHer ? (outcome === 'destroyed' ? 2 : 1) : 0) : outcome === 'destroyed' ? 1 : 0;
-  const standing = cost ? { ...s.standing, [nation]: (s.standing[nation] ?? 0) - cost } : s.standing;
+  const what = (flag: string) => (m.port !== null ? `you sacked ${sea.map.nodes[m.port].port!.name}, ${flag}` : `you took ${article(flag)} ${flag} ${m.kind.replace('-', ' ')}`);
+  if (m.forced && hurtHer) w = reckon(w, m.nation, taken ? 2 : 1, { enemy: taken ? 1 : 0, neutral: 1 }, what);
+  else if (!m.forced && taken) w = reckon(w, m.nation, m.port !== null ? 2 : 1, { enemy: m.port !== null ? 2 : 1, neutral: 1 }, what);
+
+  if (m.port !== null) {
+    if (taken) {
+      w = { ...w, sacked: { ...w.sacked, [m.port]: s.turn + SACK_DAYS } };
+      w = { ...w, log: [...w.log, { turn: s.turn, text: `${sea.map.nodes[m.port].port!.name} is sacked` }] };
+    }
+  } else {
+    w = {
+      ...w,
+      ships: w.ships.map((x) => {
+        if (x.id !== m.shipId || !taken) return x;
+        // Gone to the bottom, or taken: laid up at home, then out again.
+        return { ...x, node: x.home, laidUp: s.turn + REFIT_DAYS, dest: x.route ? x.route[1] : null, leg: x.route ? 1 : 0 };
+      }),
+      parted: taken || outcome === 'sunk' ? w.parted : { ...w.parted, [m.shipId]: s.turn + PARTED_DAYS },
+    };
+  }
 
   return {
-    ...s,
-    rng: r.rng,
+    ...w,
     gold: s.gold + f.payout,
     hull: f.ship.hull,
     sunk: outcome === 'sunk',
-    ships,
-    parted,
-    rumors,
-    nextRumor: next,
-    standing,
     encounter: null,
-    reckoning: { shipId: m.shipId, kind: m.kind, nation, outcome, payout: f.payout, attacked, heard: next - s.nextRumor },
+    reckoning: { shipId: m.shipId, port: m.port, kind: m.kind, nation: m.nation, outcome, payout: f.payout, attacked, heard: next - s.nextRumor },
   };
 }
 

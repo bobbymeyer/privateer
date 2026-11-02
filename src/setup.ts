@@ -3,8 +3,8 @@
  * hull, what's in its hold, and the price on its head.
  */
 
-import { ARMADA_CARDS, type Card, type CardDef, HUNTER_CARDS, MERCHANT_CARDS, SHIP_CARDS, TREASURE_FLEET_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
-import { type EncounterState, createEncounter } from './rules.ts';
+import { ARMADA_CARDS, type Card, type CardDef, FORTRESS_CARDS, HUNTER_CARDS, MERCHANT_CARDS, RAID_CARDS, RELIEF, SHIP_CARDS, TOWN_CARDS, TREASURE_FLEET_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
+import { type EncounterState, type Reinforcement, createEncounter } from './rules.ts';
 import type { ShipKind } from './world/ships.ts';
 
 export interface TargetDef {
@@ -13,27 +13,42 @@ export interface TargetDef {
   cargo: number;
   bounty: number;
   cards: readonly CardDef[];
+  /** A town: taken whole, the rest of its treasury is yours. */
+  takenWhole?: boolean;
+  /** Help that comes if the fight goes on. */
+  reinforce?: Reinforcement;
+  /** Cards that go into your deck for this fight: a raid's way back to the boats. */
+  yours?: readonly CardDef[];
 }
 
-export const TARGETS: Record<ShipKind, TargetDef> = {
+/** What you can fight: a ship of any kind, or a port — open or fortified. */
+export type TargetKind = ShipKind | 'town' | 'fortress';
+
+/** A raid that runs past the sixth round brings the garrison's relief, a card a round. */
+export const RELIEF_FROM = 7;
+
+export const TARGETS: Record<TargetKind, TargetDef> = {
   merchant: { name: 'merchant', hull: 12, cargo: 12, bounty: 4, cards: MERCHANT_CARDS },
   hunter: { name: 'guard ship', hull: 12, cargo: 3, bounty: 10, cards: HUNTER_CARDS },
   'treasure-ship': { name: 'galleon', hull: 13, cargo: 30, bounty: 6, cards: TREASURE_SHIP_CARDS },
   'treasure-fleet': { name: 'treasure fleet', hull: 24, cargo: 60, bounty: 10, cards: TREASURE_FLEET_CARDS },
   armada: { name: 'armada', hull: 30, cargo: 4, bounty: 20, cards: ARMADA_CARDS },
+  town: { name: 'town', hull: 10, cargo: 25, bounty: 0, cards: TOWN_CARDS, takenWhole: true, reinforce: { from: RELIEF_FROM, card: RELIEF }, yours: RAID_CARDS },
+  fortress: { name: 'fortified port', hull: 19, cargo: 45, bounty: 0, cards: FORTRESS_CARDS, takenWhole: true, reinforce: { from: RELIEF_FROM, card: RELIEF }, yours: RAID_CARDS },
 };
 
 /** Your ship, as it sails into a fight. */
 export const SHIP = { hull: 10, maxHull: 10 };
 
-export function encounterWith(kind: ShipKind, seed: number, ship: { hull: number; maxHull: number } = SHIP, shipCards: Card[] = buildDeck('ship', SHIP_CARDS)): EncounterState {
+export function encounterWith(kind: TargetKind, seed: number, ship: { hull: number; maxHull: number } = SHIP, shipCards: Card[] = buildDeck('ship', SHIP_CARDS)): EncounterState {
   const t = TARGETS[kind];
   return createEncounter({
     seed,
-    shipCards,
+    shipCards: [...shipCards, ...buildDeck('ship', t.yours ?? [])],
     targetCards: buildDeck('target', t.cards),
     ship: { hull: ship.hull, maxHull: ship.maxHull, brace: 0 },
-    target: { name: t.name, hull: t.hull, maxHull: t.hull, cargo: t.cargo, bounty: t.bounty },
+    target: { name: t.name, hull: t.hull, maxHull: t.hull, cargo: t.cargo, bounty: t.bounty, takenWhole: t.takenWhole },
+    reinforce: t.reinforce,
   });
 }
 
