@@ -1,11 +1,9 @@
 /** Words for what happened, shared by the terminal and the browser. */
 
 import type { Effect } from './cards.ts';
-import type { GameEvent, Outcome } from './rules.ts';
+import type { EffectNote, GameEvent, Outcome } from './rules.ts';
 
-const VERB: Record<Effect['kind'], string> = {
-  hit: 'hits the target for',
-  hurt: 'hurts you for',
+const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold' | 'hit' | 'hurt' | 'breach' | 'interrogate'>, string> = {
   plunder: 'hauls aboard',
   repair: 'repairs',
   brace: 'braces for',
@@ -13,24 +11,39 @@ const VERB: Record<Effect['kind'], string> = {
   mend: 'mends the target by',
 };
 
-export function describeEffect(e: Effect, applied: number): string {
-  const short = applied !== e.amount && e.kind !== 'hurt' ? ` (of ${e.amount})` : '';
-  const soaked = e.kind === 'hurt' && applied < e.amount ? ` (${e.amount - applied} braced)` : '';
-  return `${VERB[e.kind]} ${applied}${short}${soaked}`;
+export function describeEffect(e: Effect, applied: number, note?: EffectNote, mine = true): string {
+  if (e.kind === 'flee') {
+    const who = mine ? 'you' : 'the target';
+    if (note === 'unthreatened') return `${who} ${mine ? 'are' : 'is'} not threatened enough to run`;
+    if (note === 'held') return `${who} ${mine ? 'try' : 'tries'} to run, but ${mine ? 'are' : 'is'} held`;
+    return `${who} break${mine ? '' : 's'} away`;
+  }
+  if (e.kind === 'hit') return `puts ${applied} damage ${applied === 1 ? 'card' : 'cards'} against the target in the deck`;
+  if (e.kind === 'hurt') return `puts ${applied} damage ${applied === 1 ? 'card' : 'cards'} against you in the deck`;
+  if (e.kind === 'breach') {
+    if (!mine) return `the target loses ${applied} hull`;
+    return `you lose ${applied} hull${applied < e.amount ? ` (${e.amount - applied} braced)` : ''}`;
+  }
+  if (e.kind === 'interrogate') return `prisoners talk: a rumor, ${Math.round(e.reliability * 100)}% reliable`;
+  if (e.kind === 'hold') return `${mine ? 'holds the target' : 'holds you'} for ${applied}`;
+  const amount = e.amount;
+  const short = applied !== amount ? ` (of ${amount})` : '';
+  return `${VERB[e.kind]} ${applied}${short}`;
 }
 
 export const OUTCOME_TEXT: Record<Outcome, string> = {
-  stopped: 'you broke off',
+  fled: 'you got away',
+  escaped: 'the target got away',
   destroyed: 'the target went down',
-  escaped: 'the target slipped away',
   sunk: 'you were sunk',
+  parted: 'the ships drifted apart',
 };
 
 /** One line per event, or null for events that are not worth a line. */
 export function describeEvent(e: GameEvent): string | null {
   switch (e.type) {
     case 'played': return e.card.name;
-    case 'effect': return describeEffect(e.effect, e.applied);
+    case 'effect': return describeEffect(e.effect, e.applied, e.note, e.card.side === 'ship');
     case 'rejected': return `${e.card.name} goes to the bottom`;
     case 'ended': return `${OUTCOME_TEXT[e.outcome]}. you walk away with ${e.payout}`;
     case 'dealt': return null;

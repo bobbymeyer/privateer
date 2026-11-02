@@ -23,19 +23,16 @@ while (!s.outcome) {
   console.log(status(s));
   console.log('');
   s.hand.forEach((c, i) => console.log(`  ${i + 1}  ${cardLine(c)}`));
-  stdout.write('\nkeep two, in order (e.g. 31), or s to stop: ');
+  stdout.write('\nkeep two, in order (e.g. 31): ');
   const line = await lines.next();
   if (line.done) break;
   const answer = String(line.value).trim().toLowerCase();
 
   let next;
   try {
-    if (answer === 's' || answer === 'stop') next = act(s, { type: 'stop' });
-    else {
-      const digits = answer.replace(/[^0-9]/g, '').split('').map((d) => Number(d) - 1);
-      if (digits.length !== 2) throw new Error('name two cards');
-      next = act(s, { type: 'keep', picks: [digits[0], digits[1]] });
-    }
+    const digits = answer.replace(/[^0-9]/g, '').split('').map((d) => Number(d) - 1);
+    if (digits.length !== 2) throw new Error('name two cards');
+    next = act(s, { type: 'keep', picks: [digits[0], digits[1]] });
   } catch (err) {
     console.log(`  ${(err as Error).message}\n`);
     continue;
