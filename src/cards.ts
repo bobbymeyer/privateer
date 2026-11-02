@@ -114,7 +114,7 @@ export const MERCHANT_CARDS: readonly CardDef[] = [
 
 /** A guard ship: hard to shake (it grapples), little to take, a price on its head. */
 export const HUNTER_CARDS: readonly CardDef[] = [
-  { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 5 },
+  { key: 'return-fire', name: 'return fire', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 5 },
   { key: 'grapeshot', name: 'grapeshot', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 3 },
   { key: 'grapnels', name: 'grapnels', text: 'hurt 1, hold 1', effects: [{ kind: 'hurt', amount: 1 }, { kind: 'hold', amount: 1 }], copies: 2 },
   { key: 'boarders', name: 'boarders away', text: 'hurt 2, hold 1', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'hold', amount: 1 }], copies: 1 },
@@ -144,6 +144,6 @@ export const TREASURE_FLEET_CARDS: readonly CardDef[] = [
 export const ARMADA_CARDS: readonly CardDef[] = [
   { key: 'broadside', name: 'broadside', text: 'hurt 4', effects: [{ kind: 'hurt', amount: 4 }], copies: 4 },
   { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 4 },
-  { key: 'weather-gauge', name: 'the weather gauge', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 3 },
+  { key: 'weather-gauge', name: 'the weather gauge', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 2 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
 ];

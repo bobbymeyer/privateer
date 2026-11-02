@@ -12,45 +12,11 @@
  */
 
 import { type Action, type EncounterState, type Outcome, act, legalActions } from '../src/rules.ts';
+import { lookahead } from './bots.ts';
 import { TARGETS, encounterWith } from '../src/setup.ts';
 import type { ShipKind } from '../src/world/ships.ts';
 
-interface Weights {
-  /** Per point of your hull still standing. */
-  hull: number;
-  /** Per point of damage on the target: progress toward the bounty. */
-  damage: number;
-  /** Added to the payout when you get away. Negative: would rather not. */
-  fled: number;
-}
-
 type Bot = { name: string; choose: (s: EncounterState) => Action };
-
-function score(s: EncounterState, w: Weights): number {
-  if (s.outcome === 'sunk') return -20;
-  if (s.outcome === 'fled') return s.payout + w.fled;
-  if (s.outcome) return s.payout;
-  // Still fighting: what is aboard, plus what the position is worth. Damage
-  // cards waiting in the deck count for most of a hull point each — they
-  // will mostly land, but one per hand can be dodged.
-  const pending = (side: 'ship' | 'target') =>
-    [...s.deck, ...s.hand].filter((c) => c.damage && c.side === side).length;
-  const hull = s.ship.hull - 0.7 * pending('ship');
-  const dealt = s.target.maxHull - s.target.hull + 0.7 * pending('target');
-  return s.plunder + w.hull * hull + w.damage * dealt + 0.2 * s.target.cargo;
-}
-
-function lookahead(w: Weights): Bot['choose'] {
-  return (s) => {
-    let best = legalActions(s)[0];
-    let bestScore = -Infinity;
-    for (const a of legalActions(s)) {
-      const v = score(act(s, a), w);
-      if (v > bestScore) [best, bestScore] = [a, v];
-    }
-    return best;
-  };
-}
 
 const bots: Bot[] = [
   { name: 'balanced', choose: lookahead({ hull: 0.6, damage: 0.4, fled: 0 }) },
@@ -71,6 +37,8 @@ const bots: Bot[] = [
 const targetFlag = process.argv.indexOf('--target');
 const target = (targetFlag >= 0 ? process.argv[targetFlag + 1] : 'merchant') as ShipKind;
 if (!TARGETS[target]) throw new Error(`no target ${target}; try ${Object.keys(TARGETS).join(', ')}`);
+const hullFlag = process.argv.indexOf('--hull');
+const hull = hullFlag >= 0 ? Number(process.argv[hullFlag + 1]) : 10;
 const flag = process.argv.indexOf('--runs');
 const runs = flag >= 0 ? Number(process.argv[flag + 1]) : 2000;
 const outcomes: Outcome[] = ['fled', 'escaped', 'destroyed', 'sunk', 'parted'];
@@ -83,7 +51,7 @@ for (const bot of bots) {
   let rounds = 0;
   const counts = Object.fromEntries(outcomes.map((o) => [o, 0])) as Record<Outcome, number>;
   for (let seed = 0; seed < runs; seed++) {
-    let s = encounterWith(target, seed);
+    let s = encounterWith(target, seed, { hull, maxHull: hull });
     while (!s.outcome) s = act(s, bot.choose(s));
     payout += s.payout;
     rounds += s.round;

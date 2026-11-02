@@ -57,7 +57,7 @@ export interface TargetState {
 }
 
 /**
- * Credibly threatened: hull at half or less, or outgunned three to one. The
+ * Credibly threatened: hull at half or less, or outgunned two to one. The
  * only state in which a flee card works — a ship that is not in danger does
  * not run, and one facing a squadron of the line runs from the first shot.
  */
@@ -65,7 +65,7 @@ export function threatened(side: { hull: number; maxHull: number }, other: { hul
   return side.hull * 2 <= side.maxHull || other.hull >= OUTGUNNED * side.hull;
 }
 
-export const OUTGUNNED = 3;
+export const OUTGUNNED = 2;
 
 /** Why an effect did less than its face value, when that is worth saying. */
 export type EffectNote = 'held' | 'unthreatened';
