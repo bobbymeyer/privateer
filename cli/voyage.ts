@@ -19,7 +19,7 @@ import { threatened } from '../src/rules.ts';
 import { buyRound, ROUND_COST } from '../src/world/bar.ts';
 import { sailToward } from '../src/world/course.ts';
 import { type NodeId, portNamed, ports } from '../src/world/map.ts';
-import { fight, repair, REPAIR_COST } from '../src/world/meet.ts';
+import { attack, fight, letPass, repair, REPAIR_COST, YOUR_NATION } from '../src/world/meet.ts';
 import { buyShip, recruit, serves } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
@@ -102,6 +102,7 @@ const results: { won: boolean; sunk: boolean; day: number; gold: number; fights:
 const met: Record<string, number> = {};
 const ends: Record<string, number> = {};
 const killedBy: Record<string, number> = {};
+let passed = 0;
 const hullIn: Record<string, string[]> = {};
 for (let seed = 0; seed < RUNS; seed++) {
   let w = createWorld(sea, seed);
@@ -116,6 +117,13 @@ for (let seed = 0; seed < RUNS; seed++) {
     w = out.world;
     since++;
     if (out.halt === 'stuck') dest = null;
+    // A ship alongside: foreign prizes worth the risk, on a sound hull; never your own flag.
+    if (w.hail) {
+      const h = w.hail;
+      const worth = (h.kind === 'merchant' || h.kind === 'treasure-ship') && h.nation !== YOUR_NATION;
+      w = worth && w.hull >= w.maxHull * 0.6 ? attack(w) : letPass(w);
+      if (!w.encounter) passed++;
+    }
     if (w.encounter) {
       const enteredWith = `${w.hull}/${w.maxHull}`;
       fights++;
@@ -143,3 +151,4 @@ console.log(`adrift ${results.filter((r) => !r.won && !r.sunk).length} (out of t
 console.log(`fights ${mean(results.map((r) => r.fights)).toFixed(1)} a run · met`, met, '· ended', ends);
 console.log('ships at the end', results.reduce((t, r) => ((t[r.ship] = (t[r.ship] ?? 0) + 1), t), {} as Record<string, number>));
 console.log('sunk by', killedBy, '· hull going in', hullIn);
+console.log(`let pass ${(passed / RUNS).toFixed(1)} a run`);

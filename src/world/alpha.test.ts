@@ -133,6 +133,6 @@ test('a course stops for a ship', () => {
   const fleet = w.ships.find((s) => s.routeName === 'galeones')!;
   w = { ...w, ships: w.ships.map((s) => (s.id === fleet.id ? { ...s, node: tomorrow } : s)) };
   const { world, halt } = sailToward(sea, w, dest);
-  assert.equal(halt, 'encounter');
-  assert.equal(world.encounter?.shipId, fleet.id);
+  assert.equal(halt, 'hail');
+  assert.equal(world.hail?.shipId, fleet.id);
 });

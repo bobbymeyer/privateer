@@ -37,7 +37,7 @@ export function plotCourse(sea: Sea, s: WorldState, dest: NodeId): NodeId[] {
 }
 
 /** Why a day's sailing stopped short of the destination. */
-export type Halt = 'arrived' | 'encounter' | 'sunk' | 'won' | 'sighted' | 'stuck';
+export type Halt = 'arrived' | 'encounter' | 'hail' | 'sunk' | 'won' | 'sighted' | 'stuck';
 
 /** One day toward `dest`; says why to stop, if you should. */
 export function sailToward(sea: Sea, s: WorldState, dest: NodeId): { world: WorldState; halt: Halt | null } {
@@ -46,6 +46,7 @@ export function sailToward(sea: Sea, s: WorldState, dest: NodeId): { world: Worl
   const world = advance(sea, s, step);
   if (world.won) return { world, halt: 'won' };
   if (world.encounter) return { world, halt: 'encounter' };
+  if (world.hail) return { world, halt: 'hail' };
   if (world.islands.filter((i) => i.found).length > s.islands.filter((i) => i.found).length) return { world, halt: 'sighted' };
   return { world, halt: world.player === dest ? 'arrived' : null };
 }

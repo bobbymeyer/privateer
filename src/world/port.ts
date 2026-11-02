@@ -6,6 +6,7 @@
 
 import { CREW, type Outfit, SHIP_CLASSES, UPGRADES, maxHullOf, sightOf } from '../outfit.ts';
 import { adjective, type Nation } from './ports.ts';
+import { YOUR_NATION } from './meet.ts';
 import { type Sea, wantedBy } from './ships.ts';
 import type { WorldState } from './world.ts';
 
@@ -18,11 +19,30 @@ const portHere = (sea: Sea, s: WorldState) => {
   return port;
 };
 
-/** Whether this port will deal with you. Independent harbours deal with anyone. */
+/** Whether this port will deal with you. Independent harbours deal with anyone; English ones not with a pirate. */
 export const serves = (sea: Sea, s: WorldState): boolean => {
   const port = sea.map.nodes[s.player].port;
-  return !!port && (port.nation === 'local' || !wantedBy(s.standing, port.nation));
+  if (!port) return false;
+  if (s.pirate && port.nation === YOUR_NATION) return false;
+  return port.nation === 'local' || !wantedBy(s.standing, port.nation);
 };
+
+/** A royal pardon for piracy: bought in an English port, and dear. */
+export const PARDON_COST = 80;
+
+/** Buy a pardon. England forgets, as far as the law goes: you're no pirate, and its grudge is wiped clean. */
+export function buyPardon(sea: Sea, s: WorldState): WorldState {
+  const port = portHere(sea, s);
+  if (!s.pirate) throw new Error('you have nothing to be pardoned for');
+  if (port.nation !== YOUR_NATION) throw new Error('a pardon is bought in an English port');
+  const paid = pay(s, PARDON_COST);
+  return {
+    ...paid,
+    pirate: false,
+    standing: { ...s.standing, [YOUR_NATION]: 0 },
+    log: [...s.log, { turn: s.turn, text: 'a royal pardon, bought dear: you are no pirate' }],
+  };
+}
 
 const mustServe = (sea: Sea, s: WorldState) => {
   const port = portHere(sea, s);
@@ -87,6 +107,7 @@ export const bribeCost = (s: WorldState, nation: Nation) => BRIBE_COST * Math.ma
 export function bribe(sea: Sea, s: WorldState): WorldState {
   const port = portHere(sea, s);
   if (port.nation === 'local') throw new Error('nobody here to bribe');
+  if (s.pirate && port.nation === YOUR_NATION) throw new Error('no bribe buys off piracy: buy a pardon');
   const paid = pay(s, bribeCost(s, port.nation));
   return { ...paid, standing: { ...s.standing, [port.nation]: (s.standing[port.nation] ?? 0) + 1 } };
 }

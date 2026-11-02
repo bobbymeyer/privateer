@@ -5,9 +5,9 @@
   import { buyRound, ROUND_COST } from '../world/bar.ts';
   import { plotCourse, sailToward } from '../world/course.ts';
   import type { NodeId } from '../world/map.ts';
-  import { fight, repair, REPAIR_COST, type Reckoning } from '../world/meet.ts';
+  import { attack, fight, letPass, repair, REPAIR_COST, YOUR_NATION, type Reckoning } from '../world/meet.ts';
   import { SEASON_NAMES } from '../world/ocean.ts';
-  import { bribe, bribeCost, buyShip, buyUpgrade, dismiss, recruit, serves } from '../world/port.ts';
+  import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, PARDON_COST, recruit, serves } from '../world/port.ts';
   import { adjective, article } from '../world/ports.ts';
   import { markerStrength, predict } from '../world/rumors.ts';
   import type { Sea } from '../world/ships.ts';
@@ -65,7 +65,8 @@
     if (!out.halt) return;
     const why: Record<string, string> = {
       arrived: 'arrived',
-      encounter: 'a sail!',
+      encounter: 'attacked!',
+      hail: 'a sail alongside',
       sighted: 'land ho — uncharted',
       stuck: 'no way there',
       won: 'home',
@@ -184,6 +185,7 @@
       <p class="meta">
         day {world.turn + 1}, {SEASON_NAMES[Math.floor(world.turn / sea.pattern.seasonLength) % 4]} ·
         {world.gold} gold of {GOAL} to bring home to {HOME} · seed {seed}
+        {#if world.pirate}<span class="wanted"> · a pirate</span>{/if}
       </p>
     </header>
 
@@ -205,6 +207,7 @@
           <p>a {SHIP_CLASSES[world.outfit.ship].name}, {world.outfit.crew.length ? world.outfit.crew.map((c) => CREW[c].name).join(', ') : 'no hands of note'}</p>
           <p class="faint">sight {world.sight} · {world.outfit.upgrades.length ? world.outfit.upgrades.map((u) => UPGRADES[u].name).join(', ') : 'no refits'}</p>
           {#if atIsland(world)}<p>at anchor off an uncharted isle: taking on water, mending the hull.</p>{/if}
+          {#if world.pirate}<p class="wanted">a pirate: English ports are shut to you and London would hang you, until you buy a pardon ({PARDON_COST}) in an English port.</p>{/if}
         </section>
 
         <section>
@@ -224,7 +227,10 @@
         {#if port}
           <section>
             <h2>{port.name}, {adjective(port.nation)}</h2>
-            {#if !serves(sea, world)}
+            {#if world.pirate && port.nation === YOUR_NATION}
+              <p>they know you for a pirate here.</p>
+              <button onclick={() => attempt(() => buyPardon(sea!, world!), 'pardoned, at a price')}>buy a royal pardon ({PARDON_COST})</button>
+            {:else if !serves(sea, world)}
               <p>the {adjective(port.nation)} won't deal with you.</p>
               <button onclick={() => attempt(() => bribe(sea!, world!), 'the right palms are greased')}>bribe the officials ({bribeCost(world, port.nation)})</button>
             {:else}
@@ -294,7 +300,25 @@
       </aside>
     </div>
 
-    {#if shown}
+    {#if world.hail && !shown}
+      {@const h = world.hail}
+      {@const flagName = adjective(h.nation)}
+      {@const what = h.kind === 'hunter' ? 'guard ship' : h.kind.replace('-', ' ')}
+      <div class="overlay">
+        <div class="sheet">
+          <h2>{article(flagName)} {flagName} {what} alongside</h2>
+          {#if h.nation === YOUR_NATION}
+            <p class="wanted">she flies your flag. fire on her and you are a pirate: England will want you, its ports will shut, and London will hang you until you're pardoned.</p>
+          {:else}
+            <p>fire on her and the {flagName} will remember it, whatever comes of the fight{h.nation === 'local' ? '' : ': their guard ships will be out for you'}.</p>
+          {/if}
+          <div class="row">
+            <button onclick={() => (world = attack(world!))}>attack</button>
+            <button onclick={() => (world = letPass(world!))}>let her pass</button>
+          </div>
+        </div>
+      </div>
+    {:else if shown}
       <div class="overlay">
         <div class="sheet">
           <Fight fight={shown} {lastRound} {reckoning} {flag} {onact} {oncontinue} />

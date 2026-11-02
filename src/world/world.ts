@@ -14,7 +14,7 @@ import { buildPattern, type Chart, CURRENT_SEEN, chartKnowledge, type SeaKnowled
 import { type FleetEntry, type Sea, type Ship, type Standing, mayEnter, moveShip, spawnShips } from './ships.ts';
 import { type Roller, roll } from './random.ts';
 import { type Outfit, START_OUTFIT, maxHullOf } from '../outfit.ts';
-import { type Meeting, REFIT_DAYS, type Reckoning, meeting } from './meet.ts';
+import { type Hail, type Meeting, REFIT_DAYS, type Reckoning, YOUR_NATION, meeting } from './meet.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -52,6 +52,10 @@ export interface WorldState {
   islands: { node: NodeId; found: boolean }[];
   /** Home to London with a score: the run is won. */
   won: boolean;
+  /** A ship alongside, waiting on your choice. While there is one, the world waits. */
+  hail: Hail | null;
+  /** You fired on an English ship. England wants you, and London will hang you, until you're pardoned. */
+  pirate: boolean;
   /** What happened that you'd hear about: navies driving off intruders, and the like. */
   log: { turn: number; text: string }[];
 }
@@ -90,7 +94,7 @@ export const knowledge = (s: WorldState): SeaKnowledge => chartKnowledge(s.chart
  * Where the powers keep guard ships that will come after you. Out where
  * control is weak — not in Europe, whose home waters their navies keep.
  */
-export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Goa', 'Batavia', 'Manila', 'Algiers'];
+export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Goa', 'Batavia', 'Manila', 'Algiers', 'Port Royal', 'Bridgetown'];
 
 /** A merchant out of every port, a guard ship at every station, and the great courses. */
 export const DEFAULT_FLEET: FleetEntry[] = [
@@ -166,6 +170,8 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     outfit: START_OUTFIT,
     islands,
     won: false,
+    hail: null,
+    pirate: false,
   };
 }
 
@@ -174,6 +180,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   if (s.sunk) throw new Error('you went down; the run is over');
   if (s.won) throw new Error('you are home and the run is won');
   if (s.encounter) throw new Error('there is a fight to finish first');
+  if (s.hail) throw new Error('a ship is alongside: attack, or let her pass');
   if (to !== s.player && !sea.map.adj[s.player].includes(to)) {
     throw new Error(`node ${to} is not next to ${s.player}`);
   }
@@ -207,7 +214,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   // Grudges fade.
   const standing =
     turn % STANDING_DECAY === 0
-      ? Object.fromEntries(Object.entries(s.standing).map(([n, v]) => [n, v! - Math.sign(v!)]))
+      ? Object.fromEntries(Object.entries(s.standing).map(([n, v]) => [n, s.pirate && n === YOUR_NATION ? v! : v! - Math.sign(v!)]))
       : s.standing;
 
   const next: WorldState = {
@@ -227,8 +234,8 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     hull,
     standing,
   };
-  // Home with a score.
-  if (sea.map.nodes[to].port?.name === HOME && gold >= GOAL) {
+  // Home with a score — and no noose waiting.
+  if (sea.map.nodes[to].port?.name === HOME && gold >= GOAL && !s.pirate) {
     return { ...next, won: true, log: [...log, { turn, text: `home to London with ${gold}: the run is won` }] };
   }
   return meeting(sea, next);
