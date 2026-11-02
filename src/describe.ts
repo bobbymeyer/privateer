@@ -3,7 +3,7 @@
 import type { Effect } from './cards.ts';
 import type { EffectNote, GameEvent, Outcome } from './rules.ts';
 
-const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold' | 'hit' | 'hurt' | 'breach' | 'interrogate'>, string> = {
+const VERB: Record<Exclude<Effect['kind'], 'flee' | 'hold' | 'hit' | 'hurt' | 'breach' | 'interrogate' | 'recall'>, string> = {
   plunder: 'hauls aboard',
   repair: 'repairs',
   brace: 'braces for',
@@ -24,6 +24,7 @@ export function describeEffect(e: Effect, applied: number, note?: EffectNote, mi
     if (!mine) return `the target loses ${applied} hull`;
     return `you lose ${applied} hull${applied < e.amount ? ` (${e.amount - applied} braced)` : ''}`;
   }
+  if (e.kind === 'recall') return applied ? `brings ${applied} spent ${applied === 1 ? 'card' : 'cards'} back under the deck` : 'nothing spent to bring back';
   if (e.kind === 'interrogate') return `prisoners talk: a rumor, ${Math.round(e.reliability * 100)}% reliable`;
   if (e.kind === 'hold') return `${mine ? 'holds the target' : 'holds you'} for ${applied}`;
   const amount = e.amount;

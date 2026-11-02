@@ -14,7 +14,7 @@ export const PLAYER_CARDS: Record<string, CardFace> = {
   'double-shot': { key: 'double-shot', name: 'double-shotted guns', text: 'hit 5, hurt 1', effects: [{ kind: 'hit', amount: 5 }, { kind: 'hurt', amount: 1 }] },
   marksmen: { key: 'marksmen', name: 'marksmen in the tops', text: 'hit 1, hold 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'hold', amount: 1 }] },
   'prize-crew': { key: 'prize-crew', name: 'prize crew', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.8 }] },
-  'all-hands': { key: 'all-hands', name: 'all hands', text: 'brace 3', effects: [{ kind: 'brace', amount: 3 }] },
+  'all-hands': { key: 'all-hands', name: 'all hands', text: 'brace 3, recall 1', effects: [{ kind: 'brace', amount: 3 }, { kind: 'recall', amount: 1 }] },
   'surgeons-mate': { key: 'surgeons-mate', name: "surgeon's mate", text: 'repair 1, brace 1', effects: [{ kind: 'repair', amount: 1 }, { kind: 'brace', amount: 1 }] },
 };
 

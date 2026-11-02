@@ -62,8 +62,12 @@ did before the engraving.
 ## the loop
 
 1. Your ship's cards and the target's cards are shuffled into one deck.
-2. Three are dealt. Keep two, in the order they should resolve. The third
-   goes to the bottom.
+2. Three are dealt. Keep two, in the order they should resolve; then
+   they're spent, into the discard. The third goes to the bottom of the
+   deck. A spent card comes back only when a card says so: `recall` brings
+   back that side's most recently spent cards, under the deck, never
+   damage. The boatswain's *all hands* recalls one of yours; a fortress
+   mending its walls recalls one of its guns.
 3. It ends when either side **flees**, when either hull reaches 0, or when
    the deck can't deal a full hand and the ships **part**.
 

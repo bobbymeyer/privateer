@@ -33,6 +33,7 @@
 
   let picks: number[] = $state([]);
   const waiting = (side: 'ship' | 'target') => fight.deck.filter((c) => c.damage && c.side === side).length;
+  const spent = (side: 'ship' | 'target') => fight.discard.filter((c) => c.side === side && !c.damage).length;
 
   function toggle(i: number) {
     if (fight.outcome) return;
@@ -78,7 +79,7 @@
       <Gauge label="hull" value={fight.ship.hull} max={fight.ship.maxHull} />
       <p>plunder {fight.plunder}{#if fight.ship.brace} · brace {fight.ship.brace}{/if}</p>
       {#if !fight.outcome}
-        <p class="status">{waiting('ship')} damage waiting in the deck</p>
+        <p class="status">{waiting('ship')} damage waiting in the deck · {spent('ship')} of your cards spent</p>
         <p class="status">{@render state(threatened(fight.ship, fight.target), fight.ship.held)}</p>
       {/if}
     </div>
@@ -87,7 +88,7 @@
       <Gauge label="hull" value={fight.target.hull} max={fight.target.maxHull} color="var(--theirs)" />
       <p>cargo {fight.target.cargo} · bounty {fight.target.bounty}</p>
       {#if !fight.outcome}
-        <p class="status">{waiting('target')} damage waiting in the deck</p>
+        <p class="status">{waiting('target')} damage waiting in the deck · {spent('target')} of theirs spent</p>
         <p class="status">{@render state(threatened(fight.target, fight.ship), fight.target.held)}</p>
       {/if}
     </div>
@@ -102,7 +103,7 @@
       <button onclick={oncontinue}>{fight.outcome === 'sunk' ? 'the end' : 'back to sea'}</button>
     </div>
   {:else}
-    <p class="prompt">keep two. they resolve in the order you pick them; the third goes to the bottom.</p>
+    <p class="prompt">keep two. they resolve in the order you pick them, and then they're spent; the third goes to the bottom. spent cards come back only when a card recalls them.</p>
     <div class="hand">
       {#each fight.hand as card, i (card.id)}
         <CardView {card} order={picks.includes(i) ? picks.indexOf(i) + 1 : null} disabled={picks.length === 2 && !picks.includes(i)} onpick={() => toggle(i)} />
