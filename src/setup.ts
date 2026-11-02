@@ -24,17 +24,19 @@ export interface TargetDef {
 /** What you can fight: a ship of any kind, or a port — open or fortified. */
 export type TargetKind = ShipKind | 'town' | 'fortress';
 
-/** A raid that runs past the sixth round brings the garrison's relief, a card a round. */
+/** A raid that runs past the sixth round brings the garrison's relief: a card every other round, four in all. */
 export const RELIEF_FROM = 7;
+export const RELIEF_EVERY = 2;
+export const RELIEF_COUNT = 4;
 
 export const TARGETS: Record<TargetKind, TargetDef> = {
   merchant: { name: 'merchant', hull: 12, cargo: 12, bounty: 4, cards: MERCHANT_CARDS },
-  hunter: { name: 'guard ship', hull: 12, cargo: 3, bounty: 10, cards: HUNTER_CARDS },
+  hunter: { name: 'guard ship', hull: 14, cargo: 3, bounty: 10, cards: HUNTER_CARDS },
   'treasure-ship': { name: 'galleon', hull: 13, cargo: 30, bounty: 6, cards: TREASURE_SHIP_CARDS },
   'treasure-fleet': { name: 'treasure fleet', hull: 24, cargo: 60, bounty: 10, cards: TREASURE_FLEET_CARDS },
   armada: { name: 'armada', hull: 30, cargo: 4, bounty: 20, cards: ARMADA_CARDS },
-  town: { name: 'town', hull: 10, cargo: 25, bounty: 0, cards: TOWN_CARDS, takenWhole: true, reinforce: { from: RELIEF_FROM, card: RELIEF }, yours: RAID_CARDS },
-  fortress: { name: 'fortified port', hull: 19, cargo: 45, bounty: 0, cards: FORTRESS_CARDS, takenWhole: true, reinforce: { from: RELIEF_FROM, card: RELIEF }, yours: RAID_CARDS },
+  town: { name: 'town', hull: 12, cargo: 25, bounty: 0, cards: TOWN_CARDS, takenWhole: true, reinforce: { from: RELIEF_FROM, every: RELIEF_EVERY, count: RELIEF_COUNT, card: RELIEF }, yours: RAID_CARDS },
+  fortress: { name: 'fortified port', hull: 22, cargo: 45, bounty: 0, cards: FORTRESS_CARDS, takenWhole: true, reinforce: { from: RELIEF_FROM, every: RELIEF_EVERY, count: RELIEF_COUNT, card: RELIEF }, yours: RAID_CARDS },
 };
 
 /** Your ship, as it sails into a fight. */

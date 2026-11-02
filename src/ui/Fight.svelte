@@ -33,6 +33,8 @@
 
   let picks: number[] = $state([]);
   const waiting = (side: 'ship' | 'target') => fight.deck.filter((c) => c.damage && c.side === side).length;
+  const bottom = $derived(fight.deck.at(-1) ?? null);
+  const bottomCopy = $derived(bottom && !bottom.damage && !bottom.id.startsWith('reinforce') ? bottom.id.split('#')[1] : null);
   const spent = (side: 'ship' | 'target') => fight.discard.filter((c) => c.side === side && !c.damage).length;
 
   function toggle(i: number) {
@@ -110,6 +112,10 @@
       {/each}
     </div>
     <button onclick={resolve} disabled={picks.length < 2}>resolve</button>
+    <p class="status">
+      {#if bottom}at the bottom of the deck: {bottom.name}{bottomCopy ? ` #${bottomCopy}` : ''} ({bottom.damage ? (bottom.side === 'ship' ? 'a wound to you' : 'a wound to them') : bottom.side === 'ship' ? 'yours' : 'theirs'}){/if}
+      {#if fight.reinforce} · relief still to come: {fight.reinforce.count - fight.reinforced}{fight.reinforced < fight.reinforce.count && fight.round < fight.reinforce.from ? `, from round ${fight.reinforce.from}` : ''}{/if}
+    </p>
   {/if}
 
   {#if lastRound.length}

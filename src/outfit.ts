@@ -11,7 +11,7 @@ type CardFace = Omit<CardDef, 'copies'>;
 /** Every card you can come to hold. The first nine are the pinnace's; the rest come aboard with crew and refits. */
 export const PLAYER_CARDS: Record<string, CardFace> = {
   ...Object.fromEntries(SHIP_CARDS.map(({ copies: _, ...face }) => [face.key, face])),
-  'double-shot': { key: 'double-shot', name: 'double-shotted guns', text: 'hit 5, hurt 1', effects: [{ kind: 'hit', amount: 5 }, { kind: 'hurt', amount: 1 }] },
+  'double-shot': { key: 'double-shot', name: 'double-shotted guns', text: 'hit 4, hurt 1', effects: [{ kind: 'hit', amount: 4 }, { kind: 'hurt', amount: 1 }] },
   marksmen: { key: 'marksmen', name: 'marksmen in the tops', text: 'hit 1, hold 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'hold', amount: 1 }] },
   'prize-crew': { key: 'prize-crew', name: 'prize crew', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.8 }] },
   'all-hands': { key: 'all-hands', name: 'all hands', text: 'brace 3, recall 1', effects: [{ kind: 'brace', amount: 3 }, { kind: 'recall', amount: 1 }] },

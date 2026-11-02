@@ -8,16 +8,18 @@
 export type Side = 'ship' | 'target';
 
 export type Effect =
-  /**
-   * Puts this many damage cards against the target on top of the deck. Shot
-   * does not touch the hull directly: it lands when a damage card is kept.
-   */
+  /** Shot into the target: its hull, at once. */
   | { kind: 'hit'; amount: number }
-  /** Puts this many damage cards against you on top of the deck. */
+  /** Shot into you: your hull, at once, less any brace you're holding. */
   | { kind: 'hurt'; amount: number }
   /**
-   * The card's own side loses this much hull — less any brace, for you. This
-   * is what a damage card does when it is kept.
+   * A lasting wound to the other side: a wound card on top of the deck,
+   * marked against them. See `woundCard`.
+   */
+  | { kind: 'wound'; what: Wound }
+  /**
+   * The card's own side loses this much hull — less any brace, for you.
+   * What a leak or a fire does when its card is kept.
    */
   | { kind: 'breach'; amount: number }
   /** Cargo moved from the target's hold to yours. Capped by what is left. */
@@ -57,8 +59,9 @@ export interface Card {
   name: string;
   text: string;
   effects: Effect[];
-  /** Set on the damage cards that shot makes. */
+  /** Set on a wound card: a leak, a fire, shot-away sails. */
   damage?: true;
+  wound?: Wound;
 }
 
 export interface CardDef {
@@ -69,15 +72,33 @@ export interface CardDef {
   copies: number;
 }
 
+/** The wounds a ship can take that outlast the shot that made them. */
+export type Wound = 'leak' | 'fire' | 'sails';
+
+export const WOUNDS: Record<Wound, { name: string; hull: number; text: (whose: 'you' | 'they') => string }> = {
+  leak: { name: 'a leak below', hull: 2, text: (w) => `${w} lose 2 hull` },
+  fire: { name: 'fire aboard', hull: 3, text: (w) => `${w} lose 3 hull` },
+  sails: { name: 'sails shot away', hull: 0, text: (w) => `till kept, ${w} can't flee` },
+};
+
 /**
- * One point of damage, sitting in the deck against `side` until somebody
- * keeps it. One can be rejected per hand; two in a hand and one has to be
- * taken.
+ * A wound, sitting in the deck against `side` until somebody keeps it.
+ * Keeping it deals with it — pumping, fighting the fire, repairing aloft —
+ * at the cost it says, and it's spent. Sent to the bottom, it comes round
+ * again. Shot-away sails cost no hull, but while they're in that side's deck
+ * or hand, its flee cards don't work.
  */
-export function damageCard(side: Side, id: string): Card {
-  const name = side === 'ship' ? 'damage to you' : 'damage to them';
-  const text = side === 'ship' ? 'you lose 1 hull' : 'they lose 1 hull';
-  return { id, side, name, text, effects: [{ kind: 'breach', amount: 1 }], damage: true };
+export function woundCard(side: Side, id: string, what: Wound): Card {
+  const w = WOUNDS[what];
+  return {
+    id,
+    side,
+    name: w.name,
+    text: w.text(side === 'ship' ? 'you' : 'they'),
+    effects: w.hull ? [{ kind: 'breach', amount: w.hull }] : [],
+    damage: true,
+    wound: what,
+  };
 }
 
 /** Expand definitions into individual cards with unique ids. */
@@ -94,11 +115,11 @@ export function buildDeck(side: Side, defs: readonly CardDef[]): Card[] {
 // Placeholder content. The numbers are what the simulator is for.
 
 export const SHIP_CARDS: readonly CardDef[] = [
-  { key: 'broadside', name: 'broadside', text: 'hit 4', effects: [{ kind: 'hit', amount: 4 }], copies: 2 },
+  { key: 'broadside', name: 'broadside', text: 'hit 3, leak', effects: [{ kind: 'hit', amount: 3 }, { kind: 'wound', what: 'leak' }], copies: 2 },
   { key: 'raking-fire', name: 'raking fire', text: 'hit 2', effects: [{ kind: 'hit', amount: 2 }], copies: 2 },
   { key: 'sweep', name: 'sweep the hold', text: 'plunder 3', effects: [{ kind: 'plunder', amount: 3 }], copies: 2 },
   { key: 'boarding', name: 'boarding party', text: 'plunder 4, hurt 1, interrogate', effects: [{ kind: 'plunder', amount: 4 }, { kind: 'hurt', amount: 1 }, { kind: 'interrogate', reliability: 0.7 }], copies: 1 },
-  { key: 'chain-shot', name: 'chain shot', text: 'hit 1, hold 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'hold', amount: 1 }], copies: 1 },
+  { key: 'chain-shot', name: 'chain shot', text: 'hit 1, sails', effects: [{ kind: 'hit', amount: 1 }, { kind: 'wound', what: 'sails' }], copies: 1 },
   { key: 'swivel', name: 'swivel guns', text: 'hit 1, plunder 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'plunder', amount: 1 }], copies: 1 },
   { key: 'patch', name: 'patch the hull', text: 'repair 2', effects: [{ kind: 'repair', amount: 2 }], copies: 1 },
   { key: 'brace', name: 'brace', text: 'brace 2', effects: [{ kind: 'brace', amount: 2 }], copies: 1 },
@@ -113,6 +134,7 @@ export const MERCHANT_CARDS: readonly CardDef[] = [
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2, recall 1', effects: [{ kind: 'mend', amount: 2 }, { kind: 'recall', amount: 1 }], copies: 1 },
   { key: 'strike', name: 'strike colours', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.9 }], copies: 1 },
   { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
+  { key: 'lucky-shot', name: 'a lucky shot', text: 'hurt 1, leak', effects: [{ kind: 'hurt', amount: 1 }, { kind: 'wound', what: 'leak' }], copies: 1 },
 ];
 
 // First decks for the rest of the sea. Placeholders, like the merchant's
@@ -120,10 +142,10 @@ export const MERCHANT_CARDS: readonly CardDef[] = [
 
 /** A guard ship: hard to shake (it grapples), little to take, a price on its head. */
 export const HUNTER_CARDS: readonly CardDef[] = [
-  { key: 'return-fire', name: 'return fire', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 5 },
-  { key: 'grapeshot', name: 'grapeshot', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 3 },
-  { key: 'grapnels', name: 'grapnels', text: 'hurt 1, hold 1', effects: [{ kind: 'hurt', amount: 1 }, { kind: 'hold', amount: 1 }], copies: 2 },
-  { key: 'boarders', name: 'boarders away', text: 'hurt 2, hold 1', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'hold', amount: 1 }], copies: 1 },
+  { key: 'return-fire', name: 'return fire', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 4 },
+  { key: 'chain-and-bar', name: 'chain and bar', text: 'hurt 1, sails', effects: [{ kind: 'hurt', amount: 1 }, { kind: 'wound', what: 'sails' }], copies: 2 },
+  { key: 'grapnels', name: 'grapnels', text: 'hurt 2, hold 1', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'hold', amount: 1 }], copies: 2 },
+  { key: 'boarders', name: 'boarders away', text: 'hurt 3, hold 1', effects: [{ kind: 'hurt', amount: 3 }, { kind: 'hold', amount: 1 }], copies: 1 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 1 },
   { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 1 },
   { key: 'reload', name: 'the gun crews reload', text: 'recall 2', effects: [{ kind: 'recall', amount: 2 }], copies: 1 },
@@ -131,7 +153,7 @@ export const HUNTER_CARDS: readonly CardDef[] = [
 
 /** A lone galleon: heavy guns, slow to answer, a hold full of silver, and she runs. */
 export const TREASURE_SHIP_CARDS: readonly CardDef[] = [
-  { key: 'great-guns', name: 'great guns', text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 2 },
+  { key: 'great-guns', name: 'great guns', text: 'hurt 2, leak', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'wound', what: 'leak' }], copies: 2 },
   { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 3 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 2', effects: [{ kind: 'mend', amount: 2 }], copies: 2 },
   { key: 'crack-on', name: 'crack on sail', text: 'flee', effects: [{ kind: 'flee' }], copies: 3 },
@@ -141,7 +163,7 @@ export const TREASURE_SHIP_CARDS: readonly CardDef[] = [
 
 /** A convoy under escort: it doesn't run, it closes ranks, and a straggler is the chance. */
 export const TREASURE_FLEET_CARDS: readonly CardDef[] = [
-  { key: 'escort-broadside', name: "escort's broadside", text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 4 },
+  { key: 'escort-broadside', name: "escort's broadside", text: 'hurt 2, leak', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'wound', what: 'leak' }], copies: 4 },
   { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 4 },
   { key: 'cut-off', name: 'cut off', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 2 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
@@ -151,7 +173,7 @@ export const TREASURE_FLEET_CARDS: readonly CardDef[] = [
 
 /** A squadron of the line: nothing to take, everything to lose. Run. */
 export const ARMADA_CARDS: readonly CardDef[] = [
-  { key: 'broadside', name: 'broadside', text: 'hurt 4', effects: [{ kind: 'hurt', amount: 4 }], copies: 4 },
+  { key: 'broadside', name: 'broadside', text: 'hurt 3, leak', effects: [{ kind: 'hurt', amount: 3 }, { kind: 'wound', what: 'leak' }], copies: 4 },
   { key: 'return-fire', name: 'return fire', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 4 },
   { key: 'weather-gauge', name: 'the weather gauge', text: 'hold 1', effects: [{ kind: 'hold', amount: 1 }], copies: 2 },
   { key: 'carpenters', name: 'carpenters below', text: 'mend 3', effects: [{ kind: 'mend', amount: 3 }], copies: 2 },
@@ -173,7 +195,7 @@ export const TOWN_CARDS: readonly CardDef[] = [
 
 /** A fortified port: the fort's great guns, and walls to mend. Not for a pinnace. */
 export const FORTRESS_CARDS: readonly CardDef[] = [
-  { key: 'great-guns', name: "the fort's great guns", text: 'hurt 3', effects: [{ kind: 'hurt', amount: 3 }], copies: 2 },
+  { key: 'heated-shot', name: 'heated shot', text: 'hurt 2, fire', effects: [{ kind: 'hurt', amount: 2 }, { kind: 'wound', what: 'fire' }], copies: 2 },
   { key: 'battery', name: 'shore battery', text: 'hurt 2', effects: [{ kind: 'hurt', amount: 2 }], copies: 3 },
   { key: 'musketry', name: 'musketry from the walls', text: 'hurt 1', effects: [{ kind: 'hurt', amount: 1 }], copies: 2 },
   { key: 'inland', name: 'valuables carried inland', text: 'jettison 4', effects: [{ kind: 'jettison', amount: 4 }], copies: 2 },
