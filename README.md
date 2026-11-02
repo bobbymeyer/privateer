@@ -1,14 +1,16 @@
 # privateer
 
-A card game in progress. So far: one encounter, a rules module that knows
-nothing about drawing, a plain browser front end in Svelte, a terminal
-harness, and a simulator to tune the numbers.
+A card-based privateering roguelike, round the world in 16XX. It's an alpha:
+play it at [bobbymeyer.com/privateer](https://bobbymeyer.com/privateer/).
 
-It will go up on bobbymeyer.com once it has something to look at.
+Underneath it is a rules module that knows nothing about drawing, a browser
+front end in Svelte, a terminal harness, and simulators that play whole runs
+to tune the numbers. Every push to `main` is tested and published to GitHub
+Pages, and the site serves it from there.
 
 ## playing
 
-`npm run dev` and open the page. You're a privateer out of Plymouth in a
+Play it on the site, or `npm run dev` and open the page. You're a privateer out of Plymouth in a
 pinnace with 20 gold. **Bring 150 home to London and the run is won.** Sink,
 and it's over.
 
