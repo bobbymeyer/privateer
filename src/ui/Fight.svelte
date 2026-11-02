@@ -81,7 +81,7 @@
       <Gauge label="hull" value={fight.ship.hull} max={fight.ship.maxHull} />
       <p>plunder {fight.plunder}{#if fight.ship.brace} · brace {fight.ship.brace}{/if}</p>
       {#if !fight.outcome}
-        <p class="status">{waiting('ship')} damage waiting in the deck · {spent('ship')} of your cards spent</p>
+        <p class="status">{waiting('ship')} {waiting('ship') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('ship')} of your cards spent</p>
         <p class="status">{@render state(threatened(fight.ship, fight.target), fight.ship.held)}</p>
       {/if}
     </div>
@@ -90,7 +90,7 @@
       <Gauge label="hull" value={fight.target.hull} max={fight.target.maxHull} color="var(--theirs)" />
       <p>cargo {fight.target.cargo} · bounty {fight.target.bounty}</p>
       {#if !fight.outcome}
-        <p class="status">{waiting('target')} damage waiting in the deck · {spent('target')} of theirs spent</p>
+        <p class="status">{waiting('target')} {waiting('target') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('target')} of theirs spent</p>
         <p class="status">{@render state(threatened(fight.target, fight.ship), fight.target.held)}</p>
       {/if}
     </div>
