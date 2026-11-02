@@ -2,7 +2,8 @@
   import { describeEvent, OUTCOME_TEXT, RAID_OUTCOME_TEXT } from '../describe.ts';
   import { threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
   import type { Reckoning } from '../world/meet.ts';
-  import { adjective } from '../world/ports.ts';
+  import { adjective, type Nation } from '../world/ports.ts';
+  import Flag from './Flag.svelte';
   import CardView from './CardView.svelte';
   import Gauge from './Gauge.svelte';
 
@@ -12,6 +13,7 @@
     reckoning = null,
     title,
     isRaid = false,
+    nation,
     onact,
     oncontinue,
   }: {
@@ -23,6 +25,8 @@
     title: string;
     /** A raid on a port, rather than a ship. */
     isRaid?: boolean;
+    /** Whose she is, for her colours. */
+    nation: Nation;
     onact: (a: Action) => void;
     oncontinue: () => void;
   } = $props();
@@ -64,7 +68,7 @@
 
 <section class="fight" aria-label="encounter">
   <header>
-    <h2>{title}</h2>
+    <h2><Flag {nation} size={18} />{title}</h2>
     <p class="meta">round {fight.round} · {fight.deck.length} in the deck</p>
   </header>
 

@@ -5,8 +5,11 @@
   --faint: #8a8a8a;
   --rule: #d6d6d6;
   --theirs: #b3261e;
-  --land: #e4e4e4;
-  --coast: #9a9a9a;
+  /* The chart is parchment: a game's own stage, not the page's chrome. */
+  --sea: #ead8ad;
+  --land: #cbb07a;
+  --coast: #6b4f2c;
+  --sepia: #4a3520;
   --water: #2a5d9f;
   font-family: ui-serif, Georgia, 'Times New Roman', serif;
   color: var(--ink);
