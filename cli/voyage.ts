@@ -24,7 +24,7 @@ import { isEnemy } from '../src/world/wars.ts';
 import { buyShip, PROVISION_COST, provision, provisions, recruit, serves } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
-import { createSea, createWorld, GOAL, HOME, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
+import { advance, createSea, createWorld, GOAL, HOME, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
 
 const arg = (name: string, fallback: string) => {
@@ -33,6 +33,7 @@ const arg = (name: string, fallback: string) => {
 };
 const RUNS = arg('runs', '20');
 const DAYS = arg('days', '730');
+const FROM = arg('from', '0');
 
 const sea = createSea();
 const { map } = sea;
@@ -139,7 +140,7 @@ let mutinies = 0;
 let storms = 0;
 let omens = 0;
 const hullIn: Record<string, string[]> = {};
-for (let seed = 0; seed < RUNS; seed++) {
+for (let seed = FROM; seed < FROM + RUNS; seed++) {
   let w = createWorld(sea, seed);
   let dest: NodeId | null = null;
   fights = 0;
@@ -158,7 +159,8 @@ for (let seed = 0; seed < RUNS; seed++) {
     if (dest === null || since > 10 || w.player === dest || danger(w) !== null) ((dest = choose(w)), (since = 0));
     if (dest === w.player) dest = harbours[(seed + w.turn) % harbours.length];
     const out = sailToward(sea, w, dest);
-    w = out.world;
+    // Going nowhere — there already, or no way there — the day still passes, lying where she is.
+    w = out.world.turn === w.turn ? advance(sea, out.world, out.world.player) : out.world;
     since++;
     if (out.halt === 'stuck') dest = null;
     // A ship alongside: foreign prizes worth the risk, on a sound hull; never your own flag.
