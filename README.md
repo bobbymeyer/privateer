@@ -36,6 +36,14 @@ and it's over.
 - **Build the deck.** Take a ship and her stores are offered: three cards
   off her, keep one or none. A yard will strike a card out for 6, down to
   10. Your deck is listed under your ship. Hands of note draw wages.
+- **Ship and crew** have a sheet of their own (`src/ui/ShipSheet.svelte`),
+opened from the sidebar: the ship drawn to her size, her hull and morale,
+each hand of note with what they bring and what they cost, the refits,
+and the deck laid out as cards, grouped by where each came from — the
+ship, each refit, each hand, the prizes — with struck cards shown struck,
+and a strike button on each in a port with a yard. In port, every hire,
+refit and ship for sale says what it would add before you buy it. The
+sidebar's sections fold.
 - **Read a ship before you engage.** The lookout sees ships two days past
   the water you can read, and a hostile sail coming into view stops you.
   Alongside, or in the *in sight* list, you see her hull against yours and

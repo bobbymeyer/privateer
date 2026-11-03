@@ -167,3 +167,26 @@ export const maxHullOf = (o: Outfit) => SHIP_CLASSES[o.ship].hull + o.upgrades.r
 export const sightOf = (o: Outfit) => 1 + o.crew.reduce((t, c) => t + (CREW[c].sight ?? 0), 0);
 
 export const deckSize = (o: Outfit) => Object.values(cardsOf(o)).reduce((a, b) => a + b, 0);
+
+/** Where the deck's cards come from, a group each: the ship, each refit, each hand, the prizes. For showing, not for dealing. */
+export interface DeckSource {
+  label: string;
+  /** What kind of source, for grouping: the ship and its refits, the crew, prizes. */
+  kind: 'ship' | 'refit' | 'crew' | 'prize';
+  cards: Cards;
+}
+
+export function deckSources(o: Outfit): DeckSource[] {
+  const ship = add({ ...BASE }, SHIP_CLASSES[o.ship].cards);
+  const sources: DeckSource[] = [{ label: `the ${SHIP_CLASSES[o.ship].name}`, kind: 'ship', cards: ship }];
+  for (const u of o.upgrades) if (UPGRADES[u].cards) sources.push({ label: UPGRADES[u].name, kind: 'refit', cards: { ...UPGRADES[u].cards } });
+  for (const c of o.crew) if (Object.keys(CREW[c].cards).length) sources.push({ label: `the ${CREW[c].name}`, kind: 'crew', cards: { ...CREW[c].cards } });
+  if (o.prizes.length) sources.push({ label: 'taken off prizes', kind: 'prize', cards: add({}, Object.fromEntries(Object.entries(o.prizes.reduce((t, k) => ((t[k] = (t[k] ?? 0) + 1), t), {} as Cards)))) });
+  return sources;
+}
+
+/** Cards, as words: `double-shotted guns, run out the guns again ×2`. */
+export const cardWords = (cards: Cards = {}) =>
+  Object.entries(cards)
+    .map(([k, n]) => `${PLAYER_CARDS[k].name}${n > 1 ? ` ×${n}` : ''}`)
+    .join(', ');

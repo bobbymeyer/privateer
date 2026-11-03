@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { act, type Action, type EncounterState, type GameEvent } from '../rules.ts';
-  import { CREW, MIN_DECK, PLAYER_CARDS, SHIP_CLASSES, STRIKE_COST, UPGRADES, WAGE_DAYS, cardsOf, deckSize, wagesOf } from '../outfit.ts';
+  import { CREW, PLAYER_CARDS, SHIP_CLASSES, UPGRADES, WAGE_DAYS, cardWords, deckSize, wagesOf } from '../outfit.ts';
   import { buyRound, ROUND_COST } from '../world/bar.ts';
   import { plotCourse, sailToward } from '../world/course.ts';
   import type { NodeId } from '../world/map.ts';
@@ -9,13 +9,12 @@
   import { CASUS_BELLI, enemiesOf, isEnemy } from '../world/wars.ts';
   import { TARGETS } from '../setup.ts';
   import { SEASON_NAMES } from '../world/ocean.ts';
-  import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, isHaven, leavePrize, PARDON_COST, strikable, strikeCard, takePrize, PROVISION_CHEER, PROVISION_COST, PROVISION_HULL, provision, provisions, recruit, retire, serves } from '../world/port.ts';
+  import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, isHaven, leavePrize, PARDON_COST, takePrize, PROVISION_CHEER, PROVISION_COST, PROVISION_HULL, provision, provisions, recruit, retire, serves } from '../world/port.ts';
   import { IDLE_DAYS, MORALE_MAX } from '../world/events.ts';
   import { inSight, lookout, readShip } from '../world/scout.ts';
   import { ACTS, REGIONS, describeLetter, reprisal } from '../world/letters.ts';
   import { choices, choose, describe as describeDilemma } from '../world/dilemmas.ts';
   import CardView from './CardView.svelte';
-  import { explainCard } from '../describe.ts';
   import { adjective, article, nationName, sailName } from '../world/ports.ts';
   import { markerStrength, predict } from '../world/rumors.ts';
   import type { Sea } from '../world/ships.ts';
@@ -26,6 +25,7 @@
   import type { Nation } from '../world/ports.ts';
   import Gauge from './Gauge.svelte';
   import SeaChart from './SeaChart.svelte';
+  import ShipSheet from './ShipSheet.svelte';
   import { forget, load, store } from '../save.ts';
 
   function seedFromUrl(): number | null {
@@ -197,6 +197,8 @@
   // --- In port ---------------------------------------------------------------
 
   let said = $state('');
+  /** The ship and crew sheet, open over the chart. */
+  let shipOpen = $state(false);
   function attempt(f: () => WorldState, done = '') {
     try {
       world = f();
@@ -269,7 +271,7 @@
       <h1>privateer</h1>
       <p class="meta">
         day {world.turn + 1}, {SEASON_NAMES[Math.floor(world.turn / sea.pattern.seasonLength) % 4]} ·
-        {#if world.commission === 'active'}letter {world.letter!.act} of {ACTS} · {:else if world.commission === 'done'}every letter done: home to {HOME} · {/if}{world.gold} gold{world.commission === 'legacy' ? ` of ${GOAL} to bring home to ${HOME}` : world.pirate ? `, ${GOAL} to retire on` : ''} · seed {seed}
+        {#if world.commission === 'active'}letter {world.letter!.act} of {ACTS}{' · '}{:else if world.commission === 'done'}every letter done: home to {HOME}{' · '}{/if}{world.gold} gold{world.commission === 'legacy' ? ` of ${GOAL} to bring home to ${HOME}` : world.pirate ? `, ${GOAL} to retire on` : ''} · seed {seed}
         {#if world.pirate}<span class="wanted"> · a pirate</span>{/if}
       </p>
       <div class="row">
@@ -293,34 +295,22 @@
       </div>
 
       <aside>
-        <section>
-          <h2>{nodeName(world.player)}</h2>
+        <details class="panel" open>
+          <summary><h2>{nodeName(world.player)}</h2></summary>
           <Gauge label="hull" value={world.hull} max={world.maxHull} />
           <Gauge label="morale" value={world.morale} max={MORALE_MAX} />
           {#if world.morale <= 2}<p class="wanted">the crew are close to mutiny. a prize, a round ashore or fresh water would steady them.</p>{:else if world.turn - world.lastSpoils >= IDLE_DAYS}<p class="faint">{world.turn - world.lastSpoils} days since the last prize: the crew are souring.</p>{/if}
           <p>a {SHIP_CLASSES[world.outfit.ship].name}, {world.outfit.crew.length ? world.outfit.crew.map((c) => CREW[c].name).join(', ') : 'no hands of note'}</p>
           {#if wagesOf(world.outfit)}<p class="faint">wages {wagesOf(world.outfit)} every {WAGE_DAYS} days, next on day {(Math.floor(world.turn / WAGE_DAYS) + 1) * WAGE_DAYS + 1}</p>{/if}
-          <details class="deck">
-            <summary>your deck: {deckSize(world.outfit)} cards</summary>
-            <ul class="plain">
-              {#each Object.entries(cardsOf(world.outfit)) as [key, n]}
-                <li title={explainCard(PLAYER_CARDS[key].text)}>
-                  {PLAYER_CARDS[key].name} <span class="faint">{PLAYER_CARDS[key].text}{n > 1 ? ` · ×${n}` : ''}</span>
-                  {#if port && serves(sea, world)}<button class="strike" onclick={() => attempt(() => strikeCard(sea!, world!, key), `${PLAYER_CARDS[key].name} struck from the deck`)} disabled={!strikable(sea, world, key)}>strike ({STRIKE_COST})</button>{/if}
-                </li>
-              {/each}
-            </ul>
-            <p class="faint">{port && serves(sea, world) ? `a yard will strike a card for ${STRIKE_COST}, down to ${MIN_DECK} cards: a thinner deck deals what you want more often.` : 'a yard in port will strike cards out of it.'}</p>
-          </details>
+          <div class="row"><button onclick={() => (shipOpen = true)}>ship &amp; crew · deck of {deckSize(world.outfit)}</button></div>
           <p class="faint">your name: {RENOWN_WORDS[renown(world)]}{renown(world) ? ', and the hunters come farther for it' : ''}</p>
           {#if homeward(world)}<p class="wanted">homeward bound with the score: every enemy privateer is out for you.</p>{/if}
-          <p class="faint">sight {world.sight} · {world.outfit.upgrades.length ? world.outfit.upgrades.map((u) => UPGRADES[u].name).join(', ') : 'no refits'}</p>
           {#if atIsland(world)}<p>at anchor off an uncharted isle: taking on water, mending the hull.</p>{/if}
           {#if world.pirate}<p class="wanted">a pirate: English ports are shut to you and London would hang you, until you buy a pardon ({PARDON_COST}) in an English port.</p>{/if}
-        </section>
+        </details>
 
-        <section>
-          <h2>course</h2>
+        <details class="panel" open>
+          <summary><h2>course</h2></summary>
           {#if dest === null}
             <p class="faint">click the sea to set a course.</p>
           {:else}
@@ -332,11 +322,11 @@
           {/if}
           {#if halted}<p class="said">{halted}</p>{/if}
           {#if said && !port}<p class="said">{said}</p>{/if}
-        </section>
+        </details>
 
         {#if port}
-          <section>
-            <h2><Flag nation={port.nation} />{port.name}, {adjective(port.nation)}</h2>
+          <details class="panel" open>
+            <summary><h2><Flag nation={port.nation} />{port.name}, {adjective(port.nation)}</h2></summary>
             {#if isHaven(sea, world)}
               <p>a pirate's haven: they'll deal with you here, whoever wants you, and you can retire here when you're rich.</p>
               <button onclick={() => attempt(() => retire(sea!, world!))} disabled={world.gold < GOAL}>retire here ({world.gold} of {GOAL})</button>
@@ -356,33 +346,48 @@
               <p>the {adjective(port.nation)} won't deal with you.</p>
               <button onclick={() => attempt(() => bribe(sea!, world!), 'the right palms are greased')}>bribe the officials ({bribeCost(world, port.nation)})</button>
             {:else}
-              <h3>the bar</h3>
+              <details class="sub" open><summary><h3>the bar</h3></summary>
               <button onclick={round}>buy a round ({ROUND_COST})</button>
-              <div class="list">
+              <p class="faint">berths {world.outfit.crew.length} of {SHIP_CLASSES[world.outfit.ship].berths}{world.outfit.crew.length ? ' · let hands go from the ship & crew sheet' : ''}</p>
+              <ul class="plain shop">
                 {#each Object.entries(CREW).filter(([k]) => !world!.outfit.crew.includes(k)) as [key, c]}
-                  <button onclick={() => attempt(() => recruit(sea!, world!, key), `the ${c.name} signs on`)}>hire a {c.name} ({c.cost})</button>
+                  <li>
+                    <button onclick={() => attempt(() => recruit(sea!, world!, key), `the ${c.name} signs on`)} disabled={world.gold < c.cost || world.outfit.crew.length >= SHIP_CLASSES[world.outfit.ship].berths}>hire a {c.name} ({c.cost})</button>
+                    <span class="faint">{[cardWords(c.cards) && `+ ${cardWords(c.cards)}`, c.sight ? `sight +${c.sight}` : ''].filter(Boolean).join(' · ')} · wage {c.wage}</span>
+                  </li>
                 {/each}
-                {#each world.outfit.crew as key}
-                  <button onclick={() => attempt(() => dismiss(world!, key), `the ${CREW[key].name} goes ashore`)}>let the {CREW[key].name} go</button>
-                {/each}
-              </div>
-              <h3>the yard</h3>
+              </ul>
+              </details>
+              <details class="sub" open><summary><h3>the yard</h3></summary>
               {#if world.hull < world.maxHull}
                 <button onclick={() => attempt(() => repair(sea!, world!), 'the carpenters are paid')}>repair ({REPAIR_COST} a point)</button>
               {/if}
-              <div class="list">
+              <ul class="plain shop">
                 {#each Object.entries(UPGRADES) as [key, u]}
-                  <button onclick={() => attempt(() => buyUpgrade(sea!, world!, key), `${u.name} fitted`)}>{u.name} ({u.cost})</button>
+                  {@const fitted = world.outfit.upgrades.filter((x) => x === key).length}
+                  <li>
+                    <button onclick={() => attempt(() => buyUpgrade(sea!, world!, key), `${u.name} fitted`)} disabled={world.gold < u.cost || fitted >= u.max}>{u.name} ({u.cost})</button>
+                    <span class="faint">{[u.cards ? `+ ${cardWords(u.cards)}` : '', u.hull ? `hull +${u.hull}` : ''].filter(Boolean).join(' · ')}{fitted ? ` · fitted ${fitted} of ${u.max}` : ''}</span>
+                  </li>
                 {/each}
+              </ul>
+              </details>
+              <details class="sub"><summary><h3>ships for sale</h3></summary>
+              <ul class="plain shop">
                 {#each Object.entries(SHIP_CLASSES).filter(([k]) => k !== world!.outfit.ship && k !== 'pinnace') as [key, c]}
-                  <button onclick={() => attempt(() => buyShip(sea!, world!, key), `you take command of a ${c.name}`)}>a {c.name}: hull {c.hull}, {c.berths} berths ({c.cost})</button>
+                  {@const now = SHIP_CLASSES[world.outfit.ship]}
+                  <li>
+                    <button onclick={() => attempt(() => buyShip(sea!, world!, key), `you take command of a ${c.name}`)} disabled={world.gold < c.cost || world.outfit.crew.length > c.berths}>a {c.name} ({c.cost})</button>
+                    <span class="faint">hull {c.hull} ({c.hull >= now.hull ? '+' : ''}{c.hull - now.hull}), {c.berths} berths{Object.keys(c.cards).length ? ` · + ${cardWords(c.cards)}` : ''}{world.outfit.upgrades.length ? ' · your refits stay with the old ship' : ''}</span>
+                  </li>
                 {/each}
-              </div>
+              </ul>
+              </details>
               {#if (world.standing[port.nation] ?? 0) < 0}
                 <button onclick={() => attempt(() => bribe(sea!, world!), 'the right palms are greased')}>bribe the officials ({bribeCost(world, port.nation)})</button>
               {/if}
             {/if}
-            <h3>a raid</h3>
+            <details class="sub"><summary><h3>a raid</h3></summary>
             {#if (world.sacked[world.player] ?? -1) >= world.turn}
               <p class="faint">sacked lately: there's nothing left here.</p>
             {:else if onGuard(world, world.player)}
@@ -396,41 +401,13 @@
               </p>
               <button onclick={() => attempt(() => raid(sea!, world!))}>raid {port.name}</button>
             {/if}
+            </details>
             {#if said}<p class="said">{said}</p>{/if}
-          </section>
+          </details>
         {/if}
 
-        <section>
-          <h2>in sight</h2>
-          {#if !inSight(sea, world).length}<p class="faint">nothing on the horizon.</p>{/if}
-          <ul class="plain sightings">
-            {#each inSight(sea, world) as x (x.ship.id)}
-              {@const r = readShip(world, x.ship)}
-              <li class:wanted={x.hostile}>
-                <Flag nation={x.ship.nation} />{sailName(x.ship.kind, x.ship.nation)}, {x.days === 0 ? 'here' : `${x.days} ${x.days === 1 ? 'day' : 'days'} off`}{x.closing ? ', bearing down' : x.hostile ? ', hostile' : ''}
-                <span class="faint">hull {r.hull} · {r.traits.join(' · ')}</span>
-              </li>
-            {/each}
-          </ul>
-        </section>
-
-        <section>
-          <h2>rumors</h2>
-          {#if !world.rumors.length}<p class="faint">none worth the name. buy a round in port.</p>{/if}
-          <ul class="rumors">
-            {#each [...world.rumors].reverse() as r (r.id)}
-              <li>
-                <button class:focused={focus === r.id} onclick={() => (focus = focus === r.id ? null : r.id)}>
-                  <Flag nation={r.nation} />{sailName(r.kind, r.nation)}, {ago(world.turn - r.turn)}
-                  <span class="faint">· {Math.round(markerStrength(r, world.turn) * 100)}%</span>
-                </button>
-              </li>
-            {/each}
-          </ul>
-        </section>
-
-        <section>
-          <h2>your letter</h2>
+        <details class="panel" open>
+          <summary><h2>your letter</h2></summary>
           {#if world.letter}
             {@const told = describeLetter(sea, world, world.letter)}
             <p><Flag nation={world.letter.nation} />{told.title}</p>
@@ -443,10 +420,39 @@
           {:else}
             <p class="faint">a run from before letters: bring {GOAL} home to {HOME}.</p>
           {/if}
-        </section>
+        </details>
 
-        <section>
-          <h2>at war</h2>
+        <details class="panel" open>
+          <summary><h2>in sight</h2></summary>
+          {#if !inSight(sea, world).length}<p class="faint">nothing on the horizon.</p>{/if}
+          <ul class="plain sightings">
+            {#each inSight(sea, world) as x (x.ship.id)}
+              {@const r = readShip(world, x.ship)}
+              <li class:wanted={x.hostile}>
+                <Flag nation={x.ship.nation} />{sailName(x.ship.kind, x.ship.nation)}, {x.days === 0 ? 'here' : `${x.days} ${x.days === 1 ? 'day' : 'days'} off`}{x.closing ? ', bearing down' : x.hostile ? ', hostile' : ''}
+                <span class="faint">hull {r.hull} · {r.traits.join(' · ')}</span>
+              </li>
+            {/each}
+          </ul>
+        </details>
+
+        <details class="panel" open>
+          <summary><h2>rumors</h2></summary>
+          {#if !world.rumors.length}<p class="faint">none worth the name. buy a round in port.</p>{/if}
+          <ul class="rumors">
+            {#each [...world.rumors].reverse() as r (r.id)}
+              <li>
+                <button class:focused={focus === r.id} onclick={() => (focus = focus === r.id ? null : r.id)}>
+                  <Flag nation={r.nation} />{sailName(r.kind, r.nation)}, {ago(world.turn - r.turn)}
+                  <span class="faint">· {Math.round(markerStrength(r, world.turn) * 100)}%</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </details>
+
+        <details class="panel" open>
+          <summary><h2>at war</h2></summary>
           <p>
             {#each enemiesOf(world.wars, YOUR_NATION) as n}<span class="chip"><Flag nation={n} />{nationName(n)}</span>{/each}
             {#if !enemiesOf(world.wars, YOUR_NATION).length}<span class="faint">England is at peace with everyone.</span>{/if}
@@ -456,25 +462,25 @@
           {#each Object.entries(world.tension).filter(([, v]) => v) as [n, v]}
             <p class="wanted"><Flag nation={n as Nation} />the peace with {nationName(n as Nation)} is strained: {v} of {CASUS_BELLI}</p>
           {/each}
-        </section>
+        </details>
 
-        <section>
-          <h2>standing</h2>
+        <details class="panel">
+          <summary><h2>standing</h2></summary>
           {#if !Object.values(world.standing).some((v) => v)}<p class="faint">nobody has reason to hunt you.</p>{/if}
           <ul class="plain">
             {#each Object.entries(world.standing).filter(([, v]) => v) as [n, v]}
               <li class:wanted={v! < 0}><Flag nation={n as Nation} />{adjective(n as Nation)}: {v! > 0 ? '+' : ''}{v}{v! < 0 ? ', and their guard ships are out' : ''}</li>
             {/each}
           </ul>
-        </section>
+        </details>
 
         {#if world.log.length}
-          <section>
-            <h2>news</h2>
+          <details class="panel" open>
+            <summary><h2>news</h2></summary>
             <ul class="plain">
               {#each world.log.slice(-6).reverse() as l}<li class:wanted={l.stop}><span class="faint">day {l.turn + 1}:</span> {l.text}</li>{/each}
             </ul>
-          </section>
+          </details>
         {/if}
       </aside>
     </div>
@@ -566,6 +572,13 @@
           </ul>
         </div>
       </div>
+    {:else if shipOpen}
+      <div class="overlay">
+        <div class="sheet">
+          <ShipSheet {sea} {world} act={attempt} onclose={() => (shipOpen = false)} />
+          {#if said}<p class="said">{said}</p>{/if}
+        </div>
+      </div>
     {:else if world.sunk || world.won}
       <div class="overlay">
         <div class="sheet">
@@ -599,9 +612,9 @@
   .mapkeys { display: flex; gap: 0.5rem; }
   .mapkeys button { padding: 0.25rem 0.7rem; }
   aside { display: flex; flex-direction: column; gap: 1.25rem; }
-  aside section { border-top: 1px dashed var(--rule); padding-top: 0.75rem; }
-  .row, .list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-  .list button, .row button, aside button { padding: 0.3rem 0.6rem; font-size: 0.9rem; }
+  aside .panel { border-top: 1px dashed var(--rule); padding-top: 0.75rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .row button, aside button { padding: 0.3rem 0.6rem; font-size: 0.9rem; }
   .said { font-style: italic; }
   .rumors, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
   .rumors button { width: 100%; border-color: var(--rule); }
@@ -612,12 +625,17 @@
   .choices li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.75rem; margin-top: 0.6rem; }
   .stores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin: 1rem 0; }
   @media (max-width: 34rem) { .stores { grid-template-columns: 1fr; } }
-  .deck summary { cursor: pointer; }
-  .deck li { margin-top: 0.3rem; }
-  .strike { margin-left: 0.4rem; padding: 0.1rem 0.4rem; font-size: 0.8rem; }
   .sightings li { margin-top: 0.4rem; }
   .sightings .faint { display: block; font-size: 0.85rem; }
   .reading { color: var(--faint); }
+  .panel > summary, .sub > summary { list-style: none; cursor: pointer; }
+  .panel > summary::-webkit-details-marker, .sub > summary::-webkit-details-marker { display: none; }
+  .panel > summary h2, .sub > summary h3 { display: inline; }
+  .panel > summary::after, .sub > summary::after { content: ' +'; color: var(--faint); }
+  .panel[open] > summary::after, .sub[open] > summary::after { content: ' −'; }
+  .sub { margin-top: 0.6rem; }
+  .shop li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.6rem; margin-top: 0.35rem; }
+  .shop .faint { font-size: 0.85rem; }
   .intro dl { margin: 1rem 0; }
   .intro dt { margin-top: 0.75rem; }
   .intro dd { margin: 0.2rem 0 0; }
