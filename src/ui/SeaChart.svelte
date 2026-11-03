@@ -7,6 +7,8 @@
   import { ROSES, SEA_NAMES, SERPENT, SHIP, TOWER, TOWN, fade, rhumbs, windRose } from './woodcut.ts';
   import type { Sea } from '../world/ships.ts';
   import type { WorldState } from '../world/world.ts';
+  import { onDestroy, untrack } from 'svelte';
+  import SeaShader from './SeaShader.svelte';
 
   let {
     sea,
@@ -87,8 +89,70 @@
     return [d];
   });
 
+  // Motion: the camera eases to follow the ship, and the ship glides from
+  // node to node, facing the way she goes, with a short wake astern. None
+  // of it with motion turned off.
+  const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /** The sea is drawn by the shader: the SVG's own sea and wave marks stand aside. */
+  let shaded = $state(false);
+  let target: { lon: number; lat: number } | null = null;
+  let ship = $state({ lon: here().lon, lat: here().lat });
+  let facing = $state(1);
+  let wake: { lon: number; lat: number }[] = $state([]);
+  let from = { lon: here().lon, lat: here().lat, at: 0 };
+  let lastNode = untrack(() => world.player);
+  const GLIDE = 130;
+  const WAKE = 6;
+
+  $effect(() => {
+    const n = here();
+    if (world.player === lastNode) return;
+    const neighbour = map.adj[lastNode]?.includes(world.player);
+    // The nearer copy of the new position, across the dateline.
+    const lon = n.lon + 360 * Math.round((ship.lon - n.lon) / 360);
+    if (neighbour) {
+      if (Math.abs(lon - ship.lon) > 0.01) facing = lon < ship.lon ? -1 : 1;
+      wake = [...wake, { lon: ship.lon, lat: ship.lat }].slice(-WAKE);
+    } else wake = [];
+    from = { lon: ship.lon, lat: ship.lat, at: performance.now() };
+    if (still || !neighbour) ship = { lon, lat: n.lat };
+    lastNode = world.player;
+    tick();
+  });
+
+  let frame = 0;
+  function tick() {
+    cancelAnimationFrame(frame);
+    const step = () => {
+      let busy = false;
+      const n = here();
+      const lon = n.lon + 360 * Math.round((from.lon - n.lon) / 360);
+      const k = Math.min(1, (performance.now() - from.at) / GLIDE);
+      if (k < 1 && !still) {
+        const e = k * (2 - k);
+        ship = { lon: from.lon + (lon - from.lon) * e, lat: from.lat + (n.lat - from.lat) * e };
+        busy = true;
+      } else if (ship.lon !== lon || ship.lat !== n.lat) ship = { lon, lat: n.lat };
+      if (target && !drag) {
+        const [dl, dt] = [target.lon - center.lon, target.lat - center.lat];
+        if (still || Math.abs(dl) + Math.abs(dt) < span * 0.002) {
+          center = target;
+          target = null;
+        } else {
+          center = { lon: center.lon + dl * 0.2, lat: center.lat + dt * 0.2 };
+          busy = true;
+        }
+      }
+      if (busy) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+  }
+  onDestroy(() => cancelAnimationFrame(frame));
+
   export function recentre() {
-    center = { lon: here().lon, lat: here().lat };
+    const n = here();
+    target = { lon: n.lon + 360 * Math.round((center.lon - n.lon) / 360), lat: n.lat };
+    tick();
   }
 
   // Panning by drag; a click that didn't move picks a destination.
@@ -183,6 +247,7 @@
 </script>
 
 <div class="chart" bind:clientWidth={width} bind:clientHeight={height}>
+  <SeaShader lon={center.lon} lat={center.lat} {span} {width} {height} onready={(ok) => (shaded = ok)} />
   <svg
     viewBox="{center.lon - span / 2} {-center.lat - tall / 2} {span} {tall}"
     width={width}
@@ -205,8 +270,10 @@
       </pattern>
     </defs>
 
-    <rect x={center.lon - span} y={-center.lat - tall} width={span * 2} height={tall * 2} fill="var(--sea)" />
-    <rect x={center.lon - span} y={-center.lat - tall} width={span * 2} height={tall * 2} fill="url(#waves)" />
+    {#if !shaded}
+      <rect x={center.lon - span} y={-center.lat - tall} width={span * 2} height={tall * 2} fill="var(--sea)" />
+      <rect x={center.lon - span} y={-center.lat - tall} width={span * 2} height={tall * 2} fill="url(#waves)" />
+    {/if}
 
     <!-- Rhumb lines, fanning from a rose in each ocean. -->
     {#each ROSES as [lon, lat]}
@@ -332,9 +399,12 @@
       {/if}
     {/each}
 
-    <!-- You. -->
-    <circle cx={X(here().lon)} cy={Y(here().lat)} r={px * 15} fill="none" stroke="var(--ink)" stroke-width={px * 1.6} stroke-dasharray="{px * 3} {px * 2.5}" />
-    <g transform={glyph(here().lon, here().lat, 1.25)} stroke-linejoin="round">
+    <!-- You: a short wake astern, fading, then the ship, facing the way she goes. -->
+    {#each wake as p, i}
+      <circle cx={X(p.lon)} cy={Y(p.lat)} r={px * (1.2 + (i / WAKE) * 1.8)} fill="var(--ink)" fill-opacity={0.12 + (i / WAKE) * 0.4} />
+    {/each}
+    <circle cx={X(ship.lon)} cy={Y(ship.lat)} r={px * 15} fill="none" stroke="var(--ink)" stroke-width={px * 1.6} stroke-dasharray="{px * 3} {px * 2.5}" />
+    <g transform="{glyph(ship.lon, ship.lat, 1.25)} scale({facing} 1)" stroke-linejoin="round">
       <path d={SHIP.masts} stroke="var(--ink)" stroke-width="1.2" />
       <path d={SHIP.sails} fill="var(--paper)" stroke="var(--ink)" stroke-width="1.2" />
       <path d={SHIP.pennant} fill={COLORS.england.border} stroke="var(--ink)" stroke-width="0.5" />
@@ -371,6 +441,6 @@
 <style>
   .chart { position: relative; width: 100%; height: 100%; min-height: 22rem; overflow: hidden; touch-action: none; }
   .frame { position: absolute; inset: 0; pointer-events: none; }
-  svg { display: block; cursor: crosshair; user-select: none; }
+  svg { position: relative; display: block; cursor: crosshair; user-select: none; }
   text { font-family: inherit; }
 </style>

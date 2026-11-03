@@ -27,6 +27,7 @@
   import SeaChart from './SeaChart.svelte';
   import ShipSheet from './ShipSheet.svelte';
   import { forget, load, store } from '../save.ts';
+  import { ambient, bell, coin, gun, knell, setSound, soundOn, storm } from './sound.ts';
   import { type Entry, best, dailySeed, entryFor, loadLog, saveLog, today, withEntry } from '../logbook.ts';
 
   function seedFromUrl(): number | null {
@@ -85,6 +86,45 @@
     saveLog(log);
   }
 
+  // A storm coming on is heard before it's read.
+  let lastDilemma: string | null = null;
+  $effect(() => {
+    const k = world?.dilemma?.kind ?? null;
+    if (k === 'storm' && lastDilemma !== 'storm') storm();
+    lastDilemma = k;
+  });
+
+  // Sound, if asked for: the toggle in the header; the sea starts with the first click on the page.
+  let sound = $state(soundOn());
+  function toggleSound() {
+    sound = !sound;
+    setSound(sound);
+  }
+  function wake() {
+    if (sound) ambient(true);
+  }
+
+  // Keys, when nothing is open over the chart: space to sail or heave to, f to find the ship, + and − to zoom, escape to close.
+  function onkey(e: KeyboardEvent) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target as HTMLElement;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    if (e.key === 'Escape') {
+      if (logOpen) logOpen = false;
+      else if (intro) closeIntro();
+      else halted = '';
+      return;
+    }
+    if (!world || intro || logOpen || shown || world.hail || world.spoil || world.dilemma || world.sunk || world.won) return;
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (sailing) stop('hove to');
+      else if (dest !== null && course.length >= 2) setSail();
+    } else if (e.key === 'f') chart?.recentre();
+    else if (e.key === '+' || e.key === '=') chart?.zoom(1 / 1.4);
+    else if (e.key === '-') chart?.zoom(1.4);
+  }
+
   // Saved after every change; a finished run is written in the logbook and forgotten, so the next visit starts afresh.
   $effect(() => {
     if (!world) return;
@@ -141,6 +181,8 @@
     halted = why;
     if (timer) clearInterval(timer);
     timer = null;
+    // The bell: the ship heaves to for something. Not for the run's end; that has its own.
+    if (why && world && !world.sunk && !world.won) bell(why === 'arrived' ? 2 : why === 'hove to' ? 1 : 3);
   }
   /**
    * A day's sail, guarded: anything that goes wrong stops the ship and says
@@ -223,6 +265,15 @@
     world = fight(sea, world, a);
     shown = next;
     if (next.outcome) reckoning = world.reckoning;
+    // The guns, in the order the shot was fired: yours heavier, hers duller.
+    let i = 0;
+    for (const e of lastRound) {
+      if (e.type !== 'effect' || !e.applied) continue;
+      if (e.effect.kind === 'hit') gun(1 + e.applied / 4, 0.18 * i++);
+      else if (e.effect.kind === 'hurt' || (e.effect.kind === 'breach' && e.card.side === 'ship')) gun(0.6 + e.applied / 6, 0.18 * i++);
+    }
+    if (next.outcome === 'destroyed' && next.payout > 0) coin();
+    if (next.outcome === 'sunk') knell();
   }
   function oncontinue() {
     shown = null;
@@ -308,6 +359,8 @@
   };
 </script>
 
+<svelte:window onkeydown={onkey} onpointerdown={wake} />
+
 {#if !sea || !world}
   <main class="loading"><p>charting the seas…</p></main>
 {:else}
@@ -325,18 +378,31 @@
         <button onclick={() => (intro = true)}>how to play</button>
         <button onclick={() => (logOpen = true)}>logbook</button>
         <button onclick={todaysVoyage}>today's voyage</button>
+        <button onclick={toggleSound} aria-pressed={sound}>sound {sound ? 'on' : 'off'}</button>
         <button onclick={abandon}>a new run</button>
       </div>
     </header>
 
     <div class="layout">
       <div class="map">
-        <SeaChart bind:this={chart} {sea} {world} {course} {cloud} {focus} {visible} region={world.letter?.region ? REGIONS[world.letter.region] : null} onpick={(n) => ((dest = n), (halted = ''))} />
+        <div class="chartbox">
+          <SeaChart bind:this={chart} {sea} {world} {course} {cloud} {focus} {visible} region={world.letter?.region ? REGIONS[world.letter.region] : null} onpick={(n) => ((dest = n), (halted = ''))} />
+          <!-- Why the ship stopped, said on the chart where you're looking. -->
+          {#if halted || (said && !port)}
+            {#key halted + said}
+              <div class="banner" role="status">
+                <p>{halted || said}</p>
+                <button onclick={() => ((halted = ''), (said = ''))} aria-label="dismiss">×</button>
+              </div>
+            {/key}
+          {/if}
+        </div>
         <div class="mapkeys">
           <button onclick={() => chart?.zoom(1 / 1.4)} aria-label="zoom in">+</button>
           <button onclick={() => chart?.zoom(1.4)} aria-label="zoom out">−</button>
           <button onclick={() => chart?.recentre()}>find the ship</button>
         </div>
+        <p class="legend">keys: space sets sail or heaves to · f finds the ship · + and − zoom · in a fight, 1 2 3 and enter</p>
         <p class="legend">blue: the current a step out · dashed grey: this season's wind · rings: rumors, in the ship's colours, fading · red cloud: where the selected one's ship could be by now · squares are fortified ports, circles open towns, triangles ships</p>
 
         <!-- Below the map: where you are, how the powers stand, your ship. -->
@@ -497,8 +563,6 @@
               <button onclick={() => ((dest = null), stop())}>clear</button>
             </div>
           {/if}
-          {#if halted}<p class="said">{halted}</p>{/if}
-          {#if said && !port}<p class="said">{said}</p>{/if}
         </details>
 
 
@@ -777,6 +841,13 @@
   .rounds > div { flex: 1 1 14rem; }
   .rounds h4 { margin: 0 0 0.3rem; font-weight: 400; color: var(--faint); }
   .rounds .effect { padding-left: 1rem; color: var(--faint); }
+  .chartbox { position: relative; }
+  /* The banner: paper on the chart, ink-ruled, no shadow; ink on paper casts none. */
+  .banner { position: absolute; top: 14px; left: 14px; right: 14px; max-width: 34rem; display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.5rem 0.5rem 0.5rem 0.8rem; background: var(--paper); border: 1.5px solid var(--ink); animation: drop 0.25s ease-out; }
+  .banner p { margin: 0; flex: 1; }
+  .banner button { flex: none; width: 1.6rem; height: 1.6rem; padding: 0; display: grid; place-items: center; }
+  @keyframes drop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .banner { animation: none; } }
   .intro dl { margin: 1rem 0; }
   .intro dt { margin-top: 0.75rem; }
   .intro dd { margin: 0.2rem 0 0; }

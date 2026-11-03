@@ -36,7 +36,31 @@ and it's over.
 - **Build the deck.** Take a ship and her stores are offered: three cards
   off her, keep one or none. A yard will strike a card out for 6, down to
   10. Your deck is listed under your ship. Hands of note draw wages.
-- **Under the chart, three tabs.** *Location* is whatever is where you
+- **The sea moves** (`src/ui/SeaShader.svelte`). A WebGL shader draws the
+open sea under the SVG chart, in the chart's own coordinates, so it pans
+and zooms with it: the engraver's wave marks, each a short double curve
+whose curl rolls slowly, with long swells crossing them that thicken the
+ink on their faces and thin it between. Two colours, the sea's and the
+sepia's. The coast's water-lining is drawn over it as before, so the
+coastal water stays engraved and still and the open sea lives beyond it.
+Without WebGL the SVG's still marks are drawn instead.
+
+**The ship sails**: she glides from day to day instead of jumping, faces
+the way she's going, and leaves a short wake astern; the chart eases after
+her. **Stops say themselves on the chart**, as a banner where you're
+looking, not a line in the sidebar. **Keys**: space sets sail or heaves
+to, f finds the ship, + and − zoom, escape closes.
+
+**Sound** (`src/ui/sound.ts`), off until asked for in the header, and
+remembered: all made in the browser with WebAudio, no files. The sea under
+the hull, swelling and falling; the ship's bell when she heaves to (two
+strokes on arriving, three for something seen); the guns in a fight, in
+the order the shot was fired, yours heavier than hers; coin for a prize; a
+storm getting up; one long low stroke when a run ends at the bottom.
+
+None of the motion plays with reduced motion asked for.
+
+**Under the chart, three tabs.** *Location* is whatever is where you
 are: a port's bar, yard, ships for sale and raid, or at sea the water
 you're in — whose waters, a strait, a bank, a river mouth, a fort's guns,
 an island anchorage. Arriving in a port turns to it. *Politics* is who's
@@ -699,7 +723,7 @@ src/
   logbook.ts     the logbook of finished runs, and today's voyage
   rules.test.ts
   outfit.ts      ships, crew, upgrades: what your deck is made of
-  ui/            Svelte: App (the game), SeaChart, Fight, CardView, Gauge
+  ui/            Svelte: App (the game), SeaChart, SeaShader, Fight, CardView, Gauge, ShipSheet; sound.ts
   world/
     data/        world.json: the world graph, from Natural Earth
     passages.ts  the narrow straits, traced by hand
