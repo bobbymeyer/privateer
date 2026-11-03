@@ -309,27 +309,27 @@
             <h2><Flag nation={port.nation} />{port.name}, {adjective(port.nation)}</h2>
             {#if isHaven(sea, world)}
               <p>a pirate's haven: they'll deal with you here, whoever wants you, and you can retire here when you're rich.</p>
-              <button onclick={() => attempt(() => retire(sea!, world!))} disabled={world.gold < GOAL}>retire here ({world.gold} of {GOAL})</button>
+              <div class="row"><button onclick={() => attempt(() => retire(sea!, world!))} disabled={world.gold < GOAL}>retire here ({world.gold} of {GOAL})</button></div>
             {/if}
             {#if port.nation === 'native'}
               <p>islanders: no bar, no yard, no hands to hire, but water, fruit and timber in trade, for the crew and the ship.</p>
               {#if (world.standing.native ?? 0) < 0}
                 <p class="wanted">they remember what you did here, and won't trade.</p>
-                <button onclick={() => attempt(() => bribe(sea!, world!), 'gifts accepted')}>make them gifts ({bribeCost(world, 'native')})</button>
+                <div class="row"><button onclick={() => attempt(() => bribe(sea!, world!), 'gifts accepted')}>make them gifts ({bribeCost(world, 'native')})</button></div>
               {:else}
-                <button onclick={() => attempt(() => provision(sea!, world!))} disabled={!provisions(sea, world)}>trade for provisions ({PROVISION_COST}): morale +{PROVISION_CHEER}, hull +{PROVISION_HULL}</button>
+                <div class="row"><button onclick={() => attempt(() => provision(sea!, world!))} disabled={!provisions(sea, world)}>trade for provisions ({PROVISION_COST}): morale +{PROVISION_CHEER}, hull +{PROVISION_HULL}</button></div>
               {/if}
             {:else if world.pirate && port.nation === YOUR_NATION && !isHaven(sea, world)}
               <p>they know you for a pirate here.</p>
-              <button onclick={() => attempt(() => buyPardon(sea!, world!), 'pardoned, at a price')}>buy a royal pardon ({PARDON_COST})</button>
+              <div class="row"><button onclick={() => attempt(() => buyPardon(sea!, world!), 'pardoned, at a price')}>buy a royal pardon ({PARDON_COST})</button></div>
             {:else if !serves(sea, world)}
               <p>the {adjective(port.nation)} won't deal with you.</p>
-              <button onclick={() => attempt(() => bribe(sea!, world!), 'the right palms are greased')}>bribe the officials ({bribeCost(world, port.nation)})</button>
+              <div class="row"><button onclick={() => attempt(() => bribe(sea!, world!), 'the right palms are greased')}>bribe the officials ({bribeCost(world, port.nation)})</button></div>
             {:else}
               <details class="sub" open><summary><h3>the bar</h3></summary>
-              <button onclick={round}>buy a round ({ROUND_COST})</button>
               <p class="faint">berths {world.outfit.crew.length} of {SHIP_CLASSES[world.outfit.ship].berths}{world.outfit.crew.length ? ' · let hands go from the ship & crew tab' : ''}</p>
               <ul class="plain shop">
+                <li><button onclick={round}>buy a round ({ROUND_COST})</button><span class="faint">somebody may have seen a ship</span></li>
                 {#each Object.entries(CREW).filter(([k]) => !world!.outfit.crew.includes(k)) as [key, c]}
                   <li>
                     <button onclick={() => attempt(() => recruit(sea!, world!, key), `the ${c.name} signs on`)} disabled={world.gold < c.cost || world.outfit.crew.length >= SHIP_CLASSES[world.outfit.ship].berths}>hire a {c.name} ({c.cost})</button>
@@ -339,10 +339,10 @@
               </ul>
               </details>
               <details class="sub" open><summary><h3>the yard</h3></summary>
-              {#if world.hull < world.maxHull}
-                <button onclick={() => attempt(() => repair(sea!, world!), 'the carpenters are paid')}>repair ({REPAIR_COST} a point)</button>
-              {/if}
               <ul class="plain shop">
+                {#if world.hull < world.maxHull}
+                  <li><button onclick={() => attempt(() => repair(sea!, world!), 'the carpenters are paid')}>repair ({REPAIR_COST} a point)</button><span class="faint">{world.maxHull - world.hull} to mend</span></li>
+                {/if}
                 {#each Object.entries(UPGRADES) as [key, u]}
                   {@const fitted = world.outfit.upgrades.filter((x) => x === key).length}
                   <li>
@@ -364,7 +364,7 @@
               </ul>
               </details>
               {#if (world.standing[port.nation] ?? 0) < 0}
-                <button onclick={() => attempt(() => bribe(sea!, world!), 'the right palms are greased')}>bribe the officials ({bribeCost(world, port.nation)})</button>
+                <div class="row"><button onclick={() => attempt(() => bribe(sea!, world!), 'the right palms are greased')}>bribe the officials ({bribeCost(world, port.nation)})</button></div>
               {/if}
             {/if}
             <details class="sub"><summary><h3>a raid</h3></summary>
@@ -379,7 +379,7 @@
                 the {adjective(port.nation)} will remember it three times over and their guard ships will hunt twice as far.
                 {port.nation === YOUR_NATION ? ' it is your own flag: you would be a pirate.' : isEnemy(world.wars, port.nation) || reprisal(world, port.nation) ? ' they are at war with England, or named in your letter: fair game.' : ' they are at peace with England: the Crown will hear of it.'}
               </p>
-              <button onclick={() => attempt(() => raid(sea!, world!))}>raid {port.name}</button>
+              <div class="row"><button onclick={() => attempt(() => raid(sea!, world!))}>raid {port.name}</button></div>
             {/if}
             </details>
             {#if said}<p class="said">{said}</p>{/if}
@@ -635,11 +635,11 @@
   .key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; font-size: 0.8rem; color: var(--faint); }
   .layout { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; gap: 1.25rem; align-items: start; }
   .map { display: flex; flex-direction: column; gap: 0.5rem; height: min(78vh, 52rem); }
-  .mapkeys { display: flex; gap: 0.5rem; }
+  .mapkeys { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .mapkeys button { padding: 0.25rem 0.7rem; }
   aside { display: flex; flex-direction: column; gap: 1.25rem; }
   aside .panel { border-top: 1px dashed var(--rule); padding-top: 0.75rem; }
-  .row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .row { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0; }
   .row button, aside button { padding: 0.3rem 0.6rem; font-size: 0.9rem; }
   .said { font-style: italic; }
   .rumors, .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
@@ -648,7 +648,8 @@
   .wanted { color: var(--theirs); }
   .chip { display: inline-block; margin-right: 0.8rem; }
   .overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.92); display: grid; place-items: start center; overflow: auto; padding: 2rem 16px; }
-  .choices li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.75rem; margin-top: 0.6rem; }
+  .choices { flex-direction: row; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.75rem; }
+  .choices li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; flex: 1 1 12rem; max-width: 18rem; }
   .stores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin: 1rem 0; }
   @media (max-width: 34rem) { .stores { grid-template-columns: 1fr; } }
   .sightings li { margin-top: 0.4rem; }
@@ -667,7 +668,8 @@
   .panel > summary::after, .sub > summary::after { content: ' +'; color: var(--faint); }
   .panel[open] > summary::after, .sub[open] > summary::after { content: ' −'; }
   .sub { margin-top: 0.6rem; }
-  .shop li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.6rem; margin-top: 0.35rem; }
+  .shop { flex-direction: row; flex-wrap: wrap; gap: 0.6rem 0.75rem; margin-top: 0.4rem; }
+  .shop li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; flex: 0 1 14rem; }
   .shop .faint { font-size: 0.85rem; }
   .intro dl { margin: 1rem 0; }
   .intro dt { margin-top: 0.75rem; }
