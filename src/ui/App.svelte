@@ -93,9 +93,12 @@
 
   function setSail() {
     if (!sea || !world || dest === null) return;
+    // A fresh timer every time: a timer left from a sailing that went wrong is never reused.
+    if (timer) clearInterval(timer);
     sailing = true;
     halted = '';
-    timer ??= setInterval(day, 140);
+    said = '';
+    timer = setInterval(day, 140);
   }
   function stop(why = '') {
     sailing = false;
@@ -103,7 +106,20 @@
     if (timer) clearInterval(timer);
     timer = null;
   }
+  /**
+   * A day's sail, guarded: anything that goes wrong stops the ship and says
+   * so, rather than leaving a timer failing quietly behind a "sailing" ship
+   * that never moves.
+   */
   function day() {
+    try {
+      sailDay();
+    } catch (e) {
+      console.error('a day under sail failed', e, { turn: world?.turn, player: world?.player, dest, hail: !!world?.hail, encounter: !!world?.encounter, spoil: !!world?.spoil, dilemma: world?.dilemma });
+      stop(`the ship can't sail: ${(e as Error).message}`);
+    }
+  }
+  function sailDay() {
     if (!sea || !world || dest === null) return stop();
     const out = sailToward(sea, world, dest);
     world = out.world;
@@ -314,6 +330,7 @@
             </div>
           {/if}
           {#if halted}<p class="said">{halted}</p>{/if}
+          {#if said && !port}<p class="said">{said}</p>{/if}
         </section>
 
         {#if port}
