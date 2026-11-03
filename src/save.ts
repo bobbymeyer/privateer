@@ -11,7 +11,7 @@
 
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 /** From each version to the next. A run from before a feature simply goes without it. */
 const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<string, unknown>> = {
@@ -25,6 +25,8 @@ const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<stri
   4: (w) => ({ ...w, guarded: {} }),
   // 6: letters of marque. A run from before them is won the old way.
   5: (w) => ({ ...w, letter: null, acts: 0, commission: w.pirate ? 'revoked' : 'legacy' }),
+  // 7: the run's tally and its last fight, for the end of the run and the logbook.
+  6: (w) => ({ ...w, tally: { fights: 0, taken: 0, sacks: 0, fled: 0, escaped: 0, best: null }, lastFight: null }),
 };
 export const SAVE_KEY = 'privateer:run';
 
@@ -32,6 +34,8 @@ export interface Saved {
   version: number;
   seed: number;
   world: WorldState;
+  /** The date, if this is that day's voyage. */
+  daily?: string | null;
 }
 
 const toBase64 = (bytes: Uint8Array) => {
@@ -41,8 +45,8 @@ const toBase64 = (bytes: Uint8Array) => {
 };
 const fromBase64 = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
-export function encode(seed: number, world: WorldState): string {
-  return JSON.stringify({ version: SAVE_VERSION, seed, world }, (_, v) => (v instanceof Uint8Array ? { $bytes: toBase64(v) } : v));
+export function encode(seed: number, world: WorldState, daily: string | null = null): string {
+  return JSON.stringify({ version: SAVE_VERSION, seed, world, ...(daily ? { daily } : {}) }, (_, v) => (v instanceof Uint8Array ? { $bytes: toBase64(v) } : v));
 }
 
 /** The run in `text`, or null if there's none, it's from another version, or it doesn't parse. */
@@ -57,16 +61,16 @@ export function decode(text: string | null): Saved | null {
       if (!step) return null;
       world = step(world);
     }
-    return saved.version <= SAVE_VERSION ? { version: SAVE_VERSION, seed: saved.seed, world: world as unknown as WorldState } : null;
+    return saved.version <= SAVE_VERSION ? { version: SAVE_VERSION, seed: saved.seed, world: world as unknown as WorldState, daily: saved.daily ?? null } : null;
   } catch {
     return null;
   }
 }
 
 /** Browser storage can be missing or refuse: a private window, a full disk. Saving is a convenience; it never breaks the game. */
-export function store(seed: number, world: WorldState): void {
+export function store(seed: number, world: WorldState, daily: string | null = null): void {
   try {
-    localStorage.setItem(SAVE_KEY, encode(seed, world));
+    localStorage.setItem(SAVE_KEY, encode(seed, world, daily));
   } catch {
     // Nothing to do: the run goes on, unsaved.
   }
