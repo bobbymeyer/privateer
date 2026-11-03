@@ -559,7 +559,7 @@ same cards. Now most of it is chosen.
 
 **The fight moves** a little, so a round can be read without reading it.
 A new hand deals in from the deck, a card at a time; a wound card drops
-onto it from above. Hull, morale and way are rows of pips: a pip lost
+onto it from above. Hull and morale are rows of pips: a pip lost
 drains, a pip gained fills, and the difference floats up off the count.
 The round's lines come in one by one. None of it plays when the reader has
 asked for reduced motion.
