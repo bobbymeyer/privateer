@@ -153,7 +153,8 @@ test('a current once seen stays charted; wind is charted season by season', () =
   w = advance(sea, w, map.adj[away].find((m) => map.distTo(start)[m] >= 2) ?? away);
   assert.ok(knowledge(w).current(start), 'still charted');
   // Lie at anchor into the next season: the wind here is charted for it too.
-  while (seasonOf(sea.pattern, w.turn) === 0) w = advance(sea, w, w.player);
+  // Storms and the crew's shares set aside: this is about the chart.
+  while (seasonOf(sea.pattern, w.turn) === 0) w = advance(sea, { ...w, dilemma: null }, w.player);
   assert.ok(knowledge(w).wind(w.player, 0) && knowledge(w).wind(w.player, 1));
   assert.ok(!knowledge(w).wind(start, 1) || map.distTo(w.player)[start] <= 1, 'the start was not seen in spring');
 });

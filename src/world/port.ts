@@ -4,7 +4,7 @@
  * the other way.
  */
 
-import { CREW, type Outfit, SHIP_CLASSES, UPGRADES, maxHullOf, sightOf } from '../outfit.ts';
+import { CREW, MIN_DECK, type Outfit, PLAYER_CARDS, SHIP_CLASSES, STRIKE_COST, UPGRADES, cardsOf, deckSize, maxHullOf, sightOf } from '../outfit.ts';
 import { adjective, type Nation } from './ports.ts';
 import { YOUR_NATION } from './meet.ts';
 import { type Sea, wantedBy } from './ships.ts';
@@ -119,14 +119,14 @@ export function dismiss(s: WorldState, role: string): WorldState {
   return refit(s, { ...s.outfit, crew: s.outfit.crew.filter((c) => c !== role) });
 }
 
-/** A new ship at the yard. The crew come with you; the old ship's upgrades don't, nor what you paid for it. */
+/** A new ship at the yard. The crew and the prizes' cards come with you; the old ship's upgrades don't, nor what you paid for it. */
 export function buyShip(sea: Sea, s: WorldState, cls: string): WorldState {
   mustServe(sea, s);
   const c = SHIP_CLASSES[cls];
   if (!c) throw new Error(`no such ship: ${cls}`);
   if (cls === s.outfit.ship) throw new Error(`you already sail a ${c.name}`);
   if (s.outfit.crew.length > c.berths) throw new Error(`a ${c.name} has berths for ${c.berths}`);
-  return refit(pay(s, c.cost), { ship: cls, upgrades: [], crew: s.outfit.crew }, true);
+  return refit(pay(s, c.cost), { ...s.outfit, ship: cls, upgrades: [] }, true);
 }
 
 /** Fit an upgrade to the ship you have. */
@@ -164,4 +164,27 @@ export function retire(sea: Sea, s: WorldState): WorldState {
   if (!isHaven(sea, s)) throw new Error('a pirate retires in a haven: Port Royal, or the Barbary coast');
   if (s.gold < GOAL) throw new Error(`not yet: ${GOAL} to retire on`);
   return { ...s, won: true, ending: 'retired', log: [...s.log, { turn: s.turn, text: `you retired to ${port.name} with ${s.gold}, a pirate rich enough to grow old` }] };
+}
+
+/** Keep one card off the prize's stores: it joins your deck for good, and comes with you to a new ship. */
+export function takePrize(s: WorldState, key: string): WorldState {
+  if (!s.spoil) throw new Error('there is nothing to take');
+  if (!s.spoil.offers.includes(key)) throw new Error(`no ${key} among her stores`);
+  const next = refit({ ...s, spoil: null }, { ...s.outfit, prizes: [...s.outfit.prizes, key] });
+  return { ...next, log: [...s.log, { turn: s.turn, text: `${PLAYER_CARDS[key].name}, taken off the prize` }] };
+}
+
+/** Leave her stores: a thinner deck is a deck that deals what you want. */
+export const leavePrize = (s: WorldState): WorldState => ({ ...s, spoil: null });
+
+/** Whether this card can be struck here: a yard that deals with you, a copy in the deck, and a deck big enough to spare it. */
+export const strikable = (sea: Sea, s: WorldState, key: string) =>
+  serves(sea, s) && (cardsOf(s.outfit)[key] ?? 0) > 0 && deckSize(s.outfit) > MIN_DECK && s.gold >= STRIKE_COST;
+
+/** Strike a copy of a card from the deck, at a yard. */
+export function strikeCard(sea: Sea, s: WorldState, key: string): WorldState {
+  mustServe(sea, s);
+  if (!(cardsOf(s.outfit)[key] > 0)) throw new Error(`there's no ${key} in the deck`);
+  if (deckSize(s.outfit) <= MIN_DECK) throw new Error(`a deck of ${MIN_DECK} has nothing to spare`);
+  return refit(pay(s, STRIKE_COST), { ...s.outfit, struck: [...s.outfit.struck, key] });
 }

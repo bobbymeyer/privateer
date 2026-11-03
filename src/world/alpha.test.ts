@@ -19,7 +19,7 @@ const rich = (w: WorldState, gold = 500): WorldState => ({ ...w, gold });
 test('your deck is your ship, its refits and your crew', () => {
   const bare = deckOf(START_OUTFIT).length;
   assert.equal(bare, 14);
-  const kitted = { ship: 'sloop', upgrades: ['guns'], crew: ['gunner', 'marksmen'] };
+  const kitted = { ...START_OUTFIT, ship: 'sloop', upgrades: ['guns'], crew: ['gunner', 'marksmen'] };
   const cards = cardsOf(kitted);
   assert.equal(cards['raking-fire'], 2 + 1 + 1);
   assert.equal(cards['double-shot'], 1);
@@ -88,7 +88,8 @@ test('sighting an island pays, and it is an anchorage after', () => {
   const sighted = advance(sea, { ...w, player: map.adj[offshore].find((n) => n !== isle) ?? offshore }, offshore);
   assert.ok(sighted.islands[0].found);
   assert.equal(sighted.gold, w.gold + CHARTING_BOUNTY);
-  const anchored = advance(sea, { ...sighted, hull: 2 }, isle);
+  // A castaway on it, maybe: left on his beach, for this.
+  const anchored = advance(sea, { ...sighted, dilemma: null, hull: 2 }, isle);
   assert.ok(atIsland(anchored));
   assert.equal(anchored.hull, 3, 'mending a point a day');
 });

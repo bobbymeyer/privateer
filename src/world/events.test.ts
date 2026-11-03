@@ -58,16 +58,15 @@ test('storms keep their seasons: hurricanes in the Antilles in autumn, the roari
   assert.ok(stormChance(sea, forties, 0) > stormChance(sea, midAtlantic(), 0));
 });
 
-test('a storm costs hull or cargo, and an omen cheers the crew, over a long voyage', () => {
+test('storms come and ask how to meet them, and an omen cheers the crew, over a long voyage', () => {
   let w = quiet({ ...createWorld(sea, 3), player: midAtlantic(), gold: 1000, morale: 5, hull: 10, maxHull: 10 });
   let storms = 0;
   let omens = 0;
   for (let day = 1; day < 600; day++) {
-    const before = { ...w, turn: day, lastSpoils: day, hull: 10, morale: 5 };
+    const before = { ...w, turn: day, lastSpoils: day, hull: 10, morale: 5, dilemma: null };
     w = aDay(sea, before);
-    if (w.hull < 10 || w.gold < before.gold) storms++;
+    if (w.dilemma?.kind === 'storm') storms++;
     if (w.morale === 5 + OMEN_CHEER) omens++;
-    assert.ok(w.hull >= 1, 'a storm never sinks you outright');
   }
   assert.ok(storms >= 3 && storms <= 20, `storms ${storms}`);
   assert.ok(omens >= 5 && omens <= 30, `omens ${omens}`);
@@ -135,6 +134,7 @@ test('a monster keeps each sea, attacks whoever it meets, and wanders with the c
 
 test('under sail, a storm or a mutiny brings you to; a fair day does not', async () => {
   const { sailToward } = await import('./course.ts');
+  const { choices, choose } = await import('./dilemmas.ts');
   const far = at('Cape Town');
   let halts = 0;
   for (let seed = 0; seed < 6 && halts < 2; seed++) {
@@ -144,9 +144,11 @@ test('under sail, a storm or a mutiny brings you to; a fair day does not', async
       const out = sailToward(sea, w, far);
       w = out.world;
       const fresh = w.log.slice(before.log.length);
-      if (out.halt === 'news') {
+      if (out.halt === 'news' || out.halt === 'choice') {
         halts++;
-        assert.ok(fresh.some((l) => l.stop));
+        assert.ok(fresh.some((l) => l.stop) || out.world.dilemma);
+        // Meet it the first way open, and sail on.
+        if (w.dilemma) w = choose(sea, w, choices(w, w.dilemma).find((c) => !c.barred)!.key);
       } else if (out.halt === null) assert.ok(!fresh.some((l) => l.stop), 'news worth stopping for, and she sailed on');
     }
   }

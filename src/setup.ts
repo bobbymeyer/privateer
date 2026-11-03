@@ -50,6 +50,8 @@ export const SHIP = { hull: 10, maxHull: 10 };
 export interface Extra {
   hull?: number;
   cargo?: number;
+  /** A town on its guard: its relief starts coming this many rounds sooner. */
+  reliefSooner?: number;
 }
 
 export function encounterWith(kind: TargetKind, seed: number, ship: { hull: number; maxHull: number } = SHIP, shipCards: Card[] = buildDeck('ship', SHIP_CARDS), extra: Extra = {}): EncounterState {
@@ -61,7 +63,7 @@ export function encounterWith(kind: TargetKind, seed: number, ship: { hull: numb
     targetCards: buildDeck('target', t.cards),
     ship: { hull: ship.hull, maxHull: ship.maxHull, brace: 0 },
     target: { name: t.name, hull: t.hull, maxHull: t.hull, cargo: t.cargo, bounty: t.bounty, takenWhole: t.takenWhole },
-    reinforce: t.reinforce,
+    reinforce: t.reinforce && extra.reliefSooner ? { ...t.reinforce, from: Math.max(2, t.reinforce.from - extra.reliefSooner) } : t.reinforce,
   });
 }
 

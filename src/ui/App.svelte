@@ -1,16 +1,20 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { act, type Action, type EncounterState, type GameEvent } from '../rules.ts';
-  import { CREW, SHIP_CLASSES, UPGRADES } from '../outfit.ts';
+  import { CREW, MIN_DECK, PLAYER_CARDS, SHIP_CLASSES, STRIKE_COST, UPGRADES, WAGE_DAYS, cardsOf, deckSize, wagesOf } from '../outfit.ts';
   import { buyRound, ROUND_COST } from '../world/bar.ts';
   import { plotCourse, sailToward } from '../world/course.ts';
   import type { NodeId } from '../world/map.ts';
-  import { attack, fight, letPass, raid, raidable, repair, REPAIR_COST, YOUR_NATION, type Reckoning } from '../world/meet.ts';
+  import { attack, fight, GUARD_HULL, GUARD_RELIEF, guardOf, letPass, onGuard, treasury, TREASURY_REFILL, raid, raidable, repair, REPAIR_COST, YOUR_NATION, type Reckoning } from '../world/meet.ts';
   import { CASUS_BELLI, enemiesOf, isEnemy } from '../world/wars.ts';
   import { TARGETS } from '../setup.ts';
   import { SEASON_NAMES } from '../world/ocean.ts';
-  import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, isHaven, PARDON_COST, PROVISION_CHEER, PROVISION_COST, PROVISION_HULL, provision, provisions, recruit, retire, serves } from '../world/port.ts';
+  import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, isHaven, leavePrize, PARDON_COST, strikable, strikeCard, takePrize, PROVISION_CHEER, PROVISION_COST, PROVISION_HULL, provision, provisions, recruit, retire, serves } from '../world/port.ts';
   import { IDLE_DAYS, MORALE_MAX } from '../world/events.ts';
+  import { inSight, lookout, readShip } from '../world/scout.ts';
+  import { choices, choose, describe as describeDilemma } from '../world/dilemmas.ts';
+  import CardView from './CardView.svelte';
+  import { explainCard } from '../describe.ts';
   import { adjective, article, nationName, sailName } from '../world/ports.ts';
   import { markerStrength, predict } from '../world/rumors.ts';
   import type { Sea } from '../world/ships.ts';
@@ -109,6 +113,7 @@
       arrived: 'arrived',
       encounter: 'attacked!',
       hail: 'a sail alongside',
+      choice: '',
       sighted: 'land ho — uncharted',
       stuck: 'no way there',
       won: 'home',
@@ -116,6 +121,10 @@
     };
     if (out.halt === 'arrived') dest = null;
     if (out.halt === 'news') return stop([...world.log].reverse().find((l) => l.stop)!.text);
+    if (out.halt === 'sail') {
+      const x = inSight(sea, world).find((y) => y.hostile)!;
+      return stop(`a sail: ${sailName(x.ship.kind, x.ship.nation)}, ${x.days} ${x.days === 1 ? 'day' : 'days'} off${x.closing ? ', bearing down on you' : ''}`);
+    }
     stop(why[out.halt]);
   }
   function oneDay() {
@@ -206,7 +215,7 @@
   const visible = $derived.by(() => {
     if (!sea || !world) return [];
     const d = sea.map.distTo(world.player);
-    return world.ships.filter((s) => s.laidUp <= world!.turn && d[s.node] <= world!.sight + 1).map((s) => s.id);
+    return world.ships.filter((s) => s.laidUp <= world!.turn && d[s.node] <= lookout(world!)).map((s) => s.id);
   });
 
   let chart: SeaChart | null = $state(null);
@@ -273,6 +282,19 @@
           <Gauge label="morale" value={world.morale} max={MORALE_MAX} />
           {#if world.morale <= 2}<p class="wanted">the crew are close to mutiny. a prize, a round ashore or fresh water would steady them.</p>{:else if world.turn - world.lastSpoils >= IDLE_DAYS}<p class="faint">{world.turn - world.lastSpoils} days since the last prize: the crew are souring.</p>{/if}
           <p>a {SHIP_CLASSES[world.outfit.ship].name}, {world.outfit.crew.length ? world.outfit.crew.map((c) => CREW[c].name).join(', ') : 'no hands of note'}</p>
+          {#if wagesOf(world.outfit)}<p class="faint">wages {wagesOf(world.outfit)} every {WAGE_DAYS} days, next on day {(Math.floor(world.turn / WAGE_DAYS) + 1) * WAGE_DAYS + 1}</p>{/if}
+          <details class="deck">
+            <summary>your deck: {deckSize(world.outfit)} cards</summary>
+            <ul class="plain">
+              {#each Object.entries(cardsOf(world.outfit)) as [key, n]}
+                <li title={explainCard(PLAYER_CARDS[key].text)}>
+                  {PLAYER_CARDS[key].name} <span class="faint">{PLAYER_CARDS[key].text}{n > 1 ? ` · ×${n}` : ''}</span>
+                  {#if port && serves(sea, world)}<button class="strike" onclick={() => attempt(() => strikeCard(sea!, world!, key), `${PLAYER_CARDS[key].name} struck from the deck`)} disabled={!strikable(sea, world, key)}>strike ({STRIKE_COST})</button>{/if}
+                </li>
+              {/each}
+            </ul>
+            <p class="faint">{port && serves(sea, world) ? `a yard will strike a card for ${STRIKE_COST}, down to ${MIN_DECK} cards: a thinner deck deals what you want more often.` : 'a yard in port will strike cards out of it.'}</p>
+          </details>
           <p class="faint">your name: {RENOWN_WORDS[renown(world)]}{renown(world) ? ', and the hunters come farther for it' : ''}</p>
           {#if homeward(world)}<p class="wanted">homeward bound with the score: every enemy privateer is out for you.</p>{/if}
           <p class="faint">sight {world.sight} · {world.outfit.upgrades.length ? world.outfit.upgrades.map((u) => UPGRADES[u].name).join(', ') : 'no refits'}</p>
@@ -343,9 +365,12 @@
               {/if}
             {/if}
             <h3>a raid</h3>
-            {#if !raidable(sea, world)}
+            {#if (world.sacked[world.player] ?? -1) >= world.turn}
               <p class="faint">sacked lately: there's nothing left here.</p>
+            {:else if onGuard(world, world.player)}
+              <p class="faint">on its guard after your last raid: the boats would never get ashore. shut till day {guardOf(world, world.player)!.shutUntil + 1}.</p>
             {:else}
+              {#if guardOf(world, world.player)}{@const guard = guardOf(world, world.player)!}<p class="wanted">on its guard since your last raid: walls {GUARD_HULL * guard.level} stronger, its relief {GUARD_RELIEF * guard.level} rounds sooner, and {treasury(world, world.player, port.fort ? 'fortress' : 'town')} in the treasury, filling again by {TREASURY_REFILL} a day. on its guard till day {guard.until + 1}.</p>{/if}
               <p class="faint">
                 {port.fort ? 'a fortified port: not for a small ship.' : 'an open town.'}
                 the {adjective(port.nation)} will remember it three times over and their guard ships will hunt twice as far.
@@ -356,6 +381,20 @@
             {#if said}<p class="said">{said}</p>{/if}
           </section>
         {/if}
+
+        <section>
+          <h2>in sight</h2>
+          {#if !inSight(sea, world).length}<p class="faint">nothing on the horizon.</p>{/if}
+          <ul class="plain sightings">
+            {#each inSight(sea, world) as x (x.ship.id)}
+              {@const r = readShip(world, x.ship)}
+              <li class:wanted={x.hostile}>
+                <Flag nation={x.ship.nation} />{sailName(x.ship.kind, x.ship.nation)}, {x.days === 0 ? 'here' : `${x.days} ${x.days === 1 ? 'day' : 'days'} off`}{x.closing ? ', bearing down' : x.hostile ? ', hostile' : ''}
+                <span class="faint">hull {r.hull} · {r.traits.join(' · ')}</span>
+              </li>
+            {/each}
+          </ul>
+        </section>
 
         <section>
           <h2>rumors</h2>
@@ -435,6 +474,10 @@
       <div class="overlay">
         <div class="sheet">
           <h2><Flag nation={h.nation} size={18} />{article(flagName)} {flagName} {what} alongside</h2>
+          {#if world.ships.find((x) => x.id === h.shipId)}
+            {@const r = readShip(world, world.ships.find((x) => x.id === h.shipId)!)}
+            <p class="reading">hull {r.hull} to your {world.hull} · {r.traits.join(' · ')}{r.bounty ? ` · a price of ${r.bounty} on her` : ''}</p>
+          {/if}
           {#if captivesOf(h.shipId)}{@const laden = captivesOf(h.shipId)!}<p>she's laden with {adjective(laden)} captives. take her and they go free, and the {adjective(laden)} and the Crown will think the better of you.</p>{/if}
           {#if h.nation === YOUR_NATION}
             <p class="wanted">she flies your flag. fire on her and you are a pirate: England will want you, its ports will shut, and London will hang you until you're pardoned.</p>
@@ -453,6 +496,37 @@
       <div class="overlay">
         <div class="sheet">
           <Fight fight={shown} {lastRound} {reckoning} {title} {isRaid} nation={nation} {onact} {oncontinue} />
+        </div>
+      </div>
+    {:else if world.spoil}
+      <div class="overlay">
+        <div class="sheet">
+          <h2>her stores</h2>
+          <p>take one into your deck for good, or leave them: every card you add is one more between you and the cards you want.</p>
+          <div class="stores">
+            {#each world.spoil.offers as key}
+              <CardView card={{ id: key, side: 'ship', ...PLAYER_CARDS[key] }} order={null} onpick={() => attempt(() => takePrize(world!, key))} />
+            {/each}
+          </div>
+          <div class="row"><button onclick={() => (world = leavePrize(world!))}>leave them</button></div>
+          <p class="faint">your deck: {deckSize(world.outfit)} cards</p>
+        </div>
+      </div>
+    {:else if world.dilemma}
+      {@const d = world.dilemma}
+      {@const told = describeDilemma(d)}
+      <div class="overlay">
+        <div class="sheet">
+          <h2>{told.title}</h2>
+          <p>{told.text}</p>
+          <ul class="plain choices">
+            {#each choices(world, d) as c (c.key)}
+              <li>
+                <button onclick={() => attempt(() => choose(sea!, world!, c.key))} disabled={!!c.barred}>{c.label}</button>
+                <span class="faint">{c.barred ?? c.stakes}</span>
+              </li>
+            {/each}
+          </ul>
         </div>
       </div>
     {:else if world.sunk || world.won}
@@ -498,6 +572,15 @@
   .wanted { color: var(--theirs); }
   .chip { display: inline-block; margin-right: 0.8rem; }
   .overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.92); display: grid; place-items: start center; overflow: auto; padding: 2rem 16px; }
+  .choices li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.75rem; margin-top: 0.6rem; }
+  .stores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin: 1rem 0; }
+  @media (max-width: 34rem) { .stores { grid-template-columns: 1fr; } }
+  .deck summary { cursor: pointer; }
+  .deck li { margin-top: 0.3rem; }
+  .strike { margin-left: 0.4rem; padding: 0.1rem 0.4rem; font-size: 0.8rem; }
+  .sightings li { margin-top: 0.4rem; }
+  .sightings .faint { display: block; font-size: 0.85rem; }
+  .reading { color: var(--faint); }
   .intro dl { margin: 1rem 0; }
   .intro dt { margin-top: 0.75rem; }
   .intro dd { margin: 0.2rem 0 0; }

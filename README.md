@@ -33,6 +33,13 @@ and it's over.
   corsairs are fair game; anyone else's ships, the Crown hears of; an
   English ship makes you a pirate.
 - **Raiding a port**: in port, you can raid it instead of trading.
+- **Build the deck.** Take a ship and her stores are offered: three cards
+  off her, keep one or none. A yard will strike a card out for 6, down to
+  10. Your deck is listed under your ship. Hands of note draw wages.
+- **Read a ship before you engage.** The lookout sees ships two days past
+  the water you can read, and a hostile sail coming into view stops you.
+  Alongside, or in the *in sight* list, you see her hull against yours and
+  how she fights: heavily gunned, fast, hard to shake off, a rich hold.
 - **Your name gets about.** The more your prizes pay, the farther the
   hunters and privateers come for you, and the better found. Make the score
   and word gets out: every enemy privateer puts to sea to stop you getting
@@ -42,6 +49,9 @@ and it's over.
 - **Keep the crew in heart.** Morale runs out of ten. A long stretch with
   no prize sours them, and at nothing it's mutiny. A prize, a round in the
   bar, fresh water at an island and a good omen all put it up.
+- **Some events ask you.** A storm, the crew wanting their shares, a man on
+  the beach of new land: each stops the ship and offers a choice, with what
+  each choice stakes told plainly.
 - **Islanders** in Guam, Hawaii, Tahiti, Tonga, the Marquesas and Rapa Nui
   trade water, fruit and timber, not drink or ships. Sometimes they put out
   war canoes instead.
@@ -343,9 +353,9 @@ fighting:
   an island, Saint Elmo's fire, porpoises under the bow.
 - **Storms**, about one day in 120 at sea. Three times as often in the
   Antilles in autumn and in the Indian seas in the summer monsoon, and
-  twice as often past forty degrees. A storm costs 1 to 3 hull, never the
-  last point, or a tenth to a quarter of the gold, 30 at most, thrown over
-  the side. (At first it was one day in 80 and up to two fifths of the
+  twice as often past forty degrees. How to meet it is your choice (see
+  *Events that ask you something*, below). (At first a storm simply took 1
+  to 3 hull or some of the gold, it was one day in 80 and up to two fifths of the
   purse, and the captain bot's wins fell from 43% to 27%; as now, 33% over
   30 runs, about 5 storms and 10 omens a run, and no mutinies: the bot
   takes a prize often enough to keep its crew.)
@@ -360,6 +370,57 @@ fighting:
   where the current takes it, turns for home once it's more than 12 days
   out, and attacks whoever it meets. It's nobody's, so fighting it costs no
   standing, and its bounty pays (ambergris, and a story for the bar).
+
+**Events that ask you something** (`src/world/dilemmas.ts`). A storm used
+to take its toll and log it; the crew soured in silence. Now the
+events that matter stop the world and ask, and every choice says what it
+stakes before you pick it:
+
+| event | when | choices |
+| --- | --- | --- |
+| a storm | the storm chance, at sea | **ride it out**: lose 1 to 3 hull, never the last · **run before it**: no damage, but 2 to 4 days downwind, off your course, sailed day by day (anything can happen in them) · **lighten ship**: a tenth to a quarter of the gold over the side, 30 at most |
+| the crew want their shares | morale sours to 3 | **pay them**: a tenth of the purse, 5 at least, morale +3 · **promise them the next prize**: morale +1, and a quarter of the next payout is theirs · **stand firm**: even odds of morale +1 or −1 |
+| a man on the beach | half the time you sight new land | **take him aboard**: a hand of note you haven't got, free, if there's a berth — but one in four is a liar and a Jonah, and it's morale −2 · **leave him** |
+
+A choice that can't be made — nothing aboard to lighten, no berth, not
+enough to pay — is shown barred, with why. The bot rides out a storm on a
+sound hull, pays shares it can spare, and takes any castaway; with that it
+wins 27% over 30 runs, against 20% when storms rolled their own cost.
+
+**Building the deck** (`src/outfit.ts`, `src/world/port.ts`). The deck
+was all bought: a bigger ship, a gunner, and every run converged on the
+same cards. Now most of it is chosen.
+
+- **Prize cards.** Take a ship, sack a town, or kill a monster, and three
+  cards from that kind's pool in `PRIZE_CARDS` are offered: keep one, for
+  good, or leave them. The world waits on the choice. They run along three
+  ways to fight — the guns (hit and wounds: *her long guns*, *a Spanish
+  great gun*), the boarders (plunder and hold: *her grapnels*, *boarding
+  pikes*), the runner (flee and chase: *her pilot*, *galley sweeps*) — and
+  the strong ones cost you: the great gun recoils, the pikes cost blood.
+  Prize cards come with you to a new ship.
+- **Striking cards.** A yard that deals with you strikes a copy of any card
+  for 6, down to a deck of 10. The deck is listed under your ship, with the
+  strike buttons when you're in such a port.
+- **Wages.** Every 60 days each hand of note is paid, 1 or 2 gold, from the
+  purse, which is also your score. Short of it, morale falls 2, and the ship
+  stops to tell you.
+
+**Seeing her first** (`src/world/scout.ts`).
+
+- **A longer lookout.** Ships are seen two steps past the water you can
+  read, and a hostile sail newly in sight stops the ship, with how far off
+  she is and whether she's bearing down — time to run, or turn.
+- **A read of her**, off her deck: her hull with any renown bonus, against
+  yours; how heavily she's gunned (her hurt, and what her wounds would
+  cost, per card); whether she'll run, is hard to shake off, mends quickly,
+  or has help coming; and how rich her hold is, laden corsairs included. It
+  shows on the sheet when she comes alongside, and for every ship in the
+  *in sight* list.
+- What the bot makes of it: 20% won over 30 runs, against 23% before. It
+  takes the first card offered, and it dies later than it did (on day 214
+  on average, against 74). Letting it sheer off at the longer lookout made
+  it worse (13%): it turned away from too much, and ran out of time.
 
 **The late game** (`src/world/world.ts`, `src/world/meet.ts`):
 
@@ -410,6 +471,20 @@ same game against the town's defences, from `src/setup.ts`:
   nothing for anybody (no trade, no raid) for 120 days.
 - **The alarm**: the town's nation's guard ships hunt twice as far, 50 days
   out, for the next 30 days.
+- **A raid turned out leaves the town on its guard.** Falling back to the
+  boats with what you'd plundered, and coming straight back to a treasury
+  full as new, was the strongest play in the game. Now a raid that ends
+  short of a sack (you fled, or it petered out) puts the town on its guard
+  for 90 days:
+  - for the first 14 the boats would never get ashore: no raid;
+  - after that its walls have 4 more hull and its relief comes 2 rounds
+    sooner, for each raid it has turned out while on its guard;
+  - its treasury starts from what the last raid left it and fills again 1
+    a day, up to the usual.
+
+  The port panel says all of this. A sack ends the guard. Over 60 seeds
+  the captain bot, which raids enemy towns, wins 22% with the guard
+  against about 28% without.
 
 `npm run sim -- --target town --ship brigantine` measures a raid:
 
@@ -585,6 +660,8 @@ src/
     port.ts      hiring, the yard, bribes, and who will deal with you
     wars.ts      who's at war with whom, and so what's fair game
     events.ts    a day at sea: morale and mutiny, storms, omens
+    dilemmas.ts  events that ask you something, and what each choice stakes
+    scout.ts     the lookout, and a read of a ship before you meet her
     seas.ts      the named seas, where the chart letters them and the monsters keep
     course.ts    setting a course and sailing it a day at a time
     world.ts     createWorld, advance, observe, hearRumor — pure, like rules.ts
