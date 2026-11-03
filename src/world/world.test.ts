@@ -20,8 +20,11 @@ test('the sea is built once and shared', () => {
   assert.equal(createSea(), sea);
 });
 
-test('one ocean: every node reaches every other', () => {
-  assert.ok(!map.distTo(0).includes(FAR));
+test('one network of lanes: every lane node reaches every other, and the sea off them is cut off', () => {
+  const onLane = map.nodes.filter((n) => map.adj[n.id].length).map((n) => n.id);
+  const d = map.distTo(onLane[0]);
+  assert.ok(onLane.every((n) => d[n] < FAR));
+  assert.ok(onLane.length < map.nodes.length / 4, `${onLane.length} lane nodes of ${map.nodes.length}`);
 });
 
 test('every step is a day’s sail', () => {
@@ -128,10 +131,11 @@ test('knowing the sea tightens the search', () => {
     for (let i = 0; i < 4; i++) w = advance(sea, w, w.player);
     w = hearRumor(sea, w, (seed * 7) % w.ships.length, 0.9);
     for (let i = 0; i < 4; i++) w = advance(sea, w, w.player);
-    blind += searchArea(predict(sea, w.rumors[0], w.turn, KNOW_NOTHING, w.player)).length;
-    wise += searchArea(predict(sea, w.rumors[0], w.turn, KNOW_ALL, w.player)).length;
+    blind += searchArea(predict(sea, w.rumors.at(-1)!, w.turn, KNOW_NOTHING, w.player)).length;
+    wise += searchArea(predict(sea, w.rumors.at(-1)!, w.turn, KNOW_ALL, w.player)).length;
   }
-  assert.ok(wise < blind * 0.85, `${wise} vs ${blind}`);
+  // On the lanes a ship can only be so many places, so knowing the sea counts for less than it did on the open ocean.
+  assert.ok(wise < blind, `${wise} vs ${blind}`);
 });
 
 

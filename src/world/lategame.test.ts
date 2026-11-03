@@ -13,7 +13,8 @@ const sea = createSea();
 const { map } = sea;
 const at = (name: string) => portNamed(map, name);
 /** Out in the Pacific, a long way from anyone's business. */
-const farOut = () => map.nodes.find((n) => n.kind === 'ocean' && Math.abs(n.lon + 150) < 4 && Math.abs(n.lat + 20) < 4)!.id;
+/** The lane node nearest a point in the open Pacific: the sea off the lanes can't be sailed. */
+const farOut = () => map.nodes.filter((n) => n.kind === 'ocean' && map.adj[n.id].length).reduce((a, b) => (Math.hypot(b.lon + 150, b.lat + 20) < Math.hypot(a.lon + 150, a.lat + 20) ? b : a)).id;
 
 /** Fight to a finish with a hull nothing can sink, taking her if it can. */
 function takeHer(w: WorldState): WorldState {

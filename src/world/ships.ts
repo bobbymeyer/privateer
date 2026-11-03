@@ -259,7 +259,7 @@ function nearestOpen(map: SeaMap, at: [number, number]): NodeId {
   let best = 0;
   let bestD = Infinity;
   for (const n of map.nodes) {
-    if (n.kind !== 'ocean' || n.port) continue;
+    if (n.kind !== 'ocean' || n.port || !map.adj[n.id].length) continue;
     const d = distanceNm(at, [n.lon, n.lat]);
     if (d < bestD) [best, bestD] = [n.id, d];
   }

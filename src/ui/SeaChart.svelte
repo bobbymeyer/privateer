@@ -177,8 +177,9 @@
     // Nearest real node: not one a day along a longer leg.
     let best = -1;
     let bestD = Infinity;
+    // The nearest node on a lane: off them is water and nothing more.
     for (const n of map.nodes) {
-      if (n.kind === 'underway') continue;
+      if (!map.adj[n.id].length) continue;
       const d = Math.hypot((((n.lon - lon + 540) % 360) - 180) * Math.cos((lat * Math.PI) / 180), n.lat - lat);
       if (d < bestD) [best, bestD] = [n.id, d];
     }
@@ -208,7 +209,7 @@
         if (!n.waters) continue;
         const [x, y] = [n.lon + dx, -n.lat];
         blobs.set(n.waters, (blobs.get(n.waters) ?? '') + `M${(x - R).toFixed(2)},${y.toFixed(2)}a${R},${R} 0 1,0 ${2 * R},0a${R},${R} 0 1,0 ${-2 * R},0`);
-        for (const m of map.adj[n.id]) {
+        for (const m of map.open[n.id]) {
           const o = map.nodes[m];
           if (m < n.id || o.waters !== n.waters) continue;
           const ox = x + (((o.lon - n.lon + 540) % 360) - 180);
@@ -217,6 +218,18 @@
       }
     }
     return [...blobs.keys()].map((nation) => ({ nation, blobs: blobs.get(nation)!, legs: legs.get(nation) ?? '' }));
+  });
+  /** The sea lanes, as one path three copies of the world wide: built once, they never change. */
+  const lanePath = $derived.by(() => {
+    let d = '';
+    for (const dx of [-360, 0, 360]) {
+      for (const [a, b] of map.lanes) {
+        const [na, nb] = [map.nodes[a], map.nodes[b]];
+        const bx = na.lon + dx + (((nb.lon - na.lon + 540) % 360) - 180);
+        d += `M${(na.lon + dx).toFixed(2)},${(-na.lat).toFixed(2)}L${bx.toFixed(2)},${(-nb.lat).toFixed(2)}`;
+      }
+    }
+    return d;
   });
   const ARROW = 18; // px
   const arrow = (n: NodeId, v: [number, number], scale = 1) => {
@@ -306,6 +319,9 @@
       <path {d} fill="var(--land)" />
       <path {d} fill="url(#hatch)" stroke="var(--sepia)" stroke-width={px * 1.3} stroke-linejoin="round" />
     {/each}
+
+    <!-- The sea lanes: where everyone sails, you too. A dotted track, as charts marked a course. -->
+    <path d={lanePath} fill="none" stroke="var(--sepia)" stroke-width={px * 1.4} stroke-opacity="0.55" stroke-dasharray="{px * 2} {px * 3}" stroke-linecap="round" />
 
     <!-- The seas, lettered as on charts of the time. -->
     {#if span > 22}
