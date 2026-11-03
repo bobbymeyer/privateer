@@ -14,7 +14,7 @@
   import Gauge from './Gauge.svelte';
   import { SHIP } from './woodcut.ts';
 
-  let { sea, world, act, onclose }: { sea: Sea; world: WorldState; act: (f: () => WorldState, done?: string) => void; onclose: () => void } = $props();
+  let { sea, world, act, onclose }: { sea: Sea; world: WorldState; act: (f: () => WorldState, done?: string) => void; onclose?: () => void } = $props();
 
   const cls = $derived(SHIP_CLASSES[world.outfit.ship]);
   const atYard = $derived(!!sea.map.nodes[world.player].port && serves(sea, world));
@@ -100,7 +100,7 @@
     {/each}
   </section>
 
-  <div class="row"><button onclick={onclose}>back to the chart</button></div>
+  {#if onclose}<div class="row"><button onclick={onclose}>back to the chart</button></div>{/if}
 </div>
 
 <style>
@@ -110,6 +110,7 @@
   h3 { margin: 0 0 0.4rem; font-size: 1.1rem; font-weight: 400; border-bottom: 1px dashed var(--rule); padding-bottom: 0.3rem; }
   h4 { margin: 0.8rem 0 0.4rem; font-size: 0.9rem; font-weight: 400; color: var(--faint); }
   p { margin: 0.3rem 0; }
+  .plain { list-style: none; margin: 0; padding: 0; }
   .rows li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.75rem; margin-top: 0.35rem; }
   .rows button { padding: 0.1rem 0.5rem; font-size: 0.85rem; }
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.5rem; }

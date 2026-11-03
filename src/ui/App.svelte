@@ -197,8 +197,15 @@
   // --- In port ---------------------------------------------------------------
 
   let said = $state('');
-  /** The ship and crew sheet, open over the chart. */
-  let shipOpen = $state(false);
+  /** The tab under the map. Arriving in a port shows the port. */
+  type Tab = 'location' | 'politics' | 'ship';
+  let tab: Tab = $state('location');
+  let lastPort: number | null = null;
+  $effect(() => {
+    const here = world && sea?.map.nodes[world.player].port ? world.player : null;
+    if (here !== null && here !== lastPort) tab = 'location';
+    lastPort = here;
+  });
   function attempt(f: () => WorldState, done = '') {
     try {
       world = f();
@@ -289,44 +296,17 @@
           <button onclick={() => chart?.recentre()}>find the ship</button>
         </div>
         <p class="legend">blue: the current a step out · dashed grey: this season's wind · rings: rumors, in the ship's colours, fading · red cloud: where the selected one's ship could be by now · squares are fortified ports, circles open towns, triangles ships</p>
-        <ul class="key" aria-label="the nations' colours">
-          {#each Object.keys(COLORS) as n}<li><Flag nation={n as Nation} size={12} />{adjective(n as Nation)}</li>{/each}
-        </ul>
-      </div>
 
-      <aside>
-        <details class="panel" open>
-          <summary><h2>{nodeName(world.player)}</h2></summary>
-          <Gauge label="hull" value={world.hull} max={world.maxHull} />
-          <Gauge label="morale" value={world.morale} max={MORALE_MAX} />
-          {#if world.morale <= 2}<p class="wanted">the crew are close to mutiny. a prize, a round ashore or fresh water would steady them.</p>{:else if world.turn - world.lastSpoils >= IDLE_DAYS}<p class="faint">{world.turn - world.lastSpoils} days since the last prize: the crew are souring.</p>{/if}
-          <p>a {SHIP_CLASSES[world.outfit.ship].name}, {world.outfit.crew.length ? world.outfit.crew.map((c) => CREW[c].name).join(', ') : 'no hands of note'}</p>
-          {#if wagesOf(world.outfit)}<p class="faint">wages {wagesOf(world.outfit)} every {WAGE_DAYS} days, next on day {(Math.floor(world.turn / WAGE_DAYS) + 1) * WAGE_DAYS + 1}</p>{/if}
-          <div class="row"><button onclick={() => (shipOpen = true)}>ship &amp; crew · deck of {deckSize(world.outfit)}</button></div>
-          <p class="faint">your name: {RENOWN_WORDS[renown(world)]}{renown(world) ? ', and the hunters come farther for it' : ''}</p>
-          {#if homeward(world)}<p class="wanted">homeward bound with the score: every enemy privateer is out for you.</p>{/if}
-          {#if atIsland(world)}<p>at anchor off an uncharted isle: taking on water, mending the hull.</p>{/if}
-          {#if world.pirate}<p class="wanted">a pirate: English ports are shut to you and London would hang you, until you buy a pardon ({PARDON_COST}) in an English port.</p>{/if}
-        </details>
-
-        <details class="panel" open>
-          <summary><h2>course</h2></summary>
-          {#if dest === null}
-            <p class="faint">click the sea to set a course.</p>
-          {:else}
-            <p>for {nodeName(dest)}, {course.length - 1} days</p>
-            <div class="row">
-              {#if sailing}<button onclick={() => stop('hove to')}>heave to</button>{:else}<button onclick={setSail} disabled={course.length < 2}>set sail</button><button onclick={oneDay} disabled={course.length < 2}>one day</button>{/if}
-              <button onclick={() => ((dest = null), stop())}>clear</button>
-            </div>
-          {/if}
-          {#if halted}<p class="said">{halted}</p>{/if}
-          {#if said && !port}<p class="said">{said}</p>{/if}
-        </details>
-
-        {#if port}
-          <details class="panel" open>
-            <summary><h2><Flag nation={port.nation} />{port.name}, {adjective(port.nation)}</h2></summary>
+        <!-- Below the map: where you are, how the powers stand, your ship. -->
+        <div class="tabs" role="tablist">
+          {#each [['location', port ? port.name : 'at sea'], ['politics', 'politics'], ['ship', 'ship & crew']] as [key, label]}
+            <button role="tab" aria-selected={tab === key} class:current={tab === key} onclick={() => (tab = key as Tab)}>{label}</button>
+          {/each}
+        </div>
+        <div class="tabpanel" role="tabpanel">
+          {#if tab === 'location'}
+            {#if port}
+            <h2><Flag nation={port.nation} />{port.name}, {adjective(port.nation)}</h2>
             {#if isHaven(sea, world)}
               <p>a pirate's haven: they'll deal with you here, whoever wants you, and you can retire here when you're rich.</p>
               <button onclick={() => attempt(() => retire(sea!, world!))} disabled={world.gold < GOAL}>retire here ({world.gold} of {GOAL})</button>
@@ -348,7 +328,7 @@
             {:else}
               <details class="sub" open><summary><h3>the bar</h3></summary>
               <button onclick={round}>buy a round ({ROUND_COST})</button>
-              <p class="faint">berths {world.outfit.crew.length} of {SHIP_CLASSES[world.outfit.ship].berths}{world.outfit.crew.length ? ' · let hands go from the ship & crew sheet' : ''}</p>
+              <p class="faint">berths {world.outfit.crew.length} of {SHIP_CLASSES[world.outfit.ship].berths}{world.outfit.crew.length ? ' · let hands go from the ship & crew tab' : ''}</p>
               <ul class="plain shop">
                 {#each Object.entries(CREW).filter(([k]) => !world!.outfit.crew.includes(k)) as [key, c]}
                   <li>
@@ -403,8 +383,82 @@
             {/if}
             </details>
             {#if said}<p class="said">{said}</p>{/if}
-          </details>
-        {/if}
+            {:else}
+              {@const here = sea.map.nodes[world.player]}
+              <h2>{nodeName(world.player)}</h2>
+              {#if atIsland(world)}
+                <p>at anchor off an island nobody has charted: no ship troubles you here, the hull mends a point a day, and the crew take on fresh water.</p>
+              {:else}
+                <p>{here.kind === 'coast' || here.kind === 'passage' ? 'coastal water' : 'the open sea'}{here.waters ? `, in ${adjective(here.waters)} waters: their guard ships keep them` : ', nobody’s waters'}.</p>
+              {/if}
+              {#if here.strait}<p>in {here.strait}, where everything that passes is seen.</p>{/if}
+              {#if here.shoal}<p class="faint">on {here.shoal}: too shallow for deep keels.</p>{/if}
+              {#if here.river}<p class="faint">off the mouth of the {here.river}.</p>{/if}
+              {#if here.guns}<p class="wanted">under the guns of {here.guns}.</p>{/if}
+              <p class="faint">click the chart to set a course; ports are where the bar, the yard and raids are.</p>
+              {#if said}<p class="said">{said}</p>{/if}
+            {/if}
+          {:else if tab === 'politics'}
+                  <h3>at war</h3>
+          <p>
+            {#each enemiesOf(world.wars, YOUR_NATION) as n}<span class="chip"><Flag nation={n} />{nationName(n)}</span>{/each}
+            {#if !enemiesOf(world.wars, YOUR_NATION).length}<span class="faint">England is at peace with everyone.</span>{/if}
+          </p>
+          {#if world.letter && !isEnemy(world.wars, world.letter.nation)}<p><span class="chip"><Flag nation={world.letter.nation} />{nationName(world.letter.nation)}</span> <span class="faint">at peace, but named in your letter</span></p>{/if}
+          <p class="faint">their ships and towns are fair game; anyone else's, the Crown hears of.</p>
+          {#each Object.entries(world.tension).filter(([, v]) => v) as [n, v]}
+            <p class="wanted"><Flag nation={n as Nation} />the peace with {nationName(n as Nation)} is strained: {v} of {CASUS_BELLI}</p>
+          {/each}
+                  <h3>standing</h3>
+          {#if !Object.values(world.standing).some((v) => v)}<p class="faint">nobody has reason to hunt you.</p>{/if}
+          <ul class="plain">
+            {#each Object.entries(world.standing).filter(([, v]) => v) as [n, v]}
+              <li class:wanted={v! < 0}><Flag nation={n as Nation} />{adjective(n as Nation)}: {v! > 0 ? '+' : ''}{v}{v! < 0 ? ', and their guard ships are out' : ''}</li>
+            {/each}
+          </ul>
+            <h3>your name</h3>
+            <p>{RENOWN_WORDS[renown(world)]}{renown(world) ? ': hunters and privateers come farther for you, and better found.' : '.'}</p>
+            {#if world.pirate}<p class="wanted">a pirate: English ports are shut to you and London would hang you, until you buy a pardon ({PARDON_COST}) in an English port.</p>{/if}
+            <h3>the flags</h3>
+            <ul class="key" aria-label="the nations' colours">
+              {#each Object.keys(COLORS) as n}<li><Flag nation={n as Nation} size={12} />{adjective(n as Nation)}</li>{/each}
+            </ul>
+          {:else}
+            <ShipSheet {sea} {world} act={attempt} />
+          {/if}
+        </div>
+      </div>
+
+      <aside>
+        <details class="panel" open>
+          <summary><h2>{nodeName(world.player)}</h2></summary>
+          <Gauge label="hull" value={world.hull} max={world.maxHull} />
+          <Gauge label="morale" value={world.morale} max={MORALE_MAX} />
+          {#if world.morale <= 2}<p class="wanted">the crew are close to mutiny. a prize, a round ashore or fresh water would steady them.</p>{:else if world.turn - world.lastSpoils >= IDLE_DAYS}<p class="faint">{world.turn - world.lastSpoils} days since the last prize: the crew are souring.</p>{/if}
+          <p>a {SHIP_CLASSES[world.outfit.ship].name}, {world.outfit.crew.length ? world.outfit.crew.map((c) => CREW[c].name).join(', ') : 'no hands of note'}</p>
+          {#if wagesOf(world.outfit)}<p class="faint">wages {wagesOf(world.outfit)} every {WAGE_DAYS} days, next on day {(Math.floor(world.turn / WAGE_DAYS) + 1) * WAGE_DAYS + 1}</p>{/if}
+          <div class="row"><button onclick={() => (tab = 'ship')}>ship &amp; crew · deck of {deckSize(world.outfit)}</button></div>
+          {#if homeward(world)}<p class="wanted">homeward bound with the score: every enemy privateer is out for you.</p>{/if}
+          {#if atIsland(world)}<p>at anchor off an uncharted isle: taking on water, mending the hull.</p>{/if}
+          {#if world.pirate}<p class="wanted">a pirate. see politics.</p>{/if}
+          {#if port}<p><button class="link" onclick={() => (tab = 'location')}>{port.name}: the bar, the yard, a raid</button></p>{/if}
+        </details>
+
+        <details class="panel" open>
+          <summary><h2>course</h2></summary>
+          {#if dest === null}
+            <p class="faint">click the sea to set a course.</p>
+          {:else}
+            <p>for {nodeName(dest)}, {course.length - 1} days</p>
+            <div class="row">
+              {#if sailing}<button onclick={() => stop('hove to')}>heave to</button>{:else}<button onclick={setSail} disabled={course.length < 2}>set sail</button><button onclick={oneDay} disabled={course.length < 2}>one day</button>{/if}
+              <button onclick={() => ((dest = null), stop())}>clear</button>
+            </div>
+          {/if}
+          {#if halted}<p class="said">{halted}</p>{/if}
+          {#if said && !port}<p class="said">{said}</p>{/if}
+        </details>
+
 
         <details class="panel" open>
           <summary><h2>your letter</h2></summary>
@@ -451,28 +505,7 @@
           </ul>
         </details>
 
-        <details class="panel" open>
-          <summary><h2>at war</h2></summary>
-          <p>
-            {#each enemiesOf(world.wars, YOUR_NATION) as n}<span class="chip"><Flag nation={n} />{nationName(n)}</span>{/each}
-            {#if !enemiesOf(world.wars, YOUR_NATION).length}<span class="faint">England is at peace with everyone.</span>{/if}
-          </p>
-          {#if world.letter && !isEnemy(world.wars, world.letter.nation)}<p><span class="chip"><Flag nation={world.letter.nation} />{nationName(world.letter.nation)}</span> <span class="faint">at peace, but named in your letter</span></p>{/if}
-          <p class="faint">their ships and towns are fair game; anyone else's, the Crown hears of.</p>
-          {#each Object.entries(world.tension).filter(([, v]) => v) as [n, v]}
-            <p class="wanted"><Flag nation={n as Nation} />the peace with {nationName(n as Nation)} is strained: {v} of {CASUS_BELLI}</p>
-          {/each}
-        </details>
 
-        <details class="panel">
-          <summary><h2>standing</h2></summary>
-          {#if !Object.values(world.standing).some((v) => v)}<p class="faint">nobody has reason to hunt you.</p>{/if}
-          <ul class="plain">
-            {#each Object.entries(world.standing).filter(([, v]) => v) as [n, v]}
-              <li class:wanted={v! < 0}><Flag nation={n as Nation} />{adjective(n as Nation)}: {v! > 0 ? '+' : ''}{v}{v! < 0 ? ', and their guard ships are out' : ''}</li>
-            {/each}
-          </ul>
-        </details>
 
         {#if world.log.length}
           <details class="panel" open>
@@ -572,13 +605,6 @@
           </ul>
         </div>
       </div>
-    {:else if shipOpen}
-      <div class="overlay">
-        <div class="sheet">
-          <ShipSheet {sea} {world} act={attempt} onclose={() => (shipOpen = false)} />
-          {#if said}<p class="said">{said}</p>{/if}
-        </div>
-      </div>
     {:else if world.sunk || world.won}
       <div class="overlay">
         <div class="sheet">
@@ -628,6 +654,13 @@
   .sightings li { margin-top: 0.4rem; }
   .sightings .faint { display: block; font-size: 0.85rem; }
   .reading { color: var(--faint); }
+  .tabs { display: flex; gap: 0; margin-top: 1.25rem; border-bottom: 1.5px solid var(--ink); }
+  .tabs button { border: 1.5px solid var(--rule); border-bottom: none; margin-right: -1.5px; padding: 0.35rem 0.9rem; background: var(--paper); }
+  .tabs button.current { border-color: var(--ink); position: relative; top: 1.5px; background: var(--paper); border-bottom: 1.5px solid var(--paper); }
+  .tabpanel { padding: 1rem 0; }
+  .tabpanel h2 { margin: 0 0 0.5rem; font-size: 1.3rem; font-weight: 400; letter-spacing: -0.025em; }
+  .tabpanel h3 { margin: 1rem 0 0.4rem; font-size: 1.05rem; font-weight: 400; }
+  .link { border: none; padding: 0; text-decoration: underline; background: none; }
   .panel > summary, .sub > summary { list-style: none; cursor: pointer; }
   .panel > summary::-webkit-details-marker, .sub > summary::-webkit-details-marker { display: none; }
   .panel > summary h2, .sub > summary h3 { display: inline; }
