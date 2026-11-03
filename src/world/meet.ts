@@ -34,6 +34,7 @@ import { serves } from './port.ts';
 import { PRIZE_CHEER, SACK_CHEER, spoils } from './events.ts';
 import { PROMISED_SHARE } from './dilemmas.ts';
 import { advanceLetter, counts, reprisal, revoke } from './letters.ts';
+import { recordFight, tallied, whatOf } from './record.ts';
 import { makeRumor } from './rumors.ts';
 import { adjective, article, type Nation, nationName } from './ports.ts';
 import { type Sea, type ShipKind, wantedBy } from './ships.ts';
@@ -343,6 +344,11 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   }
   // A prize or a sack under your letter.
   if (w.letter && counts(sea, w.letter, { shipId: m.shipId, port: m.port, nation: m.nation, at: s.player, taken })) w = advanceLetter(sea, w);
+
+  // The tally, and the fight told, for the end of the run.
+  const place = m.port !== null ? sea.map.nodes[m.port].port!.name : null;
+  const who = whatOf(m.kind, m.nation, place, s.ships.find((x) => x.id === m.shipId)?.routeName ?? null);
+  w = { ...w, tally: tallied(w.tally, outcome, f.payout, who, m.port !== null && m.kind !== 'canoes'), lastFight: recordFight(f, who, m.kind, m.nation, s.hull) };
 
   // Shares promised to the crew come out of this prize.
   const owed = s.promised && f.payout > 0 && outcome !== 'sunk' ? Math.round(f.payout * PROMISED_SHARE) : 0;

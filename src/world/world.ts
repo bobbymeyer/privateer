@@ -20,6 +20,7 @@ import { type Hail, type Meeting, REFIT_DAYS, type Reckoning, YOUR_NATION, landf
 import { MORALE_START, aDay } from './events.ts';
 import { type Dilemma, castaway } from './dilemmas.ts';
 import { type Letter, intelligence, issue, letterDay } from './letters.ts';
+import { type FightRecord, NO_TALLY, type Tally } from './record.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -86,6 +87,10 @@ export interface WorldState {
    * won the old way, with GOAL home to London.
    */
   commission: 'active' | 'done' | 'revoked' | 'legacy';
+  /** The run's fights and prizes, counted. */
+  tally: Tally;
+  /** The last fight, told: what the end of a run shows. */
+  lastFight: FightRecord | null;
   /** Towns that turned out a raid short of a sack, on `since`: on their guard till `until`, shut to raiding till `shutUntil`, `level` steps on it, with `cargo` left in the treasury then. */
   guarded: Record<NodeId, { since: number; until: number; shutUntil: number; level: number; cargo: number }>;
   /** An event waiting on your choice: a storm, the crew's shares, a castaway. While there is one, the world waits. */
@@ -272,6 +277,8 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     letter: null,
     acts: 0,
     commission: 'active',
+    tally: NO_TALLY,
+    lastFight: null,
   };
   const r1: Roller = { rng: world.rng };
   const letter = issue(sea, world, 1, r1);

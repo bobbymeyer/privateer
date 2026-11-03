@@ -75,6 +75,23 @@ sidebar's sections fold.
 
 Each run has a seed in the URL; `?seed=42` plays the same world again.
 
+**When a run ends**, the screen tells the last fight: who she was, your
+hull going in, hers at the end, how many rounds, the wounds still against
+you, and the last three rounds card by card, down to the one that sank
+you (`src/world/record.ts`). Then the run in numbers — fights, prizes,
+sacks, ships that got away and times you did, letters done, the ship you
+ended in, your best prize — and your best run beside it.
+
+**The logbook** (`src/logbook.ts`) keeps every run that ends, and every
+one given up, in the browser: the date, the seed, the gold, letters done,
+days, the ship, how it ended and what sank you. Your best is the richest
+win; with no win yet, the furthest the letters went. It downloads as JSON,
+which is the way to send real runs back for balancing.
+
+**Today's voyage** is a seed fixed for the date, so everyone who sails it
+that day sails the same world; the header marks it, and so does the
+logbook.
+
 **The run saves as you go** (`src/save.ts`), to the browser's storage, after
 every day and every card. A reload picks it up where it was, mid-fight
 included, unless the address asks for a different seed. A finished run is
@@ -679,6 +696,7 @@ src/
   setup.ts       the one encounter so far: you and a merchant
   describe.ts    words for events and the cards' glossary, shared by terminal and browser
   save.ts        saving a run to the browser, and loading it back
+  logbook.ts     the logbook of finished runs, and today's voyage
   rules.test.ts
   outfit.ts      ships, crew, upgrades: what your deck is made of
   ui/            Svelte: App (the game), SeaChart, Fight, CardView, Gauge

@@ -27,6 +27,7 @@
   import SeaChart from './SeaChart.svelte';
   import ShipSheet from './ShipSheet.svelte';
   import { forget, load, store } from '../save.ts';
+  import { type Entry, best, dailySeed, entryFor, loadLog, saveLog, today, withEntry } from '../logbook.ts';
 
   function seedFromUrl(): number | null {
     const raw = new URLSearchParams(location.search).get('seed');
@@ -43,6 +44,8 @@
   // Building the sea takes a moment; let the page paint first.
   let sea: Sea | null = $state.raw(null);
   let seed = $state(resuming?.seed ?? asked ?? Math.floor(Math.random() * 2 ** 31));
+  /** The date, if this run is that day's voyage. */
+  let daily: string | null = $state(resuming?.daily ?? (asked !== null && asked === dailySeed(today()) ? today() : null));
   let world: WorldState | null = $state.raw(null);
   setTimeout(() => {
     sea = createSea();
@@ -68,15 +71,47 @@
     }
   }
   function abandon() {
-    if (confirm('give up this run and start another?')) newRun();
+    if (!confirm('give up this run and start another?')) return;
+    if (world && world.turn > 0) logRun(world);
+    newRun();
   }
 
-  // Saved after every change; a finished run is forgotten, so the next visit starts afresh.
+  // The logbook: every run that ends, written once.
+  let logOpen = $state(false);
+  let log: Entry[] = $state(loadLog());
+  let logged = false;
+  function logRun(w: WorldState) {
+    log = withEntry(log, entryFor(w, seed, daily, new Date()));
+    saveLog(log);
+  }
+
+  // Saved after every change; a finished run is written in the logbook and forgotten, so the next visit starts afresh.
   $effect(() => {
     if (!world) return;
-    if (world.sunk || world.won) forget();
-    else store(seed, world);
+    if (world.sunk || world.won) {
+      forget();
+      if (!logged) {
+        logged = true;
+        logRun(world);
+      }
+    } else store(seed, world, daily);
   });
+
+  /** The whole logbook, as a file to keep or send. */
+  function downloadLog() {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(log, null, 2)], { type: 'application/json' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: 'privateer-logbook.json' });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  /** Today's voyage, from the header: a run in progress is given up first, and logged. */
+  function todaysVoyage() {
+    if (world && world.turn > 0 && !world.sunk && !world.won) {
+      if (!confirm("give up this run and sail today's voyage?")) return;
+      logRun(world);
+    }
+    newRun(today());
+  }
 
   $effect(() => {
     const url = new URL(location.href);
@@ -246,10 +281,14 @@
 
   let chart: SeaChart | null = $state(null);
 
-  function newRun() {
+  function newRun(day: string | null = null) {
     stop();
-    seed = Math.floor(Math.random() * 2 ** 31);
+    daily = day;
+    seed = day ? dailySeed(day) : Math.floor(Math.random() * 2 ** 31);
     world = createWorld(sea!, seed);
+    logged = false;
+    logOpen = false;
+    tab = 'location';
     dest = null;
     focus = null;
     said = '';
@@ -280,9 +319,12 @@
         day {world.turn + 1}, {SEASON_NAMES[Math.floor(world.turn / sea.pattern.seasonLength) % 4]} ·
         {#if world.commission === 'active'}letter {world.letter!.act} of {ACTS}{' · '}{:else if world.commission === 'done'}every letter done: home to {HOME}{' · '}{/if}{world.gold} gold{world.commission === 'legacy' ? ` of ${GOAL} to bring home to ${HOME}` : world.pirate ? `, ${GOAL} to retire on` : ''} · seed {seed}
         {#if world.pirate}<span class="wanted"> · a pirate</span>{/if}
+        {#if daily}<span> · today's voyage, {daily}</span>{/if}
       </p>
       <div class="row">
         <button onclick={() => (intro = true)}>how to play</button>
+        <button onclick={() => (logOpen = true)}>logbook</button>
+        <button onclick={todaysVoyage}>today's voyage</button>
         <button onclick={abandon}>a new run</button>
       </div>
     </header>
@@ -543,6 +585,39 @@
           <button onclick={closeIntro}>to sea</button>
         </div>
       </div>
+    {:else if logOpen}
+      {@const top = best(log)}
+      <div class="overlay">
+        <div class="sheet">
+          <h2>logbook</h2>
+          {#if !log.length}
+            <p class="faint">no run has ended yet. every one that does is written here.</p>
+          {:else}
+            <p>your best: {top!.ending === 'home' || top!.ending === 'retired' ? `${top!.gold}, ${top!.ending === 'home' ? 'home to London' : 'retired'} on day ${top!.day}` : `letter ${top!.acts} of ${ACTS} done, ${top!.gold} gold`}{top!.daily ? `, on the voyage of ${top!.daily}` : ''}</p>
+            <table class="logbook">
+              <thead><tr><th>ended</th><th>how</th><th class="num">gold</th><th class="num">letters</th><th class="num">days</th><th>ship</th><th></th></tr></thead>
+              <tbody>
+                {#each log as e, i (i)}
+                  <tr class:wanted={e.ending === 'sunk'}>
+                    <td>{e.when}{e.daily ? ' · today’s voyage' : ''}</td>
+                    <td>{e.ending === 'sunk' ? `sunk${e.sunkBy ? ` by ${e.sunkBy}` : ''}` : e.ending === 'home' ? 'home' : e.ending === 'retired' ? 'retired' : 'given up'}</td>
+                    <td class="num">{e.gold}</td>
+                    <td class="num">{e.acts}</td>
+                    <td class="num">{e.day}</td>
+                    <td>{e.ship}</td>
+                    <td class="faint">seed {e.seed}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          {/if}
+          <div class="row">
+            <button onclick={() => (logOpen = false)}>close</button>
+            {#if log.length}<button onclick={downloadLog}>download the logbook</button>{/if}
+          </div>
+          <p class="faint">today's voyage is the same world for everyone who sails it today: seed {dailySeed(today())}.</p>
+        </div>
+      </div>
     {:else if world.hail && !shown}
       {@const h = world.hail}
       {@const flagName = adjective(h.nation)}
@@ -616,7 +691,30 @@
                 ? `you came home to ${HOME} on day ${world.turn + 1} with ${world.gold}${world.commission === 'done' ? ', every letter done' : ''}.`
                 : `the sea took you on day ${world.turn + 1}, ${world.gold} in the purse.`}
           </p>
-          <button onclick={newRun}>a new run</button>
+          {#if world.sunk && world.lastFight}
+            {@const f = world.lastFight}
+            <h3>the last fight: {f.what}</h3>
+            <p>you went in with {f.hullIn} hull of {f.maxHull}; she had {f.theirHull} of {f.theirMax} left at the end. it lasted {f.rounds} {f.rounds === 1 ? 'round' : 'rounds'}{f.woundsOnYou ? `, and ${f.woundsOnYou} ${f.woundsOnYou === 1 ? 'wound was' : 'wounds were'} still against you in the deck` : ''}.</p>
+            <div class="rounds">
+              {#each f.lastRounds as r (r.round)}
+                <div>
+                  <h4>round {r.round}</h4>
+                  <ul class="plain">{#each r.lines as line}<li class:effect={line.startsWith('  ')}>{line.trim()}</li>{/each}</ul>
+                </div>
+              {/each}
+            </div>
+          {/if}
+          <h3>the run</h3>
+          <p>
+            {world.tally.fights} {world.tally.fights === 1 ? 'fight' : 'fights'} · {world.tally.taken} taken · {world.tally.sacks} {world.tally.sacks === 1 ? 'town' : 'towns'} sacked · {world.tally.fled} times you got away · {world.tally.escaped} that got away from you
+          </p>
+          <p>letters done: {world.acts} of {ACTS} · ended in a {SHIP_CLASSES[world.outfit.ship].name}{world.tally.best ? ` · best prize: ${world.tally.best.what}, ${world.tally.best.payout}` : ''}</p>
+          {#if best(log)}<p class="faint">your best: {best(log)!.ending === 'home' || best(log)!.ending === 'retired' ? `${best(log)!.gold}, won` : `letter ${best(log)!.acts} done, ${best(log)!.gold} gold`}.</p>{/if}
+          <div class="row">
+            <button onclick={() => newRun()}>a new run</button>
+            <button onclick={() => newRun(today())}>today's voyage</button>
+            <button onclick={() => (logOpen = true)}>logbook</button>
+          </div>
         </div>
       </div>
     {/if}
@@ -671,6 +769,14 @@
   .shop { flex-direction: row; flex-wrap: wrap; gap: 0.6rem 0.75rem; margin-top: 0.4rem; }
   .shop li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; flex: 0 1 14rem; }
   .shop .faint { font-size: 0.85rem; }
+  .logbook { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 0.75rem 0; }
+  .logbook th, .logbook td { text-align: left; padding: 0.25rem 0.6rem 0.25rem 0; border-bottom: 1px dashed var(--rule); vertical-align: top; }
+  .logbook th { font-weight: 400; color: var(--faint); }
+  .logbook .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rounds { display: flex; flex-direction: row; flex-wrap: wrap; gap: 1rem; }
+  .rounds > div { flex: 1 1 14rem; }
+  .rounds h4 { margin: 0 0 0.3rem; font-weight: 400; color: var(--faint); }
+  .rounds .effect { padding-left: 1rem; color: var(--faint); }
   .intro dl { margin: 1rem 0; }
   .intro dt { margin-top: 0.75rem; }
   .intro dd { margin: 0.2rem 0 0; }
