@@ -355,7 +355,8 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     player: to,
     ships,
     // Faded markers are dropped; what they said is no longer worth acting on.
-    rumors: s.rumors.filter((rumor) => markerStrength(rumor, turn) >= FADED),
+    // Faded markers are dropped — but for the Admiralty's latest word of the plate ship, kept till fresher comes.
+    rumors: s.rumors.filter((rumor) => markerStrength(rumor, turn) >= FADED || isLatestWord(s, rumor)),
     chart: observe(sea, s.chart, to, s.sight, turn),
     trail: s.ships.map((ship, i) => [ship.node, ...s.trail[i]].slice(0, TRAIL)),
     rounds: 0,
@@ -385,6 +386,13 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   }
   if (to !== s.player) next = landfall(sea, next);
   return meeting(sea, next);
+}
+
+/** The newest rumor of the plate ship your letter names: it stays on the chart till fresher word replaces it. */
+export function isLatestWord(s: WorldState, rumor: Rumor): boolean {
+  const t = s.letter?.task;
+  if (t?.kind !== 'take' || rumor.shipId !== t.shipId) return false;
+  return !s.rumors.some((r) => r.shipId === t.shipId && r.id > rumor.id);
 }
 
 /** What pursuers make of you: who wants you, who's alarmed, who's at war with England. */

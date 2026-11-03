@@ -98,8 +98,13 @@ function choose(w: WorldState): NodeId {
       // The plate ship: where the freshest word of her says she is now; a big enough ship first.
       const word = w.rumors.filter((r) => r.shipId === (l.task as { shipId: number }).shipId).at(-1);
       if (word && SHIP_CLASSES[w.outfit.ship].hull >= 12) {
-        const p = predict(sea, word, w.turn, knowledge(w), w.player, pursuitOf(w, sea));
-        return p.indexOf(Math.max(...p));
+        // Intercept: where she's likeliest to be in k days, that we can reach in k days.
+        let best = { node: w.player, p: -1 };
+        for (let k = 0; k <= 30; k += 3) {
+          const p = predict(sea, word, w.turn + k, knowledge(w), w.player, pursuitOf(w, sea));
+          for (let n = 0; n < p.length; n++) if (p[n] > best.p && d[n] <= k && !map.nodes[n].port) best = { node: n, p: p[n] };
+        }
+        if (best.p > 0) return best.node;
       }
     } else if (l.task.kind === 'sack') {
       const towns = harbours.filter((p) => inRegion(sea, l.region!, p) && map.nodes[p].port!.nation === l.nation && !map.nodes[p].port!.fort && (w.sacked[p] ?? -1) < w.turn && !onGuard(w, p));

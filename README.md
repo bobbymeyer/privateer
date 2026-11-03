@@ -383,9 +383,14 @@ more time once, at −2 with England; a second, and the letter is revoked
 and you're a pirate (a pardon brings a new one). All three and home to
 London wins; gold is the score. Runs from before letters win the old way.
 
-Where it stands: the captain bot gets through two letters in about half of
-30 runs, and has not yet taken a plate ship, so the third act wins none.
-It needs either a better hunter in the bot or a set piece easier to find.
+The Admiralty's latest word of the plate ship stays on the chart till
+fresher word replaces it, so her cloud is there all act long, widening as
+the word ages.
+
+Where it stands: the captain bot, which now intercepts (it heads for where
+she's likeliest to be in k days that it can reach in k days), wins 2 of 30
+runs, on day 368 on average; 12 of 30 reach the third letter. It is sunk
+in 19 of 30: the letters take a small ship into enemy waters.
 
 **Events that ask you something** (`src/world/dilemmas.ts`). A storm used
 to take its toll and log it; the crew soured in silence. Now the
