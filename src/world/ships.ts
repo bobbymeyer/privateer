@@ -10,7 +10,7 @@ import type { Nation } from './ports.ts';
 import { type Roller, roll, weighted } from './random.ts';
 import { type SeaPattern, legWeight } from './sea.ts';
 
-export type ShipKind = 'merchant' | 'hunter' | 'privateer' | 'treasure-ship' | 'treasure-fleet' | 'armada' | 'monster';
+export type ShipKind = 'merchant' | 'hunter' | 'privateer' | 'corsair' | 'treasure-ship' | 'treasure-fleet' | 'armada' | 'monster';
 
 export interface Ship {
   id: number;
@@ -30,6 +30,10 @@ export interface Ship {
   laidUp: number;
   /** Whose flag it flies: its home port's. */
   nation: Nation;
+  /** A corsair's: the town it's bound to raid. */
+  raid?: NodeId | null;
+  /** A corsair's: whose people it carries home as captives, once it has raided. */
+  captives?: Nation | null;
 }
 
 /** How each nation regards you. Below zero, its guard ships hunt you. */
@@ -57,6 +61,8 @@ export const HABITS: Record<ShipKind, KindHabits> = {
   hunter: { slow: false, drift: 0.15, deep: false, pull: 0.4 },
   // Enemy privateers: fast, weatherly raiders out of their own ports.
   privateer: { slow: false, drift: 0.2, deep: false, pull: 0.5 },
+  // Barbary corsairs: galleys and xebecs, quick and weatherly, out for towns and captives.
+  corsair: { slow: false, drift: 0.15, deep: false, pull: 0.4 },
   // A sea monster goes where the current takes it, but never far from its own sea.
   monster: { slow: false, drift: 0.85, deep: false, pull: 1 },
   'treasure-ship': { slow: false, drift: 0.1, deep: true, pull: 1 },
@@ -79,8 +85,16 @@ export interface Pursuit {
   alarmed: (n: Nation) => boolean;
   /** A nation at war with England: its privateers come for you. */
   enemy: (n: Nation) => boolean;
+  /** How much farther than usual they'll come: more as your name gets known. 1 is usual. */
+  reach: number;
+  /** You're homeward bound with the score: enemy privateers come for you from anywhere. */
+  homeward: boolean;
+  /** The towns a corsair of this nation might raid: open towns of its enemies, not lately sacked. */
+  prey: (n: Nation) => NodeId[];
 }
-export const NO_PURSUIT: Pursuit = { standing: {}, alarmed: () => false, enemy: () => false };
+export const NO_PURSUIT: Pursuit = { standing: {}, alarmed: () => false, enemy: () => false, reach: 1, homeward: false, prey: () => [] };
+/** A corsair raids no farther than this many days from home. */
+export const CORSAIR_REACH = 45;
 /** A sea monster wanders no farther than this many days from the heart of its sea. */
 export const MONSTER_RANGE = 12;
 /** And past that, how often it still goes where the sea takes it rather than home. */
@@ -110,11 +124,11 @@ export function tradingPorts(map: SeaMap, node: NodeId): NodeId[] {
  * you're within its range, and you're not in another nation's protected
  * waters — which a guard ship won't enter.
  */
-export function hunterGoal(map: SeaMap, hunter: { home: NodeId; nation: Nation }, player: NodeId, standing: Standing, alarmed = false): NodeId {
+export function hunterGoal(map: SeaMap, hunter: { home: NodeId; nation: Nation }, player: NodeId, standing: Standing, alarmed = false, reach = 1): NodeId {
   if (!wantedBy(standing, hunter.nation)) return hunter.home;
   if (!mayEnter(map, { kind: 'hunter', nation: hunter.nation }, player)) return hunter.home;
   // A raid raises the alarm: for a while they hunt twice as far.
-  return map.distTo(hunter.home)[player] <= HUNT_RANGE * (alarmed ? 2 : 1) ? player : hunter.home;
+  return map.distTo(hunter.home)[player] <= HUNT_RANGE * (alarmed ? 2 : 1) * reach ? player : hunter.home;
 }
 
 /**
@@ -122,9 +136,11 @@ export function hunterGoal(map: SeaMap, hunter: { home: NodeId; nation: Nation }
  * England and you're in her range; else home. Unlike a guard ship she goes
  * where she likes — raiding other nations' coasts is the trade.
  */
-export function privateerGoal(map: SeaMap, ship: { home: NodeId; nation: Nation }, player: NodeId, enemy: boolean): NodeId {
+export function privateerGoal(map: SeaMap, ship: { home: NodeId; nation: Nation }, player: NodeId, enemy: boolean, reach = 1, homeward = false): NodeId {
   if (!enemy) return ship.home;
-  return map.distTo(ship.home)[player] <= PRIVATEER_RANGE ? player : ship.home;
+  // Homeward bound with a fortune, and word is out: they come from anywhere.
+  if (homeward) return player;
+  return map.distTo(ship.home)[player] <= PRIVATEER_RANGE * reach ? player : ship.home;
 }
 
 /** Whether this kind goes after you at all. */
@@ -133,8 +149,8 @@ export const pursues = (kind: ShipKind) => kind === 'hunter' || kind === 'privat
 /** Where a pursuer is bound, by kind. */
 export function pursuerGoal(map: SeaMap, ship: { kind: ShipKind; home: NodeId; nation: Nation }, player: NodeId, p: Pursuit): NodeId {
   return ship.kind === 'privateer'
-    ? privateerGoal(map, ship, player, p.enemy(ship.nation))
-    : hunterGoal(map, ship, player, p.standing, p.alarmed(ship.nation));
+    ? privateerGoal(map, ship, player, p.enemy(ship.nation), p.reach, p.homeward)
+    : hunterGoal(map, ship, player, p.standing, p.alarmed(ship.nation), p.reach);
 }
 
 /**
@@ -175,6 +191,14 @@ export function moveShip(sea: Sea, r: Roller, ship: Ship, turn: number, hunted: 
   if (ship.kind === 'monster') {
     // Drifting with the current, and back toward its own sea if it strays.
     ship.dest = map.distTo(ship.home)[ship.node] > MONSTER_RANGE ? ship.home : null;
+  } else if (ship.kind === 'corsair') {
+    // Out to raid, and home with the captives; between raids, a town picked.
+    if (ship.captives) ship.dest = ship.home;
+    else {
+      if (ship.raid == null) ship.raid = corsairTarget(map, r, ship, pursuit);
+      ship.dest = ship.raid ?? ship.home;
+    }
+    if (ship.node === ship.dest) return;
   } else if (pursues(ship.kind)) {
     ship.dest = pursuerGoal(map, ship, hunted, pursuit);
     if (ship.node === hunted && ship.dest === hunted) return; // found you
@@ -226,7 +250,7 @@ export function spawnShips(sea: Sea, fleet: FleetEntry[]): Ship[] {
     const route = entry.route ? ROUTES[entry.route].map((name) => portNamed(map, name)) : null;
     const home = route ? route[0] : portNamed(map, entry.home ?? 'Havana');
     const nation = map.nodes[home].port!.nation;
-    return { id, kind: entry.kind, node: home, dest: route ? route[1] : null, route, routeName: entry.route ?? null, leg: route ? 1 : 0, home, laidUp: 0, nation };
+    return { id, kind: entry.kind, node: home, dest: route ? route[1] : null, route, routeName: entry.route ?? null, leg: route ? 1 : 0, home, laidUp: 0, nation, ...(entry.kind === 'corsair' ? { raid: null, captives: null } : {}) };
   });
 }
 
@@ -240,4 +264,15 @@ function nearestOpen(map: SeaMap, at: [number, number]): NodeId {
     if (d < bestD) [best, bestD] = [n.id, d];
   }
   return best;
+}
+
+/**
+ * A town for a corsair to raid: an open town of one of its nation's
+ * enemies, within its reach, the nearer the likelier. Null if there's none.
+ */
+export function corsairTarget(map: SeaMap, r: Roller, ship: { home: NodeId; nation: Nation }, pursuit: Pursuit): NodeId | null {
+  const d = map.distTo(ship.home);
+  const towns = pursuit.prey(ship.nation).filter((p) => d[p] <= CORSAIR_REACH);
+  if (!towns.length) return null;
+  return towns[weighted(r, towns.map((p) => 1 / (5 + d[p])))];
 }

@@ -39,7 +39,7 @@ const { map } = sea;
 const london = portNamed(map, HOME);
 const harbours = ports(map);
 
-const WORTH: Record<ShipKind, number> = { 'treasure-ship': 3, merchant: 2, 'treasure-fleet': 1.5, hunter: 0, privateer: 0.5, armada: 0, monster: 0 };
+const WORTH: Record<ShipKind, number> = { 'treasure-ship': 3, merchant: 2, 'treasure-fleet': 1.5, hunter: 0, privateer: 0.5, corsair: 1, armada: 0, monster: 0 };
 const HIRE_ORDER = ['quartermaster', 'gunner', 'pilot', 'boatswain', 'marksmen', 'surgeon', 'navigator'];
 const fightBot = (outgunned: boolean) => lookahead({ hull: 0.6, damage: 0.4, fled: outgunned ? 100 : 0 });
 
@@ -91,7 +91,7 @@ function choose(w: WorldState): NodeId {
     if (!isEnemy(w.wars, r.nation)) continue; // only enemies are fair game
     const value = WORTH[r.kind] * markerStrength(r, w.turn);
     if (value <= 0.3 || (best && value <= best.value)) continue;
-    const p = predict(sea, r, w.turn, knowledge(w), w.player, pursuitOf(w));
+    const p = predict(sea, r, w.turn, knowledge(w), w.player, pursuitOf(w, sea));
     const node = p.indexOf(Math.max(...p));
     if (d[node] <= 25) best = { node, value };
   }

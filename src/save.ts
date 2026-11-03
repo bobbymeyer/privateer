@@ -3,12 +3,21 @@
  * but for the chart, a byte per node, which goes into the JSON as base64.
  *
  * A save carries a version. When the shape of the state changes, the version
- * goes up and an older save is dropped rather than loaded half-understood.
+ * goes up, and a step in `MIGRATIONS` brings an older save up to date —
+ * people have runs in progress, and an update shouldn't sink them. A save
+ * from a version with no way forward, or from a newer one, is dropped
+ * rather than loaded half-understood.
  */
 
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
+
+/** From each version to the next. A run from before a feature simply goes without it. */
+const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<string, unknown>> = {
+  // 2: renown, and the home stretch. The corsairs aren't in an older run's fleet.
+  1: (w) => ({ ...w, fame: 0, homewardNoised: false }),
+};
 export const SAVE_KEY = 'privateer:run';
 
 export interface Saved {
@@ -33,7 +42,14 @@ export function decode(text: string | null): Saved | null {
   if (!text) return null;
   try {
     const saved = JSON.parse(text, (_, v) => (v && typeof v === 'object' && typeof v.$bytes === 'string' ? fromBase64(v.$bytes) : v)) as Saved;
-    return saved.version === SAVE_VERSION && Number.isInteger(saved.seed) && saved.world ? saved : null;
+    if (!Number.isInteger(saved.seed) || !saved.world || !Number.isInteger(saved.version)) return null;
+    let world = saved.world as unknown as Record<string, unknown>;
+    for (let v = saved.version; v < SAVE_VERSION; v++) {
+      const step = MIGRATIONS[v];
+      if (!step) return null;
+      world = step(world);
+    }
+    return saved.version <= SAVE_VERSION ? { version: SAVE_VERSION, seed: saved.seed, world: world as unknown as WorldState } : null;
   } catch {
     return null;
   }

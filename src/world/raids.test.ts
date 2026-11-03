@@ -60,7 +60,8 @@ function alongside(pick: (s: WorldState['ships'][number]) => boolean, extra: Par
   let w = spanishWar(advance(sea, spanishWar(createWorld(sea, 1)), createWorld(sea, 1).player));
   const step = map.adj[w.player].find((n) => !map.nodes[n].port)!;
   const ship = w.ships.find(pick)!;
-  w = { ...w, ...extra, ships: w.ships.map((s) => (s.id === ship.id ? { ...s, node: step, dest: step } : s)) };
+  // Everyone else laid up, so nobody else happens along on the same day.
+  w = { ...w, ...extra, ships: w.ships.map((s) => (s.id === ship.id ? { ...s, node: step, dest: step } : { ...s, laidUp: 1e9 })) };
   return { w: advance(sea, w, step), ship };
 }
 

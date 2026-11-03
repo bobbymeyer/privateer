@@ -35,6 +35,8 @@ export interface Rumor {
   turn: number;
   /** 0..1. The chance the report was exactly right. */
   reliability: number;
+  /** Where a corsair was said to be bound: the town it's raiding, or home. */
+  bound?: NodeId | null;
 }
 
 /** How far a wrong report can be off: one node for good sources, three for bad. */
@@ -63,7 +65,8 @@ export function makeRumor(sea: Sea, r: Roller, id: number, ship: Ship, turn: num
       }
     }
   }
-  return { id, shipId: ship.id, kind: ship.kind, route: ship.route, home: ship.home, nation: ship.nation, reported, turn, reliability };
+  const bound = ship.kind === 'corsair' ? (ship.captives ? ship.home : (ship.raid ?? ship.home)) : undefined;
+  return { id, shipId: ship.id, kind: ship.kind, route: ship.route, home: ship.home, nation: ship.nation, reported, turn, reliability, ...(bound !== undefined ? { bound } : {}) };
 }
 
 /**
@@ -100,6 +103,10 @@ export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge,
   if (hunter) {
     goals = [huntGoal];
     after = () => [0];
+  } else if (rumor.kind === 'corsair') {
+    // Bound for the town it means to raid, then home: what the waterfront says it's after.
+    goals = [rumor.bound ?? rumor.home, rumor.home];
+    after = () => [1];
   } else if (rumor.kind === 'monster') {
     // Mostly where the current takes it, and drawn back to its own sea.
     goals = [rumor.home];
@@ -117,7 +124,7 @@ export function predict(sea: Sea, rumor: Rumor, now: number, know: SeaKnowledge,
     const next = goals.map((g) => tradingPorts(map, g).map((q) => index.get(q)).filter((j): j is number => j !== undefined));
     after = (i) => next[i];
   }
-  const firstPorts = new Set(hunter || rumor.route || rumor.kind === 'monster' ? goals : tradingPorts(map, rumor.reported));
+  const firstPorts = new Set(hunter || rumor.route || rumor.kind === 'monster' ? goals : rumor.kind === 'corsair' ? [goals[0]] : tradingPorts(map, rumor.reported));
   const startWeight = (i: number) => (firstPorts.has(goals[i]) ? 1 : 0);
   const startTotal = goals.reduce((t, _, i) => t + startWeight(i), 0);
 

@@ -34,6 +34,7 @@ export const TARGETS: Record<TargetKind, TargetDef> = {
   monster: { name: 'sea monster', hull: 18, cargo: 0, bounty: 25, cards: MONSTER_CARDS },
   canoes: { name: 'war canoes', hull: 10, cargo: 4, bounty: 0, cards: CANOE_CARDS },
   privateer: { name: 'privateer', hull: 12, cargo: 8, bounty: 6, cards: PRIVATEER_CARDS },
+  corsair: { name: 'corsair', hull: 12, cargo: 6, bounty: 6, cards: PRIVATEER_CARDS },
   hunter: { name: 'guard ship', hull: 14, cargo: 3, bounty: 10, cards: HUNTER_CARDS },
   'treasure-ship': { name: 'galleon', hull: 13, cargo: 30, bounty: 6, cards: TREASURE_SHIP_CARDS },
   'treasure-fleet': { name: 'treasure fleet', hull: 24, cargo: 60, bounty: 10, cards: TREASURE_FLEET_CARDS },
@@ -45,8 +46,15 @@ export const TARGETS: Record<TargetKind, TargetDef> = {
 /** Your ship, as it sails into a fight. */
 export const SHIP = { hull: 10, maxHull: 10 };
 
-export function encounterWith(kind: TargetKind, seed: number, ship: { hull: number; maxHull: number } = SHIP, shipCards: Card[] = buildDeck('ship', SHIP_CARDS)): EncounterState {
-  const t = TARGETS[kind];
+/** More than the usual: a veteran crew's hull, a laden hold. */
+export interface Extra {
+  hull?: number;
+  cargo?: number;
+}
+
+export function encounterWith(kind: TargetKind, seed: number, ship: { hull: number; maxHull: number } = SHIP, shipCards: Card[] = buildDeck('ship', SHIP_CARDS), extra: Extra = {}): EncounterState {
+  const base = TARGETS[kind];
+  const t = { ...base, hull: base.hull + (extra.hull ?? 0), cargo: base.cargo + (extra.cargo ?? 0) };
   return createEncounter({
     seed,
     shipCards: [...shipCards, ...buildDeck('ship', t.yours ?? [])],
