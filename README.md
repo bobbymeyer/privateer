@@ -36,8 +36,17 @@ and it's over.
 - **Build the deck.** Take a ship and her stores are offered: three cards
   off her, keep one or none. A yard will strike a card out for 6, down to
   10. Your deck is listed under your ship. Hands of note draw wages.
-- **Ship and crew** have a sheet of their own (`src/ui/ShipSheet.svelte`),
-opened from the sidebar: the ship drawn to her size, her hull and morale,
+- **Under the chart, three tabs.** *Location* is whatever is where you
+are: a port's bar, yard, ships for sale and raid, or at sea the water
+you're in — whose waters, a strait, a bank, a river mouth, a fort's guns,
+an island anchorage. Arriving in a port turns to it. *Politics* is who's
+at war, the strain on a peace, your standing with each nation, your name,
+and the flags. *Ship & crew* is the ship sheet. The sidebar keeps what you
+glance at while sailing: the ship's gauges, the course, your letter, what's
+in sight, rumors and news.
+
+**Ship and crew** have a sheet of their own (`src/ui/ShipSheet.svelte`),
+in its tab under the chart: the ship drawn to her size, her hull and morale,
 each hand of note with what they bring and what they cost, the refits,
 and the deck laid out as cards, grouped by where each came from — the
 ship, each refit, each hand, the prizes — with struck cards shown struck,
