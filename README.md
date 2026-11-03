@@ -371,6 +371,22 @@ fighting:
   out, and attacks whoever it meets. It's nobody's, so fighting it costs no
   standing, and its bounty pays (ambergris, and a story for the bar).
 
+**Letters of marque: a run in three acts** (`src/world/letters.ts`).
+*Work in progress on this branch.* A run is three letters, each a nation,
+a region (dashed on the chart), a task, a deadline and a reward: two
+prizes near home (the Narrow Seas, the Barbary coast), then a town to sack
+farther out (the Spanish Main, Brazil, the Indies), then a named Spanish
+plate ship. A letter makes its nation fair game while it lasts. Finishing
+one pays it and brings the next, with the Admiralty's word of where to
+look; the plate ship gets fresh word every 30 days. A missed deadline gets
+more time once, at −2 with England; a second, and the letter is revoked
+and you're a pirate (a pardon brings a new one). All three and home to
+London wins; gold is the score. Runs from before letters win the old way.
+
+Where it stands: the captain bot gets through two letters in about half of
+30 runs, and has not yet taken a plate ship, so the third act wins none.
+It needs either a better hunter in the bot or a set piece easier to find.
+
 **Events that ask you something** (`src/world/dilemmas.ts`). A storm used
 to take its toll and log it; the crew soured in silence. Now the
 events that matter stop the world and ask, and every choice says what it

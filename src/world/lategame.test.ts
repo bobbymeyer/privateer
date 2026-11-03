@@ -71,7 +71,7 @@ test('homeward bound with the score, and every enemy privateer comes, from anywh
   assert.equal(privateerGoal(map, { home: dunkirk, nation: 'france' }, far, true, 1, true), far, 'homeward: she comes');
   assert.equal(privateerGoal(map, { home: dunkirk, nation: 'france' }, far, false, 1, true), dunkirk, 'not at war: she does not');
 
-  const rich = { ...w, gold: GOAL, player: far, ships: [], trail: [] };
+  const rich = { ...w, gold: GOAL, player: far, ships: [], trail: [], letter: null, acts: 3, commission: 'done' as const };
   assert.ok(homeward(rich));
   assert.ok(!homeward({ ...rich, pirate: true }), "a pirate isn't bound for London");
   const next = advance(sea, rich, far);
@@ -106,7 +106,7 @@ test('a corsair raids a town, the town is stripped, and the captives go home wit
   let raided: string | null = null;
   let home = false;
   for (let day = 0; day < 400 && !home; day++) {
-    w = advance(sea, { ...w, encounter: null, hail: null }, w.player);
+    w = advance(sea, { ...w, encounter: null, hail: null, dilemma: null }, w.player);
     const line = w.log.find((l) => l.text.includes('corsairs raided'));
     if (line && !raided) {
       raided = line.text;

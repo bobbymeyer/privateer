@@ -62,7 +62,7 @@ export function encounterWith(kind: TargetKind, seed: number, ship: { hull: numb
     shipCards: [...shipCards, ...buildDeck('ship', t.yours ?? [])],
     targetCards: buildDeck('target', t.cards),
     ship: { hull: ship.hull, maxHull: ship.maxHull, brace: 0 },
-    target: { name: t.name, hull: t.hull, maxHull: t.hull, cargo: t.cargo, bounty: t.bounty, takenWhole: t.takenWhole },
+    target: { name: t.name, hull: t.hull, maxHull: t.hull, cargo: t.cargo, bounty: t.bounty, ...(t.takenWhole ? { takenWhole: true } : {}) },
     reinforce: t.reinforce && extra.reliefSooner ? { ...t.reinforce, from: Math.max(2, t.reinforce.from - extra.reliefSooner) } : t.reinforce,
   });
 }

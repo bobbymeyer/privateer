@@ -76,6 +76,7 @@ test('a fight is settled into the world', () => {
   for (let seed = 1; seed < 12; seed++) {
     const { w, step, fleet } = setUp(seed);
     const alongside = advance(sea, w, step);
+    if (!alongside.hail) continue; // a storm that day, and no meeting
     const after = fightOut(attack(alongside));
     const r = after.reckoning!;
     assert.equal(r.shipId, fleet.id);
@@ -126,7 +127,8 @@ test('fire on an English ship and you are a pirate', () => {
 
 test('a pirate: English ports shut, no grudge fades, no bribe works, and London is the gallows — until a pardon', () => {
   const plymouth = createWorld(sea, 1).player;
-  let w: WorldState = { ...createWorld(sea, 1), ships: [], trail: [], pirate: true, standing: { england: -3 }, gold: GOAL + PARDON_COST + 50 };
+  // Letters all done, so London would be a win but for the noose.
+  let w: WorldState = { ...createWorld(sea, 1), ships: [], trail: [], pirate: true, standing: { england: -3 }, gold: GOAL + PARDON_COST + 50, letter: null, acts: 3, commission: 'done' };
   assert.equal(serves(sea, w), false);
   assert.throws(() => bribe(sea, w), /pardon/);
   // Two months in port: the crew will ask for their shares, and be refused, for this.

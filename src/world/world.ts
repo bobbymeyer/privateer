@@ -19,6 +19,7 @@ import { type Outfit, START_OUTFIT, maxHullOf } from '../outfit.ts';
 import { type Hail, type Meeting, REFIT_DAYS, type Reckoning, YOUR_NATION, landfall, meeting } from './meet.ts';
 import { MORALE_START, aDay } from './events.ts';
 import { type Dilemma, castaway } from './dilemmas.ts';
+import { type Letter, intelligence, issue, letterDay } from './letters.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -75,6 +76,16 @@ export interface WorldState {
   lastSpoils: number;
   /** A prize's stores, waiting on your choice of one card to keep, or none. While there is one, the world waits. */
   spoil: { kind: string; offers: string[] } | null;
+  /** The letter of marque in hand: this act's task. Null between acts' end and home, or once revoked. */
+  letter: Letter | null;
+  /** Letters done. */
+  acts: number;
+  /**
+   * active: sailing under a letter. done: all three done, bound home.
+   * revoked: no letter, and a pirate. legacy: a run from before letters,
+   * won the old way, with GOAL home to London.
+   */
+  commission: 'active' | 'done' | 'revoked' | 'legacy';
   /** Towns that turned out a raid short of a sack, on `since`: on their guard till `until`, shut to raiding till `shutUntil`, `level` steps on it, with `cargo` left in the treasury then. */
   guarded: Record<NodeId, { since: number; until: number; shutUntil: number; level: number; cargo: number }>;
   /** An event waiting on your choice: a storm, the crew's shares, a castaway. While there is one, the world waits. */
@@ -119,7 +130,7 @@ export const REACH_PER_RENOWN = 0.25;
 export const HULL_PER_RENOWN = 2;
 export const renown = (s: { fame: number }) => RENOWN.filter((f) => s.fame >= f).length;
 /** Bound for London with the score, and no pirate. */
-export const homeward = (s: WorldState) => s.gold >= GOAL && !s.pirate;
+export const homeward = (s: WorldState) => !s.pirate && (s.commission === 'done' || (s.commission === 'legacy' && s.gold >= GOAL));
 
 /** Days of each ship's wake that are remembered. */
 export const TRAIL = 12;
@@ -220,7 +231,7 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
   const r: Roller = { rng: (seed ^ 0x0ce4) >>> 0 };
   const islands = placeIslands(sea, r).map((node) => ({ node, found: false }));
   const wars = openingWars(r);
-  return {
+  const world: WorldState = {
     rng: r.rng,
     turn: 0,
     player,
@@ -258,7 +269,13 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     dilemma: null,
     promised: false,
     guarded: {},
+    letter: null,
+    acts: 0,
+    commission: 'active',
   };
+  const r1: Roller = { rng: world.rng };
+  const letter = issue(sea, world, 1, r1);
+  return intelligence(sea, { ...world, rng: r1.rng, letter }, letter);
 }
 
 /** You sail to `to` (a neighbour, or where you are), then everyone else moves. */
@@ -362,7 +379,8 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     next = { ...next, homewardNoised: true, log: [...next.log, { turn, text: `word is out that you're homeward bound with ${next.gold}: every enemy privateer is putting to sea for you`, stop: true }] };
   }
   // Home with a score — and no noose waiting.
-  if (sea.map.nodes[to].port?.name === HOME && gold >= GOAL && !s.pirate) {
+  next = letterDay(sea, next);
+  if (sea.map.nodes[to].port?.name === HOME && homeward(next)) {
     return { ...next, won: true, ending: 'home', log: [...log, { turn, text: `home to London with ${gold}: the run is won` }] };
   }
   if (to !== s.player) next = landfall(sea, next);
