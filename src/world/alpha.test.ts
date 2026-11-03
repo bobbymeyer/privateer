@@ -94,15 +94,18 @@ test('sighting an island pays, and it is an anchorage after', () => {
   assert.equal(anchored.hull, 3, 'mending a point a day');
 });
 
-test('home to London with a score is a win', () => {
+test('home to London with every letter done is a win, whatever the purse; a run from before letters wins the old way', () => {
   const w = quiet(createWorld(sea, 1));
   const london = at('London');
   const offLondon = map.adj[london][0];
-  const poor = advance(sea, { ...w, player: offLondon, gold: GOAL - 1 }, london);
-  assert.equal(poor.won, false);
-  const home = advance(sea, { ...w, player: offLondon, gold: GOAL }, london);
+  const rich = advance(sea, { ...w, player: offLondon, gold: GOAL * 3 }, london);
+  assert.equal(rich.won, false, 'gold is the score, not the win: the letters are');
+  const home = advance(sea, { ...w, player: offLondon, gold: 12, letter: null, acts: 3, commission: 'done' }, london);
   assert.equal(home.won, true);
   assert.throws(() => advance(sea, home, london), /won/);
+  const legacy = { ...w, player: offLondon, letter: null, commission: 'legacy' as const };
+  assert.equal(advance(sea, { ...legacy, gold: GOAL - 1 }, london).won, false);
+  assert.equal(advance(sea, { ...legacy, gold: GOAL }, london).won, true);
 });
 
 test('a course sails a day at a time to where you set it', () => {

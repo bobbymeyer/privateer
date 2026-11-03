@@ -12,14 +12,14 @@ const sea = createSea();
 test('a run saved and loaded is the same run, and plays on the same', () => {
   let w = createWorld(sea, 11);
   for (let i = 0; i < 20; i++) {
-    if (w.encounter || w.hail) break;
+    if (w.encounter || w.hail || w.dilemma || w.spoil) break;
     w = advance(sea, w, sea.map.adj[w.player][0]);
   }
   const back = decode(encode(11, w))!;
   assert.equal(back.seed, 11);
   assert.ok(back.world.chart instanceof Uint8Array);
   assert.deepEqual(back.world, w);
-  if (!w.encounter && !w.hail) {
+  if (!w.encounter && !w.hail && !w.dilemma && !w.spoil) {
     const to = sea.map.adj[w.player][0];
     assert.deepEqual(advance(sea, back.world, to), advance(sea, w, to));
   }

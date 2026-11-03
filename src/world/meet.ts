@@ -33,6 +33,7 @@ import { type Roller, roll } from './random.ts';
 import { serves } from './port.ts';
 import { PRIZE_CHEER, SACK_CHEER, spoils } from './events.ts';
 import { PROMISED_SHARE } from './dilemmas.ts';
+import { advanceLetter, counts, reprisal, revoke } from './letters.ts';
 import { makeRumor } from './rumors.ts';
 import { adjective, article, type Nation, nationName } from './ports.ts';
 import { type Sea, type ShipKind, wantedBy } from './ships.ts';
@@ -159,9 +160,10 @@ function reckon(s: WorldState, nation: Nation, theirs: number, crown: { enemy: n
   let pirate = s.pirate;
   if (nation === YOUR_NATION) {
     standing[nation] = Math.min(standing[nation]!, PIRACY_FLOOR);
-    if (!pirate) log.push({ turn: s.turn, text: `${what('English')}: you're a pirate now, and England will hang you if it can` });
+    if (!pirate) log.push({ turn: s.turn, text: `${what('English')}: you're a pirate now, and England will hang you if it can${s.letter ? ', and your letter is void' : ''}` });
     pirate = true;
-  } else if (isEnemy(s.wars, nation)) {
+    return revoke({ ...s, standing, pirate, log });
+  } else if (isEnemy(s.wars, nation) || reprisal(s, nation)) {
     if (crown.enemy && !s.pirate) standing[YOUR_NATION] = (standing[YOUR_NATION] ?? 0) + crown.enemy;
   } else if (nation !== 'local' && nation !== 'native') {
     if (crown.neutral) {
@@ -339,12 +341,16 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     }
     w = { ...w, rng: r2.rng, spoil: { kind: m.kind, offers: offers.slice(0, PRIZE_OFFERS) } };
   }
+  // A prize or a sack under your letter.
+  if (w.letter && counts(sea, w.letter, { shipId: m.shipId, port: m.port, nation: m.nation, at: s.player, taken })) w = advanceLetter(sea, w);
+
   // Shares promised to the crew come out of this prize.
   const owed = s.promised && f.payout > 0 && outcome !== 'sunk' ? Math.round(f.payout * PROMISED_SHARE) : 0;
   if (owed) w = { ...w, promised: false, log: [...w.log, { turn: s.turn, text: `the crew's promised shares paid out of the prize: ${owed}` }] };
   return {
     ...w,
-    gold: s.gold + f.payout - owed,
+    // From w, not s: a letter finished by this prize has paid its reward into it.
+    gold: w.gold + f.payout - owed,
     hull: f.ship.hull,
     sunk: outcome === 'sunk',
     encounter: null,

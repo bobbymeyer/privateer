@@ -11,7 +11,7 @@
 
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 /** From each version to the next. A run from before a feature simply goes without it. */
 const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<string, unknown>> = {
@@ -23,6 +23,8 @@ const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<stri
   3: (w) => ({ ...w, dilemma: null, promised: false }),
   // 5: towns on their guard after a raid.
   4: (w) => ({ ...w, guarded: {} }),
+  // 6: letters of marque. A run from before them is won the old way.
+  5: (w) => ({ ...w, letter: null, acts: 0, commission: w.pirate ? 'revoked' : 'legacy' }),
 };
 export const SAVE_KEY = 'privateer:run';
 

@@ -36,6 +36,14 @@ and it's over.
 - **Build the deck.** Take a ship and her stores are offered: three cards
   off her, keep one or none. A yard will strike a card out for 6, down to
   10. Your deck is listed under your ship. Hands of note draw wages.
+- **Ship and crew** have a sheet of their own (`src/ui/ShipSheet.svelte`),
+opened from the sidebar: the ship drawn to her size, her hull and morale,
+each hand of note with what they bring and what they cost, the refits,
+and the deck laid out as cards, grouped by where each came from — the
+ship, each refit, each hand, the prizes — with struck cards shown struck,
+and a strike button on each in a port with a yard. In port, every hire,
+refit and ship for sale says what it would add before you buy it. The
+sidebar's sections fold.
 - **Read a ship before you engage.** The lookout sees ships two days past
   the water you can read, and a hostile sail coming into view stops you.
   Alongside, or in the *in sight* list, you see her hull against yours and
@@ -370,6 +378,27 @@ fighting:
   where the current takes it, turns for home once it's more than 12 days
   out, and attacks whoever it meets. It's nobody's, so fighting it costs no
   standing, and its bounty pays (ambergris, and a story for the bar).
+
+**Letters of marque: a run in three acts** (`src/world/letters.ts`).
+*Work in progress on this branch.* A run is three letters, each a nation,
+a region (dashed on the chart), a task, a deadline and a reward: two
+prizes near home (the Narrow Seas, the Barbary coast), then a town to sack
+farther out (the Spanish Main, Brazil, the Indies), then a named Spanish
+plate ship. A letter makes its nation fair game while it lasts. Finishing
+one pays it and brings the next, with the Admiralty's word of where to
+look; the plate ship gets fresh word every 30 days. A missed deadline gets
+more time once, at −2 with England; a second, and the letter is revoked
+and you're a pirate (a pardon brings a new one). All three and home to
+London wins; gold is the score. Runs from before letters win the old way.
+
+The Admiralty's latest word of the plate ship stays on the chart till
+fresher word replaces it, so her cloud is there all act long, widening as
+the word ages.
+
+Where it stands: the captain bot, which now intercepts (it heads for where
+she's likeliest to be in k days that it can reach in k days), wins 2 of 30
+runs, on day 368 on average; 12 of 30 reach the third letter. It is sunk
+in 19 of 30: the letters take a small ship into enemy waters.
 
 **Events that ask you something** (`src/world/dilemmas.ts`). A storm used
 to take its toll and log it; the crew soured in silence. Now the

@@ -94,13 +94,14 @@ test('a sure rumor is exact; a bad one is off, but not by more than it may be', 
 });
 
 test('markers fade each turn and are dropped once faded', () => {
+  // The rumor bought here, not the letter's intelligence the run opens with.
   let w = hearRumor(sea, createWorld(sea, 3), 0, 0.9);
-  const rumor = w.rumors[0];
+  const rumor = w.rumors.at(-1)!;
   assert.equal(markerStrength(rumor, rumor.turn + 1), 0.9 * FADE);
   let turns = 0;
-  while (w.rumors.length) {
-    assert.ok(markerStrength(w.rumors[0], w.turn) >= FADED);
-    w = advance(sea, w, w.player);
+  while (w.rumors.some((r) => r.id === rumor.id)) {
+    assert.ok(markerStrength(rumor, w.turn) >= FADED);
+    w = advance(sea, { ...w, dilemma: null }, w.player);
     turns++;
   }
   assert.equal(turns, Math.ceil(Math.log(FADED / 0.9) / Math.log(FADE)));
@@ -109,11 +110,11 @@ test('markers fade each turn and are dropped once faded', () => {
 test('a prediction is a probability over the sea, starts at the report, and spreads', () => {
   let w = createWorld(sea, 4);
   const flota = w.ships.find((s) => s.routeName === 'flota')!;
-  for (let i = 0; i < 5; i++) w = advance(sea, w, w.player);
+  for (let i = 0; i < 5; i++) w = advance(sea, { ...w, dilemma: null }, w.player);
   w = hearRumor(sea, w, flota.id, 1);
-  const rumor = w.rumors[0];
+  const rumor = w.rumors.at(-1)!;
   assert.ok(Math.abs(predict(sea, rumor, w.turn, knowledge(w), w.player)[rumor.reported] - 1) < 1e-9);
-  for (let i = 0; i < 6; i++) w = advance(sea, w, w.player);
+  for (let i = 0; i < 6; i++) w = advance(sea, { ...w, dilemma: null }, w.player);
   const later = predict(sea, rumor, w.turn, KNOW_ALL, w.player);
   assert.ok(Math.abs(sum(later) - 1) < 1e-9);
   assert.ok(searchArea(later).length > 1);

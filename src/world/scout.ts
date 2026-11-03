@@ -15,6 +15,7 @@ import { hostile, CAPTIVES_CARGO } from './meet.ts';
 import type { NodeId } from './map.ts';
 import { type Sea, type Ship, pursues } from './ships.ts';
 import { HULL_PER_RENOWN, renown, type WorldState } from './world.ts';
+import { PLATE_CARGO, PLATE_HULL } from './letters.ts';
 
 /** Ships are seen this many steps beyond the water you can read. */
 export const LOOKOUT_BEYOND = 2;
@@ -59,7 +60,12 @@ export function read(kind: TargetKind, extra: Extra = {}): Reading {
 /** What she'd bring to a fight with you now: her renown-hardened hull, her captives. */
 export function extraFor(s: WorldState, ship: Ship): Extra {
   const warship = ['hunter', 'privateer', 'armada', 'corsair'].includes(ship.kind);
-  return { hull: warship ? HULL_PER_RENOWN * renown(s) : 0, cargo: ship.captives ? CAPTIVES_CARGO : 0 };
+  // The plate ship your letter names: stronger and richer than her sisters.
+  const plate = s.letter?.task.kind === 'take' && s.letter.task.shipId === ship.id;
+  return {
+    hull: (warship ? HULL_PER_RENOWN * renown(s) : 0) + (plate ? PLATE_HULL : 0),
+    cargo: (ship.captives ? CAPTIVES_CARGO : 0) + (plate ? PLATE_CARGO : 0),
+  };
 }
 
 export const readShip = (s: WorldState, ship: Ship) => read(ship.kind, extraFor(s, ship));
