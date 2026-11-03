@@ -14,14 +14,14 @@
  *   npm run voyage -- [--runs 20] [--days 730]
  */
 
-import { CREW, SHIP_CLASSES } from '../src/outfit.ts';
+import { CREW, SHIP_CLASSES, deckSize } from '../src/outfit.ts';
 import { threatened } from '../src/rules.ts';
 import { buyRound, ROUND_COST } from '../src/world/bar.ts';
 import { sailToward } from '../src/world/course.ts';
 import { type NodeId, portNamed, ports } from '../src/world/map.ts';
 import { attack, fight, letPass, raid, raidable, repair, REPAIR_COST } from '../src/world/meet.ts';
 import { isEnemy } from '../src/world/wars.ts';
-import { buyShip, PROVISION_COST, provision, provisions, recruit, serves } from '../src/world/port.ts';
+import { buyShip, leavePrize, PROVISION_COST, provision, provisions, recruit, serves, takePrize } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
 import { advance, createSea, createWorld, GOAL, HOME, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
@@ -121,6 +121,8 @@ function fightItOut(w: WorldState): WorldState {
     const f = w.encounter.fight;
     w = fight(sea, w, fightBot(threatened(f.ship, f.target))(f));
   }
+  // Her stores: the bot keeps the first offer while its deck is small, and leaves them after.
+  if (w.spoil) w = deckSize(w.outfit) < 20 ? takePrize(w, w.spoil.offers[0]) : leavePrize(w);
   const r = w.reckoning!;
   ends[r.outcome] = (ends[r.outcome] ?? 0) + 1;
   if (w.sunk) {

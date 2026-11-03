@@ -33,6 +33,13 @@ and it's over.
   corsairs are fair game; anyone else's ships, the Crown hears of; an
   English ship makes you a pirate.
 - **Raiding a port**: in port, you can raid it instead of trading.
+- **Build the deck.** Take a ship and her stores are offered: three cards
+  off her, keep one or none. A yard will strike a card out for 6, down to
+  10. Your deck is listed under your ship. Hands of note draw wages.
+- **Read a ship before you engage.** The lookout sees ships two days past
+  the water you can read, and a hostile sail coming into view stops you.
+  Alongside, or in the *in sight* list, you see her hull against yours and
+  how she fights: heavily gunned, fast, hard to shake off, a rich hold.
 - **Your name gets about.** The more your prizes pay, the farther the
   hunters and privateers come for you, and the better found. Make the score
   and word gets out: every enemy privateer puts to sea to stop you getting
@@ -360,6 +367,41 @@ fighting:
   where the current takes it, turns for home once it's more than 12 days
   out, and attacks whoever it meets. It's nobody's, so fighting it costs no
   standing, and its bounty pays (ambergris, and a story for the bar).
+
+**Building the deck** (`src/outfit.ts`, `src/world/port.ts`). The deck
+was all bought: a bigger ship, a gunner, and every run converged on the
+same cards. Now most of it is chosen.
+
+- **Prize cards.** Take a ship, sack a town, or kill a monster, and three
+  cards from that kind's pool in `PRIZE_CARDS` are offered: keep one, for
+  good, or leave them. The world waits on the choice. They run along three
+  ways to fight — the guns (hit and wounds: *her long guns*, *a Spanish
+  great gun*), the boarders (plunder and hold: *her grapnels*, *boarding
+  pikes*), the runner (flee and chase: *her pilot*, *galley sweeps*) — and
+  the strong ones cost you: the great gun recoils, the pikes cost blood.
+  Prize cards come with you to a new ship.
+- **Striking cards.** A yard that deals with you strikes a copy of any card
+  for 6, down to a deck of 10. The deck is listed under your ship, with the
+  strike buttons when you're in such a port.
+- **Wages.** Every 60 days each hand of note is paid, 1 or 2 gold, from the
+  purse, which is also your score. Short of it, morale falls 2, and the ship
+  stops to tell you.
+
+**Seeing her first** (`src/world/scout.ts`).
+
+- **A longer lookout.** Ships are seen two steps past the water you can
+  read, and a hostile sail newly in sight stops the ship, with how far off
+  she is and whether she's bearing down — time to run, or turn.
+- **A read of her**, off her deck: her hull with any renown bonus, against
+  yours; how heavily she's gunned (her hurt, and what her wounds would
+  cost, per card); whether she'll run, is hard to shake off, mends quickly,
+  or has help coming; and how rich her hold is, laden corsairs included. It
+  shows on the sheet when she comes alongside, and for every ship in the
+  *in sight* list.
+- What the bot makes of it: 20% won over 30 runs, against 23% before. It
+  takes the first card offered, and it dies later than it did (on day 214
+  on average, against 74). Letting it sheer off at the longer lookout made
+  it worse (13%): it turned away from too much, and ran out of time.
 
 **The late game** (`src/world/world.ts`, `src/world/meet.ts`):
 

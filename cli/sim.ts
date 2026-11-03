@@ -15,7 +15,7 @@ import { type Action, type EncounterState, type Outcome, act, legalActions } fro
 import { lookahead } from './bots.ts';
 import { TARGETS, encounterWith } from '../src/setup.ts';
 import type { TargetKind } from '../src/setup.ts';
-import { SHIP_CLASSES, deckOf, maxHullOf } from '../src/outfit.ts';
+import { SHIP_CLASSES, START_OUTFIT, deckOf, maxHullOf } from '../src/outfit.ts';
 
 type Bot = { name: string; choose: (s: EncounterState) => Action };
 
@@ -40,7 +40,7 @@ const target = (targetFlag >= 0 ? process.argv[targetFlag + 1] : 'merchant') as 
 if (!TARGETS[target]) throw new Error(`no target ${target}; try ${Object.keys(TARGETS).join(', ')}`);
 // --ship sails a ship class with its own deck and hull; --hull overrides the hull alone.
 const shipFlag = process.argv.indexOf('--ship');
-const outfit = { ship: shipFlag >= 0 ? process.argv[shipFlag + 1] : 'pinnace', upgrades: [], crew: [] };
+const outfit = { ...START_OUTFIT, ship: shipFlag >= 0 ? process.argv[shipFlag + 1] : 'pinnace' };
 if (!SHIP_CLASSES[outfit.ship]) throw new Error(`no ship ${outfit.ship}; try ${Object.keys(SHIP_CLASSES).join(', ')}`);
 const deck = deckOf(outfit);
 const hullFlag = process.argv.indexOf('--hull');

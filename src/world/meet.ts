@@ -25,7 +25,7 @@
  */
 
 import { act, type Action, type EncounterState, type Outcome } from '../rules.ts';
-import { deckOf } from '../outfit.ts';
+import { PRIZE_CARDS, deckOf } from '../outfit.ts';
 import { encounterWith, type TargetKind } from '../setup.ts';
 import { NOTABLE, sighting } from './bar.ts';
 import type { NodeId } from './map.ts';
@@ -36,10 +36,9 @@ import { makeRumor } from './rumors.ts';
 import { adjective, article, type Nation, nationName } from './ports.ts';
 import { type Sea, type ShipKind, wantedBy } from './ships.ts';
 import { CASUS_BELLI, YOUR_NATION, declare, isEnemy } from './wars.ts';
-import { HULL_PER_RENOWN, renown, type WorldState } from './world.ts';
+import { extraFor } from './scout.ts';
+import { renown, type WorldState } from './world.ts';
 
-/** Warships that come better found against a captain with a name. */
-const WARSHIPS: ShipKind[] = ['hunter', 'privateer', 'armada', 'corsair'];
 /** What a laden corsair carries over the usual: captives, and what was taken with them. */
 export const CAPTIVES_CARGO = 12;
 
@@ -55,6 +54,8 @@ function fameFor(s: WorldState, payout: number): WorldState {
 
 export { YOUR_NATION } from './wars.ts';
 
+/** How many of a prize's cards you're offered to choose from. */
+export const PRIZE_OFFERS = 3;
 /** After parting, a ship won't engage you again for this many days. */
 export const PARTED_DAYS = 5;
 /** A ship sunk or taken is laid up at home this long. */
@@ -112,7 +113,7 @@ export const hostile = (s: WorldState, ship: { kind: ShipKind; nation: Nation })
 
 /** After a move: a ship here to fight, or to hail? Called by `advance`. */
 export function meeting(sea: Sea, s: WorldState): WorldState {
-  if (s.encounter || s.hail || s.sunk || sea.map.nodes[s.player].port || s.islands.some((i) => i.found && i.node === s.player)) return s;
+  if (s.encounter || s.hail || s.spoil || s.sunk || sea.map.nodes[s.player].port || s.islands.some((i) => i.found && i.node === s.player)) return s;
   const here = s.ships.filter((x) => x.node === s.player && x.laidUp <= s.turn && (s.parted[x.id] ?? -1) < s.turn);
   if (!here.length) return s;
   // The one that matters most, if more than one; one that means you harm first.
@@ -140,11 +141,9 @@ export function landfall(sea: Sea, s: WorldState): WorldState {
 function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean): WorldState {
   const r: Roller = { rng: s.rng };
   const seed = Math.floor(roll(r) * 2 ** 31);
-  // A warship that comes for a captain with a name comes better found; a corsair home-bound is laden.
+  // What you saw of her is what you fight: a warship better found against a captain with a name, a corsair laden.
   const ship = who.shipId >= 0 ? s.ships.find((x) => x.id === who.shipId) : undefined;
-  const veteran = ship && WARSHIPS.includes(ship.kind) ? HULL_PER_RENOWN * renown(s) : 0;
-  const laden = ship?.captives ? CAPTIVES_CARGO : 0;
-  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit), { hull: veteran, cargo: laden });
+  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit), ship ? extraFor(s, ship) : {});
   return { ...s, rng: r.rng, hail: null, encounter: { ...who, fight, forced } };
 }
 
@@ -205,6 +204,7 @@ export function raid(sea: Sea, s: WorldState): WorldState {
   const port = sea.map.nodes[s.player].port;
   if (!port) throw new Error('there is no port here to raid');
   if (s.encounter || s.hail) throw new Error('there is a fight to finish first');
+  if (s.spoil) throw new Error("the prize's stores are waiting: take a card, or leave them");
   if (!raidable(sea, s)) throw new Error(`${port.name} was sacked lately: there's nothing left`);
   let next = reckon(s, port.nation, 3, { enemy: 0, neutral: 2 }, (flag) => `you raided ${port.name}, ${flag}`, 3);
   next = { ...next, alarm: { ...next.alarm, [port.nation]: s.turn + ALARM_DAYS } };
@@ -277,6 +277,17 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
 
   if (f.payout > 0 && outcome !== 'sunk') w = fameFor(w, f.payout);
   if (f.payout > 0 && outcome !== 'sunk') w = spoils(w, m.port !== null && taken && m.kind !== 'canoes' ? SACK_CHEER : PRIZE_CHEER);
+  // Her stores: three cards to choose from, if she was taken and had anything worth having.
+  const pool = PRIZE_CARDS[m.kind];
+  if (taken && pool?.length) {
+    const r2: Roller = { rng: w.rng };
+    const offers = [...pool];
+    for (let i = offers.length - 1; i > 0; i--) {
+      const j = Math.floor(roll(r2) * (i + 1));
+      [offers[i], offers[j]] = [offers[j], offers[i]];
+    }
+    w = { ...w, rng: r2.rng, spoil: { kind: m.kind, offers: offers.slice(0, PRIZE_OFFERS) } };
+  }
   return {
     ...w,
     gold: s.gold + f.payout,

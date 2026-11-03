@@ -14,7 +14,7 @@
  * cargo you throw over to stay afloat.
  */
 
-import { CREW } from '../outfit.ts';
+import { CREW, WAGE_DAYS, wagesOf } from '../outfit.ts';
 import { type Roller, pick, roll } from './random.ts';
 import { seasonOf } from './sea.ts';
 import type { Sea } from './ships.ts';
@@ -38,6 +38,8 @@ export const OMEN_CHEER = 2;
 export const STORM_CHANCE = 1 / 120;
 /** What a storm can make you throw over: a share of the purse, and no more than this. */
 export const JETTISON_MAX = 30;
+/** Wages unpaid cost this much morale. */
+export const UNPAID = 2;
 /** What a prize does for the crew: more for a sacked town. */
 export const PRIZE_CHEER = 3;
 export const SACK_CHEER = 4;
@@ -98,6 +100,16 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
     } else if (roll(r) < OMEN_CHANCE) {
       w = cheer(w, OMEN_CHEER);
       log(`a good omen: ${pick(r, OMENS)}`);
+    }
+  }
+
+  // Payday for the hands of note. Unpaid, they sour fast.
+  const wages = wagesOf(w.outfit);
+  if (wages > 0 && w.turn > 0 && w.turn % WAGE_DAYS === 0) {
+    if (w.gold >= wages) w = { ...w, gold: w.gold - wages };
+    else {
+      w = { ...w, morale: w.morale - UNPAID };
+      log(`no money for the wages: the hands of note are owed ${wages}, and the crew know it`, true);
     }
   }
 

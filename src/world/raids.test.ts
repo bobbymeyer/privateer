@@ -6,7 +6,7 @@ import { act, legalActions } from '../rules.ts';
 import { encounterWith, RELIEF_FROM } from '../setup.ts';
 import { portNamed } from './map.ts';
 import { ALARM_DAYS, SACK_DAYS, attack, fight, meeting, raid, raidable } from './meet.ts';
-import { isHaven, retire, serves } from './port.ts';
+import { isHaven, leavePrize, retire, serves } from './port.ts';
 import { HUNT_RANGE, hunterGoal } from './ships.ts';
 import { CASUS_BELLI, ENGLAND_OPENS_AGAINST, STANDING_WARS, atWar, declare, drift, enemiesOf, isEnemy, makePeace, openingWars } from './wars.ts';
 import { GOAL, advance, createSea, createWorld, type WorldState } from './world.ts';
@@ -120,7 +120,8 @@ test('a sack: the treasury is yours, the town has nothing for months, and Spain 
     assert.equal(after.standing.england, 2, 'the Crown approves');
     assert.equal(serves(sea, after), false, 'nothing for anybody');
     assert.equal(raidable(sea, after), false);
-    assert.throws(() => raid(sea, after), /sacked lately/);
+    assert.ok(after.spoil, 'the town’s stores, to choose from');
+    assert.throws(() => raid(sea, leavePrize(after)), /sacked lately/);
     return;
   }
   assert.fail('no sack in 40 tries');

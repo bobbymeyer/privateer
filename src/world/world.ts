@@ -72,6 +72,8 @@ export interface WorldState {
   morale: number;
   /** The day the last prize was taken: the crew count from it. */
   lastSpoils: number;
+  /** A prize's stores, waiting on your choice of one card to keep, or none. While there is one, the world waits. */
+  spoil: { kind: string; offers: string[] } | null;
   /** Everything your prizes have paid, all told: how well your name is known. See `renown`. */
   fame: number;
   /** Word is out that you're homeward bound with a fortune. Said once a run. */
@@ -245,6 +247,7 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     lastSpoils: 0,
     fame: 0,
     homewardNoised: false,
+    spoil: null,
   };
 }
 
@@ -254,6 +257,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   if (s.won) throw new Error('you are home and the run is won');
   if (s.encounter) throw new Error('there is a fight to finish first');
   if (s.hail) throw new Error('a ship is alongside: attack, or let her pass');
+  if (s.spoil) throw new Error("the prize's stores are waiting: take a card, or leave them");
   if (to !== s.player && !sea.map.adj[s.player].includes(to)) {
     throw new Error(`node ${to} is not next to ${s.player}`);
   }
