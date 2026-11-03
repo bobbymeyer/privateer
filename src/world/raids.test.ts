@@ -131,11 +131,12 @@ test('a town cannot run, a raiding party can, and if the raid goes on the garris
   for (const deck of [TOWN_CARDS, FORTRESS_CARDS]) assert.ok(!deck.some((c) => c.effects.some((e) => e.kind === 'flee')));
   let f = encounterWith('town', 1);
   assert.equal([...f.deck, ...f.hand].filter((c) => c.name === 'back to the boats').length, 2);
-  // Keep blanks: play the first legal keep until the relief is due.
+  assert.ok(f.target.fixed, 'a town goes nowhere');
+  // Play the first legal keep until the relief is due.
   while (!f.outcome && f.round < RELIEF_FROM) f = act(f, legalActions(f)[0]);
   if (f.outcome) return; // over before the relief was due: nothing to see
-  assert.ok([...f.hand, ...f.deck].some((c) => c.id.startsWith('reinforce#')), 'relief came');
-  assert.ok(f.hand.some((c) => c.id.startsWith('reinforce#')), 'on top, so in this hand');
+  assert.ok([...(f.intent ? [f.intent] : []), ...f.herDeck].some((c) => c.id.startsWith('reinforce#')), 'relief came');
+  assert.ok(f.intent?.id.startsWith('reinforce#'), 'on top of her deck, so her next card');
 });
 
 test('an alarm sends guard ships twice as far', () => {
@@ -201,7 +202,7 @@ function raidAndRun(w: WorldState): WorldState {
     const f = s.encounter.fight;
     const score = (a: ReturnType<typeof legalActions>[number]) => {
       const n = act(f, a);
-      return (n.outcome === 'fled' ? 1e6 : 0) + n.plunder * 10 + n.ship.way - (n.outcome === 'destroyed' ? 1e7 : 0);
+      return (n.outcome === 'fled' ? 1e6 : 0) + n.plunder * 10 + n.range - (n.outcome === 'destroyed' ? 1e7 : 0);
     };
     s = fight(sea, s, legalActions(f).reduce((a, b) => (score(b) > score(a) ? b : a)));
   }

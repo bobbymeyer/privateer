@@ -9,7 +9,7 @@
  * run, or to turn and meet her.
  */
 
-import { type CardDef, WOUNDS } from '../cards.ts';
+import { type CardDef, REACHES, type Reach, WOUNDS } from '../cards.ts';
 import { type Extra, TARGETS, type TargetKind } from '../setup.ts';
 import { hostile, CAPTIVES_CARGO } from './meet.ts';
 import type { NodeId } from './map.ts';
@@ -38,8 +38,12 @@ export function read(kind: TargetKind, extra: Extra = {}): Reading {
   const cards = t.cards;
   const total = copies(cards, () => true);
   // Weight of shot a card throws at you: its hurt, and what its wounds will cost after.
-  const shot = (c: CardDef) => amount(c, 'hurt') + c.effects.reduce((t, e) => t + (e.kind === 'wound' ? WOUNDS[e.what].hull : 0), 0);
-  const guns = cards.reduce((sum, c) => sum + shot(c) * c.copies, 0) / total;
+  // Weight of shot a card throws at you at a range: its hurt there, and what its wounds will cost after.
+  const shotAt = (c: CardDef, r: Reach) =>
+    c.effects.reduce((t, e) => t + (e.at && !e.at.includes(r) ? 0 : e.kind === 'hurt' ? e.amount : e.kind === 'wound' ? WOUNDS[e.what].hull : 0), 0);
+  const avgAt = (r: Reach) => cards.reduce((sum, c) => sum + shotAt(c, r) * c.copies, 0) / total;
+  // Her guns at their best range: one range applies at a time, so the best of them, not the sum.
+  const guns = Math.max(...REACHES.map(avgAt));
   const running = copies(cards, (c) => c.effects.some((e) => e.kind === 'flee')) / total;
   const grip = copies(cards, (c) => c.effects.some((e) => e.kind === 'hold' || e.kind === 'chase'));
   const mends = copies(cards, (c) => c.effects.some((e) => e.kind === 'mend'));
@@ -53,6 +57,8 @@ export function read(kind: TargetKind, extra: Extra = {}): Reading {
   if (wounds >= 3) traits.push('her shot leaves wounds');
   if (mends >= 2) traits.push('she mends quickly');
   if (t.reinforce) traits.push('help comes if it drags on');
+  if (avgAt('far') >= 1.1) traits.push('her guns reach you far off');
+  if (Math.max(...cards.map((c) => shotAt(c, 'grappled'))) >= 4) traits.push('deadly alongside');
   traits.push(cargo >= 20 ? 'a rich hold' : cargo >= 10 ? 'a fair hold' : cargo > 0 ? 'a light hold' : 'nothing to take');
   return { hull: t.hull + (extra.hull ?? 0), cargo, bounty: t.bounty, traits };
 }

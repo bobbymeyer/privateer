@@ -1,6 +1,7 @@
 <script lang="ts">
   import { describeEvent, GLOSSARY, OUTCOME_TEXT, RAID_OUTCOME_TEXT } from '../describe.ts';
-  import { ESCAPE, threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
+  import { threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
+  import { type Card, REACHES } from '../cards.ts';
   import type { Reckoning } from '../world/meet.ts';
   import { adjective, type Nation } from '../world/ports.ts';
   import Flag from './Flag.svelte';
@@ -41,10 +42,13 @@
     fly(node, still ? { duration: 0 } : wound ? { y: -36, duration: 320, delay: 120 + i * 110 } : { x: -48, duration: 260, delay: i * 110 });
   /** The round's lines, one at a time, as they happened. */
   const told = (node: Element, { i }: { i: number }) => fade(node, still ? { duration: 0 } : { duration: 200, delay: i * 90 });
-  const waiting = (side: 'ship' | 'target') => fight.deck.filter((c) => c.damage && c.side === side).length;
+  const waiting = (side: 'ship' | 'target') => (side === 'ship' ? fight.deck : fight.herDeck).filter((c) => c.damage && c.side === side).length;
+  /** Whether any of a card's effects works at the range as it stands. */
+  const inRange = (card: Card) => !card.effects.length || card.effects.some((e) => !e.at || e.at.includes(REACHES[fight.range]));
+  const RANGE_WORDS = ['grappled: alongside and made fast, where boarders go across', 'close: broadside range', 'far: long guns only, and one more stretch of open water and a ship is away'];
   const bottom = $derived(fight.deck.at(-1) ?? null);
   const bottomCopy = $derived(bottom && !bottom.damage && !bottom.id.startsWith('reinforce') ? bottom.id.split('#')[1] : null);
-  const spent = (side: 'ship' | 'target') => fight.discard.filter((c) => c.side === side && !c.damage).length;
+  const spent = (side: 'ship' | 'target') => (side === 'ship' ? fight.discard : fight.herDiscard).filter((c) => c.side === side && !c.damage).length;
 
   function toggle(i: number) {
     if (fight.outcome) return;
@@ -91,7 +95,6 @@
       <p>plunder {fight.plunder}{#if fight.ship.brace} · brace {fight.ship.brace}{/if}</p>
       {#if !fight.outcome}
         <p class="status">{waiting('ship')} {waiting('ship') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('ship')} of your cards spent</p>
-        <Gauge label="way" value={fight.ship.way} max={ESCAPE} />
         <p class="status">{@render state(threatened(fight.ship, fight.target))}</p>
       {/if}
     </div>
@@ -101,11 +104,20 @@
       <p>cargo {fight.target.cargo} · bounty {fight.target.bounty}</p>
       {#if !fight.outcome}
         <p class="status">{waiting('target')} {waiting('target') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('target')} of theirs spent</p>
-        <Gauge label="way" value={fight.target.way} max={ESCAPE} color="var(--theirs)" />
         <p class="status">{@render state(threatened(fight.target, fight.ship))}</p>
       {/if}
     </div>
   </div>
+
+  <!-- The range: where the ships lie, and so what will work. -->
+  <div class="range" aria-label="the range: {REACHES[fight.range]}">
+    {#each REACHES as r, i}
+      <span class="stop" class:here={fight.range === i}>{r}</span>
+      <span class="gap" aria-hidden="true"></span>
+    {/each}
+    <span class="stop away">away</span>
+  </div>
+  <p class="status">{RANGE_WORDS[fight.range]}{fight.target.fixed ? ' · a town goes nowhere: close is the boats offshore, grappled is the party ashore' : ''}</p>
 
   {#if fight.outcome}
     <div class="outcome">
@@ -116,13 +128,24 @@
       <button onclick={oncontinue}>{fight.outcome === 'sunk' ? 'the end' : 'back to sea'}</button>
     </div>
   {:else}
-    <p class="prompt">keep two. they resolve in the order you pick them, and then they're spent; the third goes to the bottom. spent cards come back only when a card recalls them. three way and a ship is away; chase and hold take it off her.</p>
-    <div class="hand">
-      {#each fight.hand as card, i (card.id)}
-        <div class="slot" in:deal={{ i, wound: !!card.damage }}>
-        <CardView {card} order={picks.includes(i) ? picks.indexOf(i) + 1 : null} disabled={picks.length === 2 && !picks.includes(i)} onpick={() => toggle(i)} />
+    <p class="prompt">her next card is face up. keep two of yours: they play first, in the order you pick them, then hers. the third goes under your deck. a card does only what works at the range as it stands, so close or open it first.</p>
+    <div class="table">
+      <div class="hand">
+        {#each fight.hand as card, i (card.id)}
+          <div class="slot" in:deal={{ i, wound: !!card.damage }}>
+            <CardView {card} order={picks.includes(i) ? picks.indexOf(i) + 1 : null} disabled={picks.length === 2 && !picks.includes(i)} note={inRange(card) ? '' : 'out of range now'} onpick={() => toggle(i)} />
+          </div>
+        {/each}
+      </div>
+      {#if fight.intent}
+        <div class="intent">
+          {#key fight.intent.id}
+            <div class="slot" in:deal={{ i: 3, wound: !!fight.intent.damage }}>
+              <CardView card={fight.intent} order={null} disabled note="her next card" onpick={() => {}} />
+            </div>
+          {/key}
         </div>
-      {/each}
+      {/if}
     </div>
     <button onclick={resolve} disabled={picks.length < 2}>resolve</button>
     <p class="status">
@@ -162,7 +185,14 @@
   .ships { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
   .ship { min-width: 0; }
   .theirs { color: var(--theirs); }
+  .table { display: grid; grid-template-columns: 3fr 1fr; gap: 1.25rem; align-items: start; }
+  .intent { border-left: 1px dashed var(--rule); padding-left: 1.25rem; }
   .hand { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+  .range { display: flex; align-items: center; gap: 0; }
+  .range .stop { padding: 0.2rem 0.6rem; border: 1.5px solid var(--rule); color: var(--faint); transition: background 0.25s, color 0.25s; }
+  .range .stop.here { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .range .stop.away { border-style: dashed; }
+  .range .gap { flex: 0 0 1.25rem; height: 1.5px; background: var(--rule); }
   .slot { display: grid; }
   .outcome h3 { font-size: 1.4rem; letter-spacing: -0.025em; }
   .outcome button { margin-top: 0.75rem; }
@@ -176,6 +206,10 @@
   .glossary dt { color: var(--ink); }
   .glossary dd { margin: 0; }
   .keys { font-size: 0.8rem; border-top: 1px dashed var(--rule); padding-top: 0.75rem; }
+  @media (max-width: 40rem) {
+    .table { grid-template-columns: 1fr; }
+    .intent { border-left: none; padding-left: 0; border-top: 1px dashed var(--rule); padding-top: 0.75rem; }
+  }
   @media (max-width: 34rem) {
     .ships, .hand { grid-template-columns: 1fr; }
   }
