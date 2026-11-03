@@ -111,7 +111,9 @@
   h4 { margin: 0.8rem 0 0.4rem; font-size: 0.9rem; font-weight: 400; color: var(--faint); }
   p { margin: 0.3rem 0; }
   .plain { list-style: none; margin: 0; padding: 0; }
-  .rows li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.75rem; margin-top: 0.35rem; }
+  .rows { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.6rem 0.75rem; margin-top: 0.4rem; }
+  .rows li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; flex: 0 1 15rem; }
+  .rows .faint { font-size: 0.85rem; }
   .rows button { padding: 0.1rem 0.5rem; font-size: 0.85rem; }
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.5rem; }
   .card { display: flex; flex-direction: column; gap: 0.25rem; min-height: 5.2rem; padding: 0.5rem 0.6rem; border: 1.5px solid var(--ink); }
