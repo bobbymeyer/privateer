@@ -38,7 +38,7 @@ export function plotCourse(sea: Sea, s: WorldState, dest: NodeId): NodeId[] {
 }
 
 /** Why a day's sailing stopped short of the destination. `news`: something in the log worth heaving to for. */
-export type Halt = 'arrived' | 'encounter' | 'hail' | 'sunk' | 'won' | 'sighted' | 'stuck' | 'news' | 'sail';
+export type Halt = 'arrived' | 'encounter' | 'hail' | 'sunk' | 'won' | 'sighted' | 'stuck' | 'news' | 'sail' | 'choice';
 
 /** One day toward `dest`; says why to stop, if you should. */
 export function sailToward(sea: Sea, s: WorldState, dest: NodeId): { world: WorldState; halt: Halt | null } {
@@ -48,6 +48,7 @@ export function sailToward(sea: Sea, s: WorldState, dest: NodeId): { world: Worl
   if (world.won) return { world, halt: 'won' };
   if (world.encounter) return { world, halt: 'encounter' };
   if (world.hail) return { world, halt: 'hail' };
+  if (world.dilemma) return { world, halt: 'choice' };
   if (world.islands.filter((i) => i.found).length > s.islands.filter((i) => i.found).length) return { world, halt: 'sighted' };
   if (world.player !== dest && world.log.slice(s.log.length).some((l) => l.stop)) return { world, halt: 'news' };
   // A hostile sail newly in sight: heave to while there's time to choose.

@@ -32,6 +32,7 @@ import type { NodeId } from './map.ts';
 import { type Roller, roll } from './random.ts';
 import { serves } from './port.ts';
 import { PRIZE_CHEER, SACK_CHEER, spoils } from './events.ts';
+import { PROMISED_SHARE } from './dilemmas.ts';
 import { makeRumor } from './rumors.ts';
 import { adjective, article, type Nation, nationName } from './ports.ts';
 import { type Sea, type ShipKind, wantedBy } from './ships.ts';
@@ -113,7 +114,7 @@ export const hostile = (s: WorldState, ship: { kind: ShipKind; nation: Nation })
 
 /** After a move: a ship here to fight, or to hail? Called by `advance`. */
 export function meeting(sea: Sea, s: WorldState): WorldState {
-  if (s.encounter || s.hail || s.spoil || s.sunk || sea.map.nodes[s.player].port || s.islands.some((i) => i.found && i.node === s.player)) return s;
+  if (s.encounter || s.hail || s.spoil || s.dilemma || s.sunk || sea.map.nodes[s.player].port || s.islands.some((i) => i.found && i.node === s.player)) return s;
   const here = s.ships.filter((x) => x.node === s.player && x.laidUp <= s.turn && (s.parted[x.id] ?? -1) < s.turn);
   if (!here.length) return s;
   // The one that matters most, if more than one; one that means you harm first.
@@ -288,9 +289,12 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     }
     w = { ...w, rng: r2.rng, spoil: { kind: m.kind, offers: offers.slice(0, PRIZE_OFFERS) } };
   }
+  // Shares promised to the crew come out of this prize.
+  const owed = s.promised && f.payout > 0 && outcome !== 'sunk' ? Math.round(f.payout * PROMISED_SHARE) : 0;
+  if (owed) w = { ...w, promised: false, log: [...w.log, { turn: s.turn, text: `the crew's promised shares paid out of the prize: ${owed}` }] };
   return {
     ...w,
-    gold: s.gold + f.payout,
+    gold: s.gold + f.payout - owed,
     hull: f.ship.hull,
     sunk: outcome === 'sunk',
     encounter: null,

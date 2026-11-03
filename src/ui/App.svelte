@@ -12,6 +12,7 @@
   import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, dismiss, isHaven, leavePrize, PARDON_COST, strikable, strikeCard, takePrize, PROVISION_CHEER, PROVISION_COST, PROVISION_HULL, provision, provisions, recruit, retire, serves } from '../world/port.ts';
   import { IDLE_DAYS, MORALE_MAX } from '../world/events.ts';
   import { inSight, lookout, readShip } from '../world/scout.ts';
+  import { choices, choose, describe as describeDilemma } from '../world/dilemmas.ts';
   import CardView from './CardView.svelte';
   import { explainCard } from '../describe.ts';
   import { adjective, article, nationName, sailName } from '../world/ports.ts';
@@ -112,6 +113,7 @@
       arrived: 'arrived',
       encounter: 'attacked!',
       hail: 'a sail alongside',
+      choice: '',
       sighted: 'land ho — uncharted',
       stuck: 'no way there',
       won: 'home',
@@ -507,6 +509,23 @@
           <p class="faint">your deck: {deckSize(world.outfit)} cards</p>
         </div>
       </div>
+    {:else if world.dilemma}
+      {@const d = world.dilemma}
+      {@const told = describeDilemma(d)}
+      <div class="overlay">
+        <div class="sheet">
+          <h2>{told.title}</h2>
+          <p>{told.text}</p>
+          <ul class="plain choices">
+            {#each choices(world, d) as c (c.key)}
+              <li>
+                <button onclick={() => attempt(() => choose(sea!, world!, c.key))} disabled={!!c.barred}>{c.label}</button>
+                <span class="faint">{c.barred ?? c.stakes}</span>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      </div>
     {:else if world.sunk || world.won}
       <div class="overlay">
         <div class="sheet">
@@ -550,6 +569,7 @@
   .wanted { color: var(--theirs); }
   .chip { display: inline-block; margin-right: 0.8rem; }
   .overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.92); display: grid; place-items: start center; overflow: auto; padding: 2rem 16px; }
+  .choices li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.75rem; margin-top: 0.6rem; }
   .stores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin: 1rem 0; }
   @media (max-width: 34rem) { .stores { grid-template-columns: 1fr; } }
   .deck summary { cursor: pointer; }

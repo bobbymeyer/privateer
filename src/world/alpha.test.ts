@@ -88,7 +88,8 @@ test('sighting an island pays, and it is an anchorage after', () => {
   const sighted = advance(sea, { ...w, player: map.adj[offshore].find((n) => n !== isle) ?? offshore }, offshore);
   assert.ok(sighted.islands[0].found);
   assert.equal(sighted.gold, w.gold + CHARTING_BOUNTY);
-  const anchored = advance(sea, { ...sighted, hull: 2 }, isle);
+  // A castaway on it, maybe: left on his beach, for this.
+  const anchored = advance(sea, { ...sighted, dilemma: null, hull: 2 }, isle);
   assert.ok(atIsland(anchored));
   assert.equal(anchored.hull, 3, 'mending a point a day');
 });

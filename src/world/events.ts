@@ -19,6 +19,7 @@ import { type Roller, pick, roll } from './random.ts';
 import { seasonOf } from './sea.ts';
 import type { Sea } from './ships.ts';
 import { refit } from './port.ts';
+import { SHARES_AT, sharesCost } from './dilemmas.ts';
 import { type WorldState, atIsland } from './world.ts';
 
 export const MORALE_MAX = 10;
@@ -36,8 +37,6 @@ export const OMEN_CHANCE = 1 / 45;
 export const OMEN_CHEER = 2;
 /** A storm, on any day at sea, outside its seasons and its latitudes. */
 export const STORM_CHANCE = 1 / 120;
-/** What a storm can make you throw over: a share of the purse, and no more than this. */
-export const JETTISON_MAX = 30;
 /** Wages unpaid cost this much morale. */
 export const UNPAID = 2;
 /** What a prize does for the crew: more for a sacked town. */
@@ -86,17 +85,10 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
   if (atIsland(w)) w = cheer(w, 1);
 
   if (atSea && !atIsland(w)) {
-    if (roll(r) < stormChance(sea, s.player, s.turn)) {
-      const throwOver = w.gold > 0 && roll(r) < 0.5;
-      if (throwOver) {
-        const lost = Math.min(JETTISON_MAX, Math.max(1, Math.round(w.gold * (0.1 + 0.15 * roll(r)))));
-        w = { ...w, gold: w.gold - lost };
-        log(`a storm: ${lost} in cargo thrown over the side to keep her afloat`, true);
-      } else {
-        const lost = Math.min(1 + Math.floor(roll(r) * 3), w.hull - 1);
-        w = { ...w, hull: w.hull - lost };
-        log(lost > 0 ? `a storm: the ship takes ${lost} hull of damage` : 'a storm, ridden out with nothing left to lose', true);
-      }
+    if (!w.dilemma && roll(r) < stormChance(sea, s.player, s.turn)) {
+      // How to meet it is your choice: see dilemmas.ts.
+      w = { ...w, dilemma: { kind: 'storm' } };
+      log('a storm coming on', true);
     } else if (roll(r) < OMEN_CHANCE) {
       w = cheer(w, OMEN_CHEER);
       log(`a good omen: ${pick(r, OMENS)}`);
@@ -118,6 +110,8 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
   if (idle >= IDLE_DAYS && (idle - IDLE_DAYS) % SOUR_EVERY === 0) {
     w = { ...w, morale: w.morale - 1 };
     if (w.morale > 0) log(`${idle} days without a prize, and the crew are grumbling`, w.morale <= 2);
+    // Low enough, and they send a man aft to ask for their shares.
+    if (w.morale === SHARES_AT && !w.dilemma) w = { ...w, dilemma: { kind: 'shares', cost: sharesCost(w.gold) } };
   }
   if (w.morale <= 0) w = mutiny({ ...w, rng: r.rng }, r);
   return { ...w, rng: r.rng };

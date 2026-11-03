@@ -21,6 +21,7 @@ import { sailToward } from '../src/world/course.ts';
 import { type NodeId, portNamed, ports } from '../src/world/map.ts';
 import { attack, fight, letPass, raid, raidable, repair, REPAIR_COST } from '../src/world/meet.ts';
 import { isEnemy } from '../src/world/wars.ts';
+import { choices, choose as decide } from '../src/world/dilemmas.ts';
 import { buyShip, leavePrize, PROVISION_COST, provision, provisions, recruit, serves, takePrize } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
@@ -110,6 +111,21 @@ function choose(w: WorldState): NodeId {
   return near.length ? near[(w.turn * 7) % near.length] : london;
 }
 
+/** The bot's answer to an event that asks: ride out a storm on a sound hull, pay shares it can spare, take any castaway. */
+function answer(w: WorldState): WorldState {
+  while (w.dilemma) {
+    const open = choices(w, w.dilemma).filter((c) => !c.barred).map((c) => c.key);
+    const want =
+      w.dilemma.kind === 'storm'
+        ? w.hull > 3 ? 'ride' : open.includes('lighten') ? 'lighten' : 'run'
+        : w.dilemma.kind === 'shares'
+          ? open.includes('pay') && w.gold >= w.dilemma.cost + 20 ? 'pay' : 'promise'
+          : open.includes('take') ? 'take' : 'leave';
+    w = decide(sea, w, want);
+  }
+  return w;
+}
+
 /** Fight the encounter at hand to its end, keeping the tallies. */
 let fights = 0;
 function fightItOut(w: WorldState): WorldState {
@@ -162,7 +178,7 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
     if (dest === w.player) dest = harbours[(seed + w.turn) % harbours.length];
     const out = sailToward(sea, w, dest);
     // Going nowhere — there already, or no way there — the day still passes, lying where she is.
-    w = out.world.turn === w.turn ? advance(sea, out.world, out.world.player) : out.world;
+    w = answer(out.world.turn === w.turn ? advance(sea, answer(out.world), out.world.player) : out.world);
     since++;
     if (out.halt === 'stuck') dest = null;
     // A ship alongside: foreign prizes worth the risk, on a sound hull; never your own flag.

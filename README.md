@@ -49,6 +49,9 @@ and it's over.
 - **Keep the crew in heart.** Morale runs out of ten. A long stretch with
   no prize sours them, and at nothing it's mutiny. A prize, a round in the
   bar, fresh water at an island and a good omen all put it up.
+- **Some events ask you.** A storm, the crew wanting their shares, a man on
+  the beach of new land: each stops the ship and offers a choice, with what
+  each choice stakes told plainly.
 - **Islanders** in Guam, Hawaii, Tahiti, Tonga, the Marquesas and Rapa Nui
   trade water, fruit and timber, not drink or ships. Sometimes they put out
   war canoes instead.
@@ -350,9 +353,9 @@ fighting:
   an island, Saint Elmo's fire, porpoises under the bow.
 - **Storms**, about one day in 120 at sea. Three times as often in the
   Antilles in autumn and in the Indian seas in the summer monsoon, and
-  twice as often past forty degrees. A storm costs 1 to 3 hull, never the
-  last point, or a tenth to a quarter of the gold, 30 at most, thrown over
-  the side. (At first it was one day in 80 and up to two fifths of the
+  twice as often past forty degrees. How to meet it is your choice (see
+  *Events that ask you something*, below). (At first a storm simply took 1
+  to 3 hull or some of the gold, it was one day in 80 and up to two fifths of the
   purse, and the captain bot's wins fell from 43% to 27%; as now, 33% over
   30 runs, about 5 storms and 10 omens a run, and no mutinies: the bot
   takes a prize often enough to keep its crew.)
@@ -367,6 +370,22 @@ fighting:
   where the current takes it, turns for home once it's more than 12 days
   out, and attacks whoever it meets. It's nobody's, so fighting it costs no
   standing, and its bounty pays (ambergris, and a story for the bar).
+
+**Events that ask you something** (`src/world/dilemmas.ts`). A storm used
+to take its toll and log it; the crew soured in silence. Now the
+events that matter stop the world and ask, and every choice says what it
+stakes before you pick it:
+
+| event | when | choices |
+| --- | --- | --- |
+| a storm | the storm chance, at sea | **ride it out**: lose 1 to 3 hull, never the last · **run before it**: no damage, but 2 to 4 days downwind, off your course, sailed day by day (anything can happen in them) · **lighten ship**: a tenth to a quarter of the gold over the side, 30 at most |
+| the crew want their shares | morale sours to 3 | **pay them**: a tenth of the purse, 5 at least, morale +3 · **promise them the next prize**: morale +1, and a quarter of the next payout is theirs · **stand firm**: even odds of morale +1 or −1 |
+| a man on the beach | half the time you sight new land | **take him aboard**: a hand of note you haven't got, free, if there's a berth — but one in four is a liar and a Jonah, and it's morale −2 · **leave him** |
+
+A choice that can't be made — nothing aboard to lighten, no berth, not
+enough to pay — is shown barred, with why. The bot rides out a storm on a
+sound hull, pays shares it can spare, and takes any castaway; with that it
+wins 27% over 30 runs, against 20% when storms rolled their own cost.
 
 **Building the deck** (`src/outfit.ts`, `src/world/port.ts`). The deck
 was all bought: a bigger ship, a gunner, and every run converged on the
@@ -627,6 +646,8 @@ src/
     port.ts      hiring, the yard, bribes, and who will deal with you
     wars.ts      who's at war with whom, and so what's fair game
     events.ts    a day at sea: morale and mutiny, storms, omens
+    dilemmas.ts  events that ask you something, and what each choice stakes
+    scout.ts     the lookout, and a read of a ship before you meet her
     seas.ts      the named seas, where the chart letters them and the monsters keep
     course.ts    setting a course and sailing it a day at a time
     world.ts     createWorld, advance, observe, hearRumor — pure, like rules.ts

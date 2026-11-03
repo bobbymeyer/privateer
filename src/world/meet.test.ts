@@ -129,7 +129,9 @@ test('a pirate: English ports shut, no grudge fades, no bribe works, and London 
   let w: WorldState = { ...createWorld(sea, 1), ships: [], trail: [], pirate: true, standing: { england: -3 }, gold: GOAL + PARDON_COST + 50 };
   assert.equal(serves(sea, w), false);
   assert.throws(() => bribe(sea, w), /pardon/);
-  for (let i = 0; i < STANDING_DECAY; i++) w = advance(sea, w, w.player);
+  // Two months in port: the crew will ask for their shares, and be refused, for this.
+  for (let i = 0; i < STANDING_DECAY; i++) w = advance(sea, { ...w, dilemma: null }, w.player);
+  w = { ...w, dilemma: null };
   assert.equal(w.standing.england, -3, 'it does not fade');
   // Sail into London rich, but a pirate: no win.
   const london = map.nodes.find((n) => n.port?.name === 'London')!.id;

@@ -18,6 +18,7 @@ import { type Roller, roll } from './random.ts';
 import { type Outfit, START_OUTFIT, maxHullOf } from '../outfit.ts';
 import { type Hail, type Meeting, REFIT_DAYS, type Reckoning, YOUR_NATION, landfall, meeting } from './meet.ts';
 import { MORALE_START, aDay } from './events.ts';
+import { type Dilemma, castaway } from './dilemmas.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -74,6 +75,10 @@ export interface WorldState {
   lastSpoils: number;
   /** A prize's stores, waiting on your choice of one card to keep, or none. While there is one, the world waits. */
   spoil: { kind: string; offers: string[] } | null;
+  /** An event waiting on your choice: a storm, the crew's shares, a castaway. While there is one, the world waits. */
+  dilemma: Dilemma | null;
+  /** The crew have been promised a share of the next prize. */
+  promised: boolean;
   /** Everything your prizes have paid, all told: how well your name is known. See `renown`. */
   fame: number;
   /** Word is out that you're homeward bound with a fortune. Said once a run. */
@@ -248,6 +253,8 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     fame: 0,
     homewardNoised: false,
     spoil: null,
+    dilemma: null,
+    promised: false,
   };
 }
 
@@ -258,6 +265,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   if (s.encounter) throw new Error('there is a fight to finish first');
   if (s.hail) throw new Error('a ship is alongside: attack, or let her pass');
   if (s.spoil) throw new Error("the prize's stores are waiting: take a card, or leave them");
+  if (s.dilemma) throw new Error('there is a choice to make first');
   if (to !== s.player && !sea.map.adj[s.player].includes(to)) {
     throw new Error(`node ${to} is not next to ${s.player}`);
   }
@@ -294,10 +302,12 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   let gold = s.gold;
   let hull = s.hull;
   const near = sea.map.distTo(to);
+  let found = false;
   const islands = s.islands.map((isle) => {
     if (isle.found || near[isle.node] > s.sight) return isle;
     gold += CHARTING_BOUNTY;
     log.push({ turn, text: `you sighted land nobody has charted, and the Crown will pay ${CHARTING_BOUNTY} for it` });
+    found = true;
     return { ...isle, found: true };
   });
   if (atIsland({ ...s, islands }, to)) hull = Math.min(s.maxHull, hull + 1);
@@ -337,6 +347,12 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     tension,
     wars,
   };
+  // Land nobody has charted, and maybe somebody on it.
+  if (found) {
+    const r2: Roller = { rng: next.rng };
+    const d = castaway(next, r2);
+    next = { ...next, rng: r2.rng, ...(d ? { dilemma: d } : {}) };
+  }
   next = aDay(sea, next);
   // Homeward bound with the score, and word gets out.
   if (homeward(next) && !next.homewardNoised) {
