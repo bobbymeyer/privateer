@@ -14,7 +14,7 @@
   import { adjective, article, nationName, sailName } from '../world/ports.ts';
   import { markerStrength, predict } from '../world/rumors.ts';
   import type { Sea } from '../world/ships.ts';
-  import { atIsland, createSea, createWorld, GOAL, HOME, knowledge, pursuitOf, type WorldState } from '../world/world.ts';
+  import { atIsland, createSea, createWorld, GOAL, HOME, homeward, knowledge, pursuitOf, renown, type WorldState } from '../world/world.ts';
   import Fight from './Fight.svelte';
   import Flag from './Flag.svelte';
   import { COLORS } from '../world/colors.ts';
@@ -198,7 +198,7 @@
     if (!sea || !world || focus === null || sailing) return [];
     const r = world.rumors.find((x) => x.id === focus);
     if (!r) return [];
-    const p = predict(sea, r, world.turn, knowledge(world), world.player, pursuitOf(world));
+    const p = predict(sea, r, world.turn, knowledge(world), world.player, pursuitOf(world, sea));
     return p.flatMap((v, node) => (v > 0.003 ? [{ node, p: v }] : []));
   });
 
@@ -222,6 +222,8 @@
     chart?.recentre();
   }
 
+  const captivesOf = (id: number) => world?.ships.find((x) => x.id === id)?.captives ?? null;
+  const RENOWN_WORDS = ['unknown', 'getting about', 'known in every port', 'a legend'];
   const ago = (days: number) => (days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days back`);
 
   const nodeName = (id: NodeId) => {
@@ -271,6 +273,8 @@
           <Gauge label="morale" value={world.morale} max={MORALE_MAX} />
           {#if world.morale <= 2}<p class="wanted">the crew are close to mutiny. a prize, a round ashore or fresh water would steady them.</p>{:else if world.turn - world.lastSpoils >= IDLE_DAYS}<p class="faint">{world.turn - world.lastSpoils} days since the last prize: the crew are souring.</p>{/if}
           <p>a {SHIP_CLASSES[world.outfit.ship].name}, {world.outfit.crew.length ? world.outfit.crew.map((c) => CREW[c].name).join(', ') : 'no hands of note'}</p>
+          <p class="faint">your name: {RENOWN_WORDS[renown(world)]}{renown(world) ? ', and the hunters come farther for it' : ''}</p>
+          {#if homeward(world)}<p class="wanted">homeward bound with the score: every enemy privateer is out for you.</p>{/if}
           <p class="faint">sight {world.sight} · {world.outfit.upgrades.length ? world.outfit.upgrades.map((u) => UPGRADES[u].name).join(', ') : 'no refits'}</p>
           {#if atIsland(world)}<p>at anchor off an uncharted isle: taking on water, mending the hull.</p>{/if}
           {#if world.pirate}<p class="wanted">a pirate: English ports are shut to you and London would hang you, until you buy a pardon ({PARDON_COST}) in an English port.</p>{/if}
@@ -431,6 +435,7 @@
       <div class="overlay">
         <div class="sheet">
           <h2><Flag nation={h.nation} size={18} />{article(flagName)} {flagName} {what} alongside</h2>
+          {#if captivesOf(h.shipId)}{@const laden = captivesOf(h.shipId)!}<p>she's laden with {adjective(laden)} captives. take her and they go free, and the {adjective(laden)} and the Crown will think the better of you.</p>{/if}
           {#if h.nation === YOUR_NATION}
             <p class="wanted">she flies your flag. fire on her and you are a pirate: England will want you, its ports will shut, and London will hang you until you're pardoned.</p>
           {:else if isEnemy(world.wars, h.nation)}

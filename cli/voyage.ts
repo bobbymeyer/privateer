@@ -24,7 +24,7 @@ import { isEnemy } from '../src/world/wars.ts';
 import { buyShip, PROVISION_COST, provision, provisions, recruit, serves } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
-import { createSea, createWorld, GOAL, HOME, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
+import { advance, createSea, createWorld, GOAL, HOME, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
 
 const arg = (name: string, fallback: string) => {
@@ -33,13 +33,14 @@ const arg = (name: string, fallback: string) => {
 };
 const RUNS = arg('runs', '20');
 const DAYS = arg('days', '730');
+const FROM = arg('from', '0');
 
 const sea = createSea();
 const { map } = sea;
 const london = portNamed(map, HOME);
 const harbours = ports(map);
 
-const WORTH: Record<ShipKind, number> = { 'treasure-ship': 3, merchant: 2, 'treasure-fleet': 1.5, hunter: 0, privateer: 0.5, armada: 0, monster: 0 };
+const WORTH: Record<ShipKind, number> = { 'treasure-ship': 3, merchant: 2, 'treasure-fleet': 1.5, hunter: 0, privateer: 0.5, corsair: 1, armada: 0, monster: 0 };
 const HIRE_ORDER = ['quartermaster', 'gunner', 'pilot', 'boatswain', 'marksmen', 'surgeon', 'navigator'];
 const fightBot = (outgunned: boolean) => lookahead({ hull: 0.6, damage: 0.4, fled: outgunned ? 100 : 0 });
 
@@ -91,7 +92,7 @@ function choose(w: WorldState): NodeId {
     if (!isEnemy(w.wars, r.nation)) continue; // only enemies are fair game
     const value = WORTH[r.kind] * markerStrength(r, w.turn);
     if (value <= 0.3 || (best && value <= best.value)) continue;
-    const p = predict(sea, r, w.turn, knowledge(w), w.player, pursuitOf(w));
+    const p = predict(sea, r, w.turn, knowledge(w), w.player, pursuitOf(w, sea));
     const node = p.indexOf(Math.max(...p));
     if (d[node] <= 25) best = { node, value };
   }
@@ -139,7 +140,7 @@ let mutinies = 0;
 let storms = 0;
 let omens = 0;
 const hullIn: Record<string, string[]> = {};
-for (let seed = 0; seed < RUNS; seed++) {
+for (let seed = FROM; seed < FROM + RUNS; seed++) {
   let w = createWorld(sea, seed);
   let dest: NodeId | null = null;
   fights = 0;
@@ -158,7 +159,8 @@ for (let seed = 0; seed < RUNS; seed++) {
     if (dest === null || since > 10 || w.player === dest || danger(w) !== null) ((dest = choose(w)), (since = 0));
     if (dest === w.player) dest = harbours[(seed + w.turn) % harbours.length];
     const out = sailToward(sea, w, dest);
-    w = out.world;
+    // Going nowhere — there already, or no way there — the day still passes, lying where she is.
+    w = out.world.turn === w.turn ? advance(sea, out.world, out.world.player) : out.world;
     since++;
     if (out.halt === 'stuck') dest = null;
     // A ship alongside: foreign prizes worth the risk, on a sound hull; never your own flag.

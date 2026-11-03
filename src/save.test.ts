@@ -38,3 +38,14 @@ test('nothing saved, garbage, or a save from another version: no run', () => {
   const old = JSON.parse(encode(1, createWorld(sea, 1)));
   assert.equal(decode(JSON.stringify({ ...old, version: SAVE_VERSION + 1 })), null);
 });
+
+test('a save from before renown and the home stretch is brought up to date, and plays on', () => {
+  const w = createWorld(sea, 2);
+  const { fame: _f, homewardNoised: _h, ...old } = w;
+  const v1 = encode(2, old as typeof w).replace(`"version":${SAVE_VERSION}`, '"version":1');
+  const back = decode(v1)!;
+  assert.equal(back.version, SAVE_VERSION);
+  assert.equal(back.world.fame, 0);
+  assert.equal(back.world.homewardNoised, false);
+  advance(sea, back.world, sea.map.adj[back.world.player][0]);
+});

@@ -36,7 +36,22 @@ import { makeRumor } from './rumors.ts';
 import { adjective, article, type Nation, nationName } from './ports.ts';
 import { type Sea, type ShipKind, wantedBy } from './ships.ts';
 import { CASUS_BELLI, YOUR_NATION, declare, isEnemy } from './wars.ts';
-import type { WorldState } from './world.ts';
+import { HULL_PER_RENOWN, renown, type WorldState } from './world.ts';
+
+/** Warships that come better found against a captain with a name. */
+const WARSHIPS: ShipKind[] = ['hunter', 'privateer', 'armada', 'corsair'];
+/** What a laden corsair carries over the usual: captives, and what was taken with them. */
+export const CAPTIVES_CARGO = 12;
+
+/** A prize's payout to your name. Passing a step of renown is news. */
+function fameFor(s: WorldState, payout: number): WorldState {
+  const fame = s.fame + payout;
+  const before = renown(s);
+  const after = renown({ fame });
+  if (after === before) return { ...s, fame };
+  const text = ['', 'your name is getting about: hunters and privateers will come farther for you, and better found', 'your name is known in every port: they come farther still, and better found', 'your name is a legend: no captain on the seas is hunted harder'][after];
+  return { ...s, fame, log: [...s.log, { turn: s.turn, text, stop: true }] };
+}
 
 export { YOUR_NATION } from './wars.ts';
 
@@ -93,7 +108,7 @@ export interface Reckoning {
  */
 export const hostile = (s: WorldState, ship: { kind: ShipKind; nation: Nation }) =>
   ship.kind === 'monster' ||
-  ((ship.kind === 'hunter' || ship.kind === 'armada' || ship.kind === 'privateer') && (wantedBy(s.standing, ship.nation) || isEnemy(s.wars, ship.nation)));
+  ((ship.kind === 'hunter' || ship.kind === 'armada' || ship.kind === 'privateer' || ship.kind === 'corsair') && (wantedBy(s.standing, ship.nation) || isEnemy(s.wars, ship.nation)));
 
 /** After a move: a ship here to fight, or to hail? Called by `advance`. */
 export function meeting(sea: Sea, s: WorldState): WorldState {
@@ -125,7 +140,11 @@ export function landfall(sea: Sea, s: WorldState): WorldState {
 function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean): WorldState {
   const r: Roller = { rng: s.rng };
   const seed = Math.floor(roll(r) * 2 ** 31);
-  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit));
+  // A warship that comes for a captain with a name comes better found; a corsair home-bound is laden.
+  const ship = who.shipId >= 0 ? s.ships.find((x) => x.id === who.shipId) : undefined;
+  const veteran = ship && WARSHIPS.includes(ship.kind) ? HULL_PER_RENOWN * renown(s) : 0;
+  const laden = ship?.captives ? CAPTIVES_CARGO : 0;
+  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit), { hull: veteran, cargo: laden });
   return { ...s, rng: r.rng, hail: null, encounter: { ...who, fight, forced } };
 }
 
@@ -237,10 +256,18 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
       w = { ...w, log: [...w.log, { turn: s.turn, text: `${sea.map.nodes[m.port].port!.name} is sacked` }] };
     }
   } else {
+    // A corsair taken with captives aboard: they go free, and their nation and the Crown hear of it.
+    const freed = taken ? s.ships.find((x) => x.id === m.shipId)?.captives : null;
+    if (freed) {
+      const standing = { ...w.standing, [freed]: (w.standing[freed] ?? 0) + 1 };
+      if (!w.pirate && freed !== YOUR_NATION) standing[YOUR_NATION] = (standing[YOUR_NATION] ?? 0) + 1;
+      w = { ...w, standing, log: [...w.log, { turn: s.turn, text: `you freed ${adjective(freed)} captives from the corsairs' hold` }] };
+    }
     w = {
       ...w,
       ships: w.ships.map((x) => {
         if (x.id !== m.shipId || !taken) return x;
+        if (x.kind === 'corsair') return { ...x, node: x.home, laidUp: s.turn + REFIT_DAYS, dest: null, raid: null, captives: null };
         // Gone to the bottom, or taken: laid up at home, then out again.
         return { ...x, node: x.home, laidUp: s.turn + REFIT_DAYS, dest: x.route ? x.route[1] : null, leg: x.route ? 1 : 0 };
       }),
@@ -248,6 +275,7 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     };
   }
 
+  if (f.payout > 0 && outcome !== 'sunk') w = fameFor(w, f.payout);
   if (f.payout > 0 && outcome !== 'sunk') w = spoils(w, m.port !== null && taken && m.kind !== 'canoes' ? SACK_CHEER : PRIZE_CHEER);
   return {
     ...w,

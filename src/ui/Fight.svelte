@@ -6,6 +6,7 @@
   import Flag from './Flag.svelte';
   import CardView from './CardView.svelte';
   import Gauge from './Gauge.svelte';
+  import { fade, fly } from 'svelte/transition';
 
   let {
     fight,
@@ -32,6 +33,14 @@
   } = $props();
 
   let picks: number[] = $state([]);
+
+  // Motion, unless the reader has asked for none.
+  const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /** A card dealt off the deck, from the left, one after another; a wound drops onto it from above. */
+  const deal = (node: Element, { i, wound }: { i: number; wound: boolean }) =>
+    fly(node, still ? { duration: 0 } : wound ? { y: -36, duration: 320, delay: 120 + i * 110 } : { x: -48, duration: 260, delay: i * 110 });
+  /** The round's lines, one at a time, as they happened. */
+  const told = (node: Element, { i }: { i: number }) => fade(node, still ? { duration: 0 } : { duration: 200, delay: i * 90 });
   const waiting = (side: 'ship' | 'target') => fight.deck.filter((c) => c.damage && c.side === side).length;
   const bottom = $derived(fight.deck.at(-1) ?? null);
   const bottomCopy = $derived(bottom && !bottom.damage && !bottom.id.startsWith('reinforce') ? bottom.id.split('#')[1] : null);
@@ -65,8 +74,8 @@
 
 <svelte:window {onkeydown} />
 
-{#snippet state(isThreatened: boolean, way: number)}
-  {`way ${way} of ${ESCAPE}` + (isThreatened ? ' · threatened: hard pressed, and likely to run' : '')}
+{#snippet state(isThreatened: boolean)}
+  {isThreatened ? 'threatened: hard pressed, and likely to run' : ''}
 {/snippet}
 
 <section class="fight" aria-label="encounter">
@@ -82,7 +91,8 @@
       <p>plunder {fight.plunder}{#if fight.ship.brace} · brace {fight.ship.brace}{/if}</p>
       {#if !fight.outcome}
         <p class="status">{waiting('ship')} {waiting('ship') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('ship')} of your cards spent</p>
-        <p class="status">{@render state(threatened(fight.ship, fight.target), fight.ship.way)}</p>
+        <Gauge label="way" value={fight.ship.way} max={ESCAPE} />
+        <p class="status">{@render state(threatened(fight.ship, fight.target))}</p>
       {/if}
     </div>
     <div class="ship theirs">
@@ -91,7 +101,8 @@
       <p>cargo {fight.target.cargo} · bounty {fight.target.bounty}</p>
       {#if !fight.outcome}
         <p class="status">{waiting('target')} {waiting('target') === 1 ? 'wound' : 'wounds'} waiting in the deck · {spent('target')} of theirs spent</p>
-        <p class="status">{@render state(threatened(fight.target, fight.ship), fight.target.way)}</p>
+        <Gauge label="way" value={fight.target.way} max={ESCAPE} color="var(--theirs)" />
+        <p class="status">{@render state(threatened(fight.target, fight.ship))}</p>
       {/if}
     </div>
   </div>
@@ -108,7 +119,9 @@
     <p class="prompt">keep two. they resolve in the order you pick them, and then they're spent; the third goes to the bottom. spent cards come back only when a card recalls them. three way and a ship is away; chase and hold take it off her.</p>
     <div class="hand">
       {#each fight.hand as card, i (card.id)}
+        <div class="slot" in:deal={{ i, wound: !!card.damage }}>
         <CardView {card} order={picks.includes(i) ? picks.indexOf(i) + 1 : null} disabled={picks.length === 2 && !picks.includes(i)} onpick={() => toggle(i)} />
+        </div>
       {/each}
     </div>
     <button onclick={resolve} disabled={picks.length < 2}>resolve</button>
@@ -121,12 +134,13 @@
   {#if lastRound.length}
     <div class="log" aria-live="polite">
       <h3>last round</h3>
-      <ul>
-        {#each lastRound as e}
-          {@const line = describeEvent(e)}
-          {#if line}<li class={e.type}>{line}</li>{/if}
-        {/each}
-      </ul>
+      {#key fight.round}
+        <ul>
+          {#each lastRound.filter((e) => describeEvent(e)) as e, i}
+            <li class={e.type} in:told={{ i }}>{describeEvent(e)}</li>
+          {/each}
+        </ul>
+      {/key}
     </div>
   {/if}
   <details class="glossary">
@@ -146,8 +160,10 @@
   .meta, .prompt, .keys, .log, .status { color: var(--faint); }
   .status { font-size: 0.85rem; }
   .ships { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  .ship { min-width: 0; }
   .theirs { color: var(--theirs); }
   .hand { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+  .slot { display: grid; }
   .outcome h3 { font-size: 1.4rem; letter-spacing: -0.025em; }
   .outcome button { margin-top: 0.75rem; }
   .log ul { list-style: none; margin: 0; padding: 0; }

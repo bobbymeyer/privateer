@@ -33,6 +33,12 @@ and it's over.
   corsairs are fair game; anyone else's ships, the Crown hears of; an
   English ship makes you a pirate.
 - **Raiding a port**: in port, you can raid it instead of trading.
+- **Your name gets about.** The more your prizes pay, the farther the
+  hunters and privateers come for you, and the better found. Make the score
+  and word gets out: every enemy privateer puts to sea to stop you getting
+  it home.
+- **Barbary corsairs** raid the open towns of their enemies for captives.
+  Take one laden and the captives go free.
 - **Keep the crew in heart.** Morale runs out of ten. A long stretch with
   no prize sours them, and at nothing it's mutiny. A prize, a round in the
   bar, fresh water at an island and a good omen all put it up.
@@ -354,6 +360,38 @@ fighting:
   where the current takes it, turns for home once it's more than 12 days
   out, and attacks whoever it meets. It's nobody's, so fighting it costs no
   standing, and its bounty pays (ambergris, and a story for the bar).
+
+**The late game** (`src/world/world.ts`, `src/world/meet.ts`):
+
+- **Renown**, from everything your prizes have paid. At 60, 120 and 200 it
+  goes up a step, and each step hunters and privateers come a quarter
+  farther for you (`reach` in `Pursuit`), and a hostile warship comes with
+  2 more hull. Passing a step is news, and stops the ship.
+- **The home stretch.** With the score in hand and no noose waiting, word
+  gets out, and every privateer of a nation at war with England comes for
+  you, whatever the range. The Channel ports — Dunkirk, Saint-Malo,
+  Amsterdam — are between you and London.
+- **Barbary corsairs**, one each out of Algiers, Salé, Tunis and Tripoli.
+  Each picks an open town of an enemy of its nation within 45 days of home,
+  the nearer the likelier: Baltimore is in reach, and Reykjavík when the
+  Danes are at war with them. It strips the town for 60 days, logs it (and
+  stops your ship if the town was English), and sails home with the
+  captives, where it lies 20 days before going out again. A corsair is
+  hostile to you while its nation is at war with England. Take one laden
+  and it carries 12 more in its hold, and the captives go free: a point
+  with their nation, and one with the Crown.
+- **What it does to a run**: over 30 runs the captain bot wins 23%, down
+  from 33%. Corsairs sank it twice; the bot has no notion of the home
+  stretch and sails into it blind.
+- **Saves migrate.** Each change to the save's shape adds a step to
+  `MIGRATIONS` in `src/save.ts`, so a run in progress survives an update.
+
+**The fight moves** a little, so a round can be read without reading it.
+A new hand deals in from the deck, a card at a time; a wound card drops
+onto it from above. Hull, morale and way are rows of pips: a pip lost
+drains, a pip gained fills, and the difference floats up off the count.
+The round's lines come in one by one. None of it plays when the reader has
+asked for reduced motion.
 
 **Raiding a port.** In port, raid it instead of trading. The fight is the
 same game against the town's defences, from `src/setup.ts`:
