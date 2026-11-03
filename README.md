@@ -243,10 +243,14 @@ Earth's 1:10m land (public domain):
    300 miles apart mid-ocean.
 3. Everything is triangulated on the sphere. Any edge that crosses more
    than a spit of land, or runs far longer than its neighbours, is dropped.
+   Then any edge that touches land at all, the 1:10m or the coastline the
+   chart draws, is dropped too wherever the sea goes round it in a few
+   legs, so no lane is seen crossing a headland. The few that stay are the
+   only way into a sound narrower than the nodes' spacing.
 4. Water cut off from the ocean (the Caspian, the Great Lakes) is dropped,
    and so is the ice beyond 62°S and 72°N.
 
-That gives 6,954 nodes (3,213 on the coast).
+That gives 6,952 nodes (3,211 on the coast).
 
 Straits narrower than the coastal spacing would be missed, since coastal
 nodes sit offshore. Ten are traced by hand in `src/world/passages.ts` and
@@ -723,8 +727,8 @@ npm run play -- --seed 42    # that encounter again
 npm run sim                  # card bots × 2000 fights (--target armada, --hull 14)
 npm run voyage               # whole runs with a captain bot (--runs 40 --days 730)
 npm run rumors               # how good a rumor is, by age and knowledge
-npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
 npm run coast -- ne.geojson  # rebuild the coastline the browser draws (1:50m)
+npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m); reads the coastline, so after it
 npm run chart -- out.svg land.geojson [--turns 2000 --flow current --box w,s,e,n --scale 30]
 ```
 

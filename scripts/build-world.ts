@@ -4,11 +4,15 @@
  *
  *   npm run world -- path/to/ne_10m_land.geojson
  *
+ * It reads src/world/data/coast.json too, so build that first.
+ *
  * Coastline first, because the coast is where the action is: a node offshore
  * every COAST_NM along every coast and island. Then the open ocean is filled,
  * sparser the farther it is from land. Then the narrow passages are threaded
  * through by hand. Then the lot is triangulated on the sphere, and edges that
- * cross land or run far longer than their neighbourhood are dropped.
+ * cross land or run far longer than their neighbourhood are dropped; and so
+ * is any edge touching land at all, this land or the coastline the chart
+ * draws, wherever the sea goes round it.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -35,19 +39,19 @@ const src = process.argv[2];
 if (!src) throw new Error('usage: npm run world -- ne_10m_land.geojson');
 const geo = JSON.parse(readFileSync(src, 'utf8'));
 
-// --- Land raster, 0.05°, even–odd fill over every ring --------------------
+// --- Land rasters, 0.05°, even–odd fill over every ring ------------------
 
 const RES = 0.05;
 const W = 360 / RES;
 const H = 180 / RES;
-const land = new Uint8Array(W * H);
 const rings: LL[][] = [];
 const outer: LL[][] = [];
 for (const f of geo.features) {
   const polys: LL[][][] = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
   for (const poly of polys) poly.forEach((ring, i) => (rings.push(ring), i === 0 && outer.push(ring)));
 }
-{
+function raster(rings: LL[][]): Uint8Array {
+  const land = new Uint8Array(W * H);
   const rows: number[][] = Array.from({ length: H }, () => []);
   for (const ring of rings) {
     for (let i = 0; i < ring.length - 1; i++) {
@@ -71,13 +75,26 @@ for (const f of geo.features) {
       for (let c = c0; c <= c1; c++) land[r * W + c] = 1;
     }
   });
+  return land;
 }
+/** Where the nodes may sit: the 1:10m land. */
+const land = raster(rings);
+/**
+ * What a leg may not cross: that, and the coastline the chart draws
+ * (coast.json, the 1:50m land simplified), so no leg is seen to cross land
+ * either. Build the coast first.
+ */
+const drawn: { rings: number[][] } = JSON.parse(readFileSync(new URL('../src/world/data/coast.json', import.meta.url), 'utf8'));
+const solid = raster(drawn.rings.map((r) => Array.from({ length: r.length / 2 }, (_, i): LL => [r[2 * i], r[2 * i + 1]])));
+for (let i = 0; i < solid.length; i++) solid[i] |= land[i];
 const wrapLon = (lon: number) => ((((lon + 180) % 360) + 360) % 360) - 180;
-const isLand = ([lon, lat]: LL) => {
+const cell = ([lon, lat]: LL) => {
   const c = Math.floor((wrapLon(lon) + 180) / RES);
   const r = Math.floor((90 - lat) / RES);
-  return r >= 0 && r < H && land[r * W + Math.min(W - 1, c)] === 1;
+  return r >= 0 && r < H ? r * W + Math.min(W - 1, c) : -1;
 };
+const isLand = (p: LL) => land[cell(p)] === 1;
+const isSolid = (p: LL) => solid[cell(p)] === 1;
 
 // --- Sphere helpers --------------------------------------------------------
 
@@ -227,6 +244,9 @@ for (const p of PASSAGES) {
 
 // --- 4. Triangulate, then drop what crosses land or runs too long --------
 
+/** Hops a dropped leg's way round may take: a headland, not the Baltic. */
+const DETOUR = 8;
+
 const tri = geoDelaunay(nodes.map((n) => n.at));
 const inPassage = new Set(passageChains.flat());
 const crossesLand = (a: LL, b: LL) => {
@@ -240,6 +260,14 @@ const crossesLand = (a: LL, b: LL) => {
   }
   return false;
 };
+/** Kilometres of land, the 1:10m or the chart's, under the leg a→b at its widest, looked at every 2 km. */
+const landKm = (a: LL, b: LL) => {
+  const n = Math.max(2, Math.ceil((angle(a, b) * R_NM * KM_PER_NM) / 2));
+  let run = 0;
+  let most = 0;
+  for (let k = 1; k < n; k++) most = Math.max(most, (run = isSolid(along(a, b, k / n)) ? run + 1 : 0));
+  return most * 2;
+};
 const edges = new Set<string>();
 const keyOf = (a: number, b: number) => (a < b ? `${a},${b}` : `${b},${a}`);
 for (const [a, b] of tri.edges as [number, number][]) {
@@ -248,17 +276,60 @@ for (const [a, b] of tri.edges as [number, number][]) {
   if (long || crossesLand(nodes[a].at, nodes[b].at)) continue;
   edges.add(keyOf(a, b));
 }
-// Passages: a chain end to end, each end joined to its two nearest sea nodes.
+// Passages: a chain end to end, as traced, wherever the chart's coarser
+// coast would put it; each end joined to its two nearest sea nodes, across
+// open water where there is any.
+const chainLegs = new Set<string>();
 for (const chain of passageChains) {
-  for (let k = 0; k < chain.length - 1; k++) edges.add(keyOf(chain[k], chain[k + 1]));
+  for (let k = 0; k < chain.length - 1; k++) chainLegs.add(keyOf(chain[k], chain[k + 1]));
   for (const end of [chain[0], chain[chain.length - 1]]) {
     const near = hash
       .near(nodes[end].at, step * 1.6)
       .filter((id) => !inPassage.has(id))
-      .sort((x, y) => angle(nodes[end].at, nodes[x].at) - angle(nodes[end].at, nodes[y].at))
-      .slice(0, 2);
-    for (const id of near) edges.add(keyOf(end, id));
+      .sort((x, y) => angle(nodes[end].at, nodes[x].at) - angle(nodes[end].at, nodes[y].at));
+    const clear = near.filter((id) => landKm(nodes[end].at, nodes[id].at) === 0);
+    for (const id of [...clear, ...near.filter((id) => !clear.includes(id))].slice(0, 2)) edges.add(keyOf(end, id));
   }
+}
+for (const e of chainLegs) edges.add(e);
+
+// A leg over a spit, or over land as the chart draws it, is let go wherever
+// the sea goes round it in a few legs: the worst first. Where it does not —
+// the only way into a sound narrower than a node's spacing — it stays.
+{
+  const near: Set<number>[] = nodes.map(() => new Set());
+  for (const e of edges) {
+    const [a, b] = e.split(',').map(Number);
+    near[a].add(b);
+    near[b].add(a);
+  }
+  const roundabout = (from: number, to: number) => {
+    const seen = new Set([from]);
+    let ring = [from];
+    for (let hop = 0; hop < DETOUR && ring.length; hop++) {
+      const next: number[] = [];
+      for (const n of ring) for (const m of near[n]) if (!seen.has(m)) (seen.add(m), next.push(m));
+      if (seen.has(to)) return true;
+      ring = next;
+    }
+    return false;
+  };
+  const over = [...edges]
+    .filter((e) => !chainLegs.has(e))
+    .map((e) => {
+      const [a, b] = e.split(',').map(Number);
+      return { e, a, b, km: landKm(nodes[a].at, nodes[b].at) };
+    })
+    .filter((x) => x.km > 0)
+    .sort((x, y) => y.km - x.km);
+  let kept = 0;
+  for (const { e, a, b } of over) {
+    near[a].delete(b);
+    near[b].delete(a);
+    if (roundabout(a, b)) edges.delete(e);
+    else (near[a].add(b), near[b].add(a), kept++);
+  }
+  console.log(`${over.length - kept} legs over land dropped, ${kept} kept as the only way through`);
 }
 
 // --- 5. The one ocean: the largest connected body -------------------------
