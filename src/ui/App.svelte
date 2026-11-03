@@ -5,7 +5,7 @@
   import { buyRound, ROUND_COST } from '../world/bar.ts';
   import { plotCourse, sailToward } from '../world/course.ts';
   import type { NodeId } from '../world/map.ts';
-  import { attack, fight, letPass, raid, raidable, repair, REPAIR_COST, YOUR_NATION, type Reckoning } from '../world/meet.ts';
+  import { attack, fight, GUARD_HULL, GUARD_RELIEF, guardOf, letPass, onGuard, treasury, TREASURY_REFILL, raid, raidable, repair, REPAIR_COST, YOUR_NATION, type Reckoning } from '../world/meet.ts';
   import { CASUS_BELLI, enemiesOf, isEnemy } from '../world/wars.ts';
   import { TARGETS } from '../setup.ts';
   import { SEASON_NAMES } from '../world/ocean.ts';
@@ -365,9 +365,12 @@
               {/if}
             {/if}
             <h3>a raid</h3>
-            {#if !raidable(sea, world)}
+            {#if (world.sacked[world.player] ?? -1) >= world.turn}
               <p class="faint">sacked lately: there's nothing left here.</p>
+            {:else if onGuard(world, world.player)}
+              <p class="faint">on its guard after your last raid: the boats would never get ashore. shut till day {guardOf(world, world.player)!.shutUntil + 1}.</p>
             {:else}
+              {#if guardOf(world, world.player)}{@const guard = guardOf(world, world.player)!}<p class="wanted">on its guard since your last raid: walls {GUARD_HULL * guard.level} stronger, its relief {GUARD_RELIEF * guard.level} rounds sooner, and {treasury(world, world.player, port.fort ? 'fortress' : 'town')} in the treasury, filling again by {TREASURY_REFILL} a day. on its guard till day {guard.until + 1}.</p>{/if}
               <p class="faint">
                 {port.fort ? 'a fortified port: not for a small ship.' : 'an open town.'}
                 the {adjective(port.nation)} will remember it three times over and their guard ships will hunt twice as far.

@@ -471,6 +471,20 @@ same game against the town's defences, from `src/setup.ts`:
   nothing for anybody (no trade, no raid) for 120 days.
 - **The alarm**: the town's nation's guard ships hunt twice as far, 50 days
   out, for the next 30 days.
+- **A raid turned out leaves the town on its guard.** Falling back to the
+  boats with what you'd plundered, and coming straight back to a treasury
+  full as new, was the strongest play in the game. Now a raid that ends
+  short of a sack (you fled, or it petered out) puts the town on its guard
+  for 90 days:
+  - for the first 14 the boats would never get ashore: no raid;
+  - after that its walls have 4 more hull and its relief comes 2 rounds
+    sooner, for each raid it has turned out while on its guard;
+  - its treasury starts from what the last raid left it and fills again 1
+    a day, up to the usual.
+
+  The port panel says all of this. A sack ends the guard. Over 60 seeds
+  the captain bot, which raids enemy towns, wins 22% with the guard
+  against about 28% without.
 
 `npm run sim -- --target town --ship brigantine` measures a raid:
 

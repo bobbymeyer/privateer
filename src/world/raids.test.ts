@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { FORTRESS_CARDS, TOWN_CARDS } from '../cards.ts';
 import { act, legalActions } from '../rules.ts';
-import { encounterWith, RELIEF_FROM } from '../setup.ts';
+import { encounterWith, RELIEF_FROM, TARGETS } from '../setup.ts';
 import { portNamed } from './map.ts';
-import { ALARM_DAYS, SACK_DAYS, attack, fight, meeting, raid, raidable } from './meet.ts';
+import { ALARM_DAYS, GUARD_DAYS, GUARD_HULL, GUARD_RELIEF, GUARD_SHUT, SACK_DAYS, TREASURY_REFILL, treasury, attack, fight, meeting, raid, raidable } from './meet.ts';
 import { isHaven, leavePrize, retire, serves } from './port.ts';
 import { HUNT_RANGE, hunterGoal } from './ships.ts';
 import { CASUS_BELLI, ENGLAND_OPENS_AGAINST, STANDING_WARS, atWar, declare, drift, enemiesOf, isEnemy, makePeace, openingWars } from './wars.ts';
@@ -191,4 +191,67 @@ test('a pirate’s havens deal with him whoever wants him, and he can retire the
   const honest = { ...quiet(createWorld(sea, 1)), player: at('Algiers'), gold: GOAL };
   assert.equal(isHaven(sea, honest), false);
   assert.throws(() => retire(sea, honest), /haven/);
+});
+
+/** Raid, take what's quick to take, and fall back to the boats: plunder first, then run. */
+function raidAndRun(w: WorldState): WorldState {
+  let s = raid(sea, w);
+  s = { ...s, encounter: { ...s.encounter!, fight: { ...s.encounter!.fight, ship: { ...s.encounter!.fight.ship, hull: 999, maxHull: 999 } } } };
+  while (s.encounter) {
+    const f = s.encounter.fight;
+    const score = (a: ReturnType<typeof legalActions>[number]) => {
+      const n = act(f, a);
+      return (n.outcome === 'fled' ? 1e6 : 0) + n.plunder * 10 + n.ship.way - (n.outcome === 'destroyed' ? 1e7 : 0);
+    };
+    s = fight(sea, s, legalActions(f).reduce((a, b) => (score(b) > score(a) ? b : a)));
+  }
+  return s;
+}
+
+test('a raid turned out leaves the town on its guard: shut a fortnight, then harder, poorer, and quicker with relief', () => {
+  const town = at('Maracaibo');
+  const w = quiet({ ...createWorld(sea, 1), player: town });
+  const first = raidAndRun(w);
+  assert.equal(first.reckoning?.outcome, 'fled');
+  const g = first.guarded[town];
+  assert.ok(g, 'on its guard');
+  assert.equal(g.level, 1);
+  assert.equal(g.until, w.turn + GUARD_DAYS);
+  assert.ok(g.cargo < TARGETS.town.cargo, `${g.cargo} left: what was carried off or carried inland is gone`);
+
+  // Straight back in: the boats would never get ashore.
+  assert.equal(raidable(sea, first), false);
+  assert.throws(() => raid(sea, first), /on its guard/);
+  const fortnight = { ...first, turn: w.turn + GUARD_SHUT - 1 };
+  assert.throws(() => raid(sea, fortnight), /on its guard/);
+
+  // After the fortnight: harder walls, relief sooner, and the treasury only so far filled again.
+  const later = { ...first, turn: w.turn + GUARD_SHUT };
+  assert.ok(raidable(sea, later));
+  const again = raid(sea, later).encounter!.fight;
+  assert.equal(again.target.maxHull, TARGETS.town.hull + GUARD_HULL);
+  assert.equal(again.target.cargo, Math.min(TARGETS.town.cargo, g.cargo + TREASURY_REFILL * GUARD_SHUT));
+  assert.equal(treasury({ ...first, turn: w.turn + 1 }, town, 'town'), g.cargo + TREASURY_REFILL, 'a day at a time');
+  assert.equal(treasury({ ...first, turn: w.turn + 80 }, town, 'town'), TARGETS.town.cargo, 'and no more than full');
+  assert.equal(again.reinforce!.from, RELIEF_FROM - GUARD_RELIEF);
+
+  // Turned out a second time: a step further on its guard.
+  const second = raidAndRun(later);
+  assert.equal(second.guarded[town].level, 2);
+
+  // Once the guard lapses, it's an ordinary town again.
+  const lapsed = { ...first, turn: w.turn + GUARD_DAYS };
+  assert.equal(raid(sea, lapsed).encounter!.fight.target.maxHull, TARGETS.town.hull);
+});
+
+test('a sack ends the guard: there is nothing left to guard', () => {
+  const town = at('Maracaibo');
+  for (let seed = 0; seed < 40; seed++) {
+    const w = { ...quiet({ ...createWorld(sea, 1), player: town }), rng: seed, hull: 40, maxHull: 40, guarded: { [town]: { since: 0, until: 500, shutUntil: 0, level: 1, cargo: 10 } } };
+    const after = fightOut(raid(sea, w));
+    if (after.reckoning?.outcome !== 'destroyed') continue;
+    assert.equal(after.guarded[town], undefined);
+    return;
+  }
+  assert.fail('no sack in 40 tries');
 });

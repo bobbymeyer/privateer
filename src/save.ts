@@ -11,7 +11,7 @@
 
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 /** From each version to the next. A run from before a feature simply goes without it. */
 const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<string, unknown>> = {
@@ -21,6 +21,8 @@ const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<stri
   2: (w) => ({ ...w, spoil: null, outfit: { prizes: [], struck: [], ...(w.outfit as object) } }),
   // 4: events that ask you something; shares promised to the crew.
   3: (w) => ({ ...w, dilemma: null, promised: false }),
+  // 5: towns on their guard after a raid.
+  4: (w) => ({ ...w, guarded: {} }),
 };
 export const SAVE_KEY = 'privateer:run';
 

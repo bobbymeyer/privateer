@@ -75,6 +75,8 @@ export interface WorldState {
   lastSpoils: number;
   /** A prize's stores, waiting on your choice of one card to keep, or none. While there is one, the world waits. */
   spoil: { kind: string; offers: string[] } | null;
+  /** Towns that turned out a raid short of a sack, on `since`: on their guard till `until`, shut to raiding till `shutUntil`, `level` steps on it, with `cargo` left in the treasury then. */
+  guarded: Record<NodeId, { since: number; until: number; shutUntil: number; level: number; cargo: number }>;
   /** An event waiting on your choice: a storm, the crew's shares, a castaway. While there is one, the world waits. */
   dilemma: Dilemma | null;
   /** The crew have been promised a share of the next prize. */
@@ -255,6 +257,7 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     spoil: null,
     dilemma: null,
     promised: false,
+    guarded: {},
   };
 }
 
