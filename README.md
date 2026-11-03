@@ -36,7 +36,28 @@ and it's over.
 - **Build the deck.** Take a ship and her stores are offered: three cards
   off her, keep one or none. A yard will strike a card out for 6, down to
   10. Your deck is listed under your ship. Hands of note draw wages.
-- **The sea moves** (`src/ui/SeaShader.svelte`). A WebGL shader draws the
+- **Sea lanes** (`buildLanes` in `src/world/map.ts`). The open ocean wasn't
+serving the game: on 24,000 day-steps of water the ships spread thin, and
+sailing was waiting, prizes were hard to find, and nothing said where to
+go. Now everyone sails the lanes, you too: the shortest paths between each
+port and its three nearest, along a tree spanning every port so none is
+cut off, along the great crossings (`OCEAN_LANES` in `src/world/ocean.ts`:
+Plymouth to Barbados and Virginia, Lisbon to Bahia, the Cape to Goa,
+Acapulco to Hawaii and on), and along the great courses, traced through
+water deep enough for the ships that sail them. That's about 2,700 nodes
+of 24,000; the map's adjacency is the lanes and nothing else, so courses,
+ships, distances and rumor clouds all keep to them without knowing it.
+The water off them is drawn and never sailed. The chart marks them as a
+dotted track, and a click on the chart lands on the nearest lane.
+
+Over 30 runs the captain bot has half again as many fights (29.5 a run,
+against 19.8 on the open ocean), wins 7 against 2, and is sunk 14 times
+against 19. A cost: on the lanes a ship can be in fewer places, so
+knowing the currents and winds tightens a rumor's cloud less than it did.
+Some legs of the underlying graph cut a headland, Brittany's for one; the
+lanes show it now that they're drawn.
+
+**The sea moves** (`src/ui/SeaShader.svelte`). A WebGL shader draws the
 open sea under the SVG chart, in the chart's own coordinates, so it pans
 and zooms with it: the engraver's wave marks, each a short double curve
 whose curl rolls slowly, with long swells crossing them that thicken the

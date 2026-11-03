@@ -129,6 +129,41 @@ export const SEASON_NAMES = ['winter', 'spring', 'summer', 'autumn'];
  *   the Cape.
  * - The armadas patrol.
  */
+/**
+ * The great crossings, where trade went across open water rather than port
+ * to port along a coast: to the Americas, round Africa, across the Pacific.
+ * The sea lanes are the shortest paths between these pairs, between each
+ * port and its nearest neighbours, and along the great courses below.
+ */
+export const OCEAN_LANES: [string, string][] = [
+  ['Plymouth', 'Bridgetown'],
+  ['Plymouth', 'Jamestown'],
+  ['Plymouth', 'Bermuda'],
+  ['Bristol', 'Boston'],
+  ['Brest', 'Quebec'],
+  ['Saint-Malo', 'Saint-Pierre'],
+  ['Amsterdam', 'New Amsterdam'],
+  ['Amsterdam', 'Elmina'],
+  ['Lisbon', 'Salvador'],
+  ['Lisbon', 'Recife'],
+  ['Luanda', 'Salvador'],
+  ['Rio de Janeiro', 'Buenos Aires'],
+  ['Buenos Aires', 'Valdivia'],
+  ['Valparaíso', 'Rapa Nui'],
+  ['Callao', 'Acapulco'],
+  ['Acapulco', 'Kealakekua'],
+  ['Kealakekua', 'Matavai'],
+  ['Matavai', 'Nuku Hiva'],
+  ['Matavai', 'Nuku’alofa'],
+  ['Kealakekua', 'Umatac'],
+  ['Cape Town', 'Goa'],
+  ['Goa', 'Mocha'],
+  ['Batavia', 'Malacca'],
+  ['Malacca', 'Macau'],
+  ['Macau', 'Nagasaki'],
+  ['Cape Town', 'Elmina'],
+];
+
 export const ROUTES: Record<string, string[]> = {
   flota: ['Cádiz', 'Las Palmas', 'San Juan', 'Veracruz', 'Havana'],
   galeones: ['Cádiz', 'Las Palmas', 'Cartagena', 'Portobelo', 'Cartagena', 'Havana'],

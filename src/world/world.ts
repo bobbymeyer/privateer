@@ -219,7 +219,8 @@ export const START = 'Plymouth';
 function placeIslands(sea: Sea, r: Roller): NodeId[] {
   const { map } = sea;
   const harbours = ports(map);
-  const candidates = map.nodes.filter((n) => n.kind === 'ocean' && n.waters === null && Math.abs(n.lat) < 55);
+  // Off the beaten track, but on a lane: you only find what you sail past.
+  const candidates = map.nodes.filter((n) => n.kind === 'ocean' && n.waters === null && Math.abs(n.lat) < 55 && map.adj[n.id].length);
   const placed: NodeId[] = [];
   for (let tries = 0; placed.length < ISLANDS && tries < 500; tries++) {
     const n = candidates[Math.floor(roll(r) * candidates.length)].id;

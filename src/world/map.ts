@@ -10,7 +10,7 @@
 
 import world from './data/world.json' with { type: 'json' };
 import { type LonLat, along, distanceNm } from './geo.ts';
-import { RIVERS, SHOALS, STRAITS } from './ocean.ts';
+import { OCEAN_LANES, RIVERS, ROUTES, SHOALS, STRAITS } from './ocean.ts';
 import { type Nation, PORTS, WATERS_DAYS } from './ports.ts';
 
 export type NodeId = number;
@@ -56,6 +56,10 @@ export interface SeaMap extends Graph {
   nodes: SeaNode[];
   /** The same sea for deep keels: no banks. */
   deep: Graph;
+  /** The sea lanes, as legs: what the chart draws. The map's own adjacency is these and nothing else. */
+  lanes: [NodeId, NodeId][];
+  /** Every leg of open water, lanes or not: for drawing, never for sailing. */
+  open: NodeId[][];
 }
 
 const at = (n: SeaNode): LonLat => [n.lon, n.lat];
@@ -126,7 +130,80 @@ export function buildMap(): SeaMap {
   }
 
   const deepAdj = adj.map((out, i) => (nodes[i].shoal && !nodes[i].port ? [] : out.filter((m) => !nodes[m].shoal || nodes[m].port)));
-  return { nodes, adj, distTo: distances_, deep: { adj: deepAdj, distTo: distances(deepAdj) } };
+
+  // The sea lanes. Everyone sails them, you included: the open ocean off
+  // them is water on the chart and nothing more. Ships kept to a few
+  // thousand nodes instead of all of them meet, and a lane is somewhere to
+  // lie in wait.
+  const laneEdges = buildLanes(nodes, adj, deepAdj, distances_, distances(deepAdj));
+  const laneAdj: NodeId[][] = nodes.map(() => []);
+  for (const key of laneEdges) {
+    const [a, b] = key.split(',').map(Number);
+    laneAdj[a].push(b);
+    laneAdj[b].push(a);
+  }
+  const deepLaneAdj = laneAdj.map((out, i) => (nodes[i].shoal && !nodes[i].port ? [] : out.filter((m) => !nodes[m].shoal || nodes[m].port)));
+  const traffic = new Uint16Array(nodes.length);
+  for (const key of laneEdges) for (const n of key.split(',').map(Number)) traffic[n]++;
+  return { nodes, adj: laneAdj, distTo: distances(laneAdj), deep: { adj: deepLaneAdj, distTo: distances(deepLaneAdj) }, lanes: [...laneEdges].map((k) => k.split(',').map(Number) as [NodeId, NodeId]), open: adj };
+}
+
+/** Each port's nearest neighbours that a lane joins it to. */
+export const LANE_NEIGHBOURS = 3;
+
+/**
+ * The sea lanes, as a set of edges `a,b` (a < b): the shortest paths
+ * between each port and its LANE_NEIGHBOURS nearest; between the pairs of a
+ * tree spanning all ports, so no port is cut off; along the great crossings
+ * (OCEAN_LANES); and along the great courses (ROUTES), traced through water
+ * deep enough for the ships that sail them.
+ */
+function buildLanes(nodes: SeaNode[], adj: NodeId[][], deepAdj: NodeId[][], dist: (n: NodeId) => Int32Array, deepDist: (n: NodeId) => Int32Array): Set<string> {
+  const edges = new Set<string>();
+  const harbours = nodes.filter((n) => n.port).map((n) => n.id);
+  const named = (name: string) => nodes.find((n) => n.port?.name === name)?.id;
+  const trace = (from: NodeId, to: NodeId, g: NodeId[][], d: Int32Array) => {
+    if (d[from] >= FAR) return;
+    let at = from;
+    while (at !== to) {
+      const next = g[at].find((m) => d[m] === d[at] - 1);
+      if (next === undefined) return;
+      edges.add(at < next ? `${at},${next}` : `${next},${at}`);
+      at = next;
+    }
+  };
+  const join = (a: NodeId, b: NodeId) => trace(a, b, adj, dist(b));
+
+  // Nearest neighbours, and a spanning tree over all ports by sailing days.
+  const fromPort = new Map(harbours.map((p) => [p, dist(p)]));
+  for (const p of harbours) {
+    const d = fromPort.get(p)!;
+    harbours.filter((q) => q !== p && d[q] < FAR).sort((a, b) => d[a] - d[b]).slice(0, LANE_NEIGHBOURS).forEach((q) => join(p, q));
+  }
+  const inTree = new Set([harbours[0]]);
+  while (inTree.size < harbours.length) {
+    let best: [NodeId, NodeId, number] | null = null;
+    for (const p of inTree) {
+      const d = fromPort.get(p)!;
+      for (const q of harbours) if (!inTree.has(q) && d[q] < FAR && (!best || d[q] < best[2])) best = [p, q, d[q]];
+    }
+    if (!best) break;
+    join(best[0], best[1]);
+    inTree.add(best[1]);
+  }
+
+  for (const [a, b] of OCEAN_LANES) {
+    const [x, y] = [named(a), named(b)];
+    if (x !== undefined && y !== undefined) join(x, y);
+  }
+  // The great courses, deep enough for the ships that sail them.
+  for (const stops of Object.values(ROUTES)) {
+    for (let i = 0; i < stops.length; i++) {
+      const [x, y] = [named(stops[i]), named(stops[(i + 1) % stops.length])];
+      if (x !== undefined && y !== undefined && x !== y) trace(x, y, deepAdj, deepDist(y));
+    }
+  }
+  return edges;
 }
 
 /** Breadth-first distances to a node, cached; the oldest are let go past a few hundred. */

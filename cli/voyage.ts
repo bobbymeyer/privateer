@@ -112,7 +112,7 @@ function choose(w: WorldState): NodeId {
     } else if (!inRegion(sea, l.region!, w.player)) {
       // Into the region: its nearest port that will deal with you, else its nearest water.
       const inside = harbours.filter((p) => inRegion(sea, l.region!, p) && serves(sea, { ...w, player: p }));
-      return (inside.length ? inside : map.nodes.filter((n) => n.kind === 'ocean' && inRegion(sea, l.region!, n.id)).map((n) => n.id)).sort((a, b) => d[a] - d[b])[0];
+      return (inside.length ? inside : map.nodes.filter((n) => n.kind === 'ocean' && map.adj[n.id].length && inRegion(sea, l.region!, n.id)).map((n) => n.id)).sort((a, b) => d[a] - d[b])[0];
     }
   }
   if (w.hull < w.maxHull * 0.6) {

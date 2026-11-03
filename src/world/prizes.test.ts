@@ -16,7 +16,8 @@ import { advance, createSea, createWorld, type WorldState } from './world.ts';
 const sea = createSea();
 const { map } = sea;
 const at = (name: string) => portNamed(map, name);
-const farOut = () => map.nodes.find((n) => n.kind === 'ocean' && Math.abs(n.lon + 150) < 4 && Math.abs(n.lat + 20) < 4)!.id;
+/** The lane node nearest a point in the open Pacific: the sea off the lanes can't be sailed. */
+const farOut = () => map.nodes.filter((n) => n.kind === 'ocean' && map.adj[n.id].length).reduce((a, b) => (Math.hypot(b.lon + 150, b.lat + 20) < Math.hypot(a.lon + 150, a.lat + 20) ? b : a)).id;
 
 /** Fight to a finish with a hull nothing can sink, taking her if it can. */
 function takeHer(w: WorldState): WorldState {
@@ -131,7 +132,7 @@ test('the lookout sees farther than the water, and a hostile sail coming into vi
   const w0 = createWorld(sea, 2);
   const armada = w0.ships.find((s) => s.kind === 'armada' && s.nation === 'spain')!;
   const from = farOut();
-  const dest = map.nodes.find((n) => n.kind === 'ocean' && map.distTo(from)[n.id] === 12)!.id;
+  const dest = map.nodes.find((n) => map.distTo(from)[n.id] === 12)!.id;
   const step = nextStep(sea, { ...w0, player: from }, dest)!;
   const range = lookout(w0);
   // Just out of sight from where you are, and just in sight from where you'll be.

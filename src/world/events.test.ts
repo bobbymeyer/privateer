@@ -124,7 +124,8 @@ test('a monster keeps each sea, attacks whoever it meets, and wanders with the c
       seen.add(m.node);
       assert.ok(map.distTo(m.home)[m.node] <= MONSTER_RANGE + 6, `${m.routeName} strays only a little past its range before turning back`);
     }
-    assert.ok(seen.size > 15, `${m.routeName} wanders`);
+    // Monsters keep to the lanes like everyone: a thin network in some seas.
+    assert.ok(seen.size > 5, `${m.routeName} wanders`);
   }
 
   const met = meeting(sea, { ...w, ships: [{ ...monsters[0] }], trail: [[]], player: monsters[0].node });
