@@ -381,8 +381,8 @@ fighting:
   and it carries 12 more in its hold, and the captives go free: a point
   with their nation, and one with the Crown.
 - **What it does to a run**: over 30 runs the captain bot wins 23%, down
-  from 33%. Corsairs sank it twice, early, crossing the Bay of Biscay; it
-  has no notion of the home stretch and sails into it blind.
+  from 33%. Corsairs sank it twice; the bot has no notion of the home
+  stretch and sails into it blind.
 - **Saves migrate.** Each change to the save's shape adds a step to
   `MIGRATIONS` in `src/save.ts`, so a run in progress survives an update.
 
