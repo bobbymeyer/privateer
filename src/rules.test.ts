@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { type Card, woundCard } from './cards.ts';
-import { act, createEncounter, legalActions, type EncounterState } from './rules.ts';
+import { act, type Action, CLOSE, createEncounter, FAR, GRAPPLED, legalActions, type EncounterState, type Range } from './rules.ts';
 import { merchantEncounter } from './setup.ts';
 
 const card = (id: string, side: Card['side'], effects: Card['effects']): Card =>
@@ -98,9 +98,9 @@ test('a finished encounter takes no more actions', () => {
   assert.throws(() => act(s1, { type: 'keep', picks: [0, 1] }));
 });
 
-test('the deck running short parts the ships', () => {
-  // Four blanks: one hand of three, keep two, two left — not enough to deal.
-  const s1 = act(encounter(blank(4)), { type: 'keep', picks: [0, 1] });
+test('your deck running short parts the ships', () => {
+  // Three blanks: one hand, keep two, the third goes under — one card can't make a hand.
+  const s1 = act(encounter(blank(3)), { type: 'keep', picks: [0, 1] });
   assert.equal(s1.outcome, 'parted');
   assert.equal(s1.round, 1);
 });
@@ -123,59 +123,77 @@ test('illegal picks are refused', () => {
   assert.throws(() => act(s, { type: 'keep', picks: [0, 3] }));
 });
 
-const flee = (side: Card['side'], amount = 2) => card(`flee-${side}`, side, [{ kind: 'flee', amount }]);
+const flee = (side: Card['side'], amount = 1) => card(`flee-${side}`, side, [{ kind: 'flee', amount }]);
 const hold = (side: Card['side'], amount = 1) => card(`hold-${side}`, side, [{ kind: 'hold', amount }]);
-const chase = (side: Card['side'], amount = 2) => card(`chase-${side}`, side, [{ kind: 'chase', amount }]);
-/** Damage landing now, as if a wound of that size were kept. */
-const hit = (n: number) => card(`hit${n}`, 'target', [{ kind: 'breach', amount: n }]);
+const chase = (side: Card['side'], amount = 1) => card(`chase-${side}`, side, [{ kind: 'chase', amount }]);
 const hurt = (n: number) => card(`hurt${n}`, 'ship', [{ kind: 'breach', amount: n }]);
+const keep01: Action = { type: 'keep', picks: [0, 1] };
 
-test('a flee card makes way; three is away', () => {
-  const s1 = act(stacked([flee('target'), ...blank(2)]), { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.outcome, null, 'two way is not enough');
-  assert.equal(s1.target.way, 2);
-  const s2 = act({ ...s1, hand: [flee('target'), ...blank(2)] }, { type: 'keep', picks: [0, 1] });
-  assert.equal(s2.outcome, 'escaped', 'four is');
+/** As `stacked`, at this range, with her intent face up and her deck beneath it. */
+function facing(hand: Card[], range: Range, intent: Card | null = null, herDeck: Card[] = blank(6, 'target')): EncounterState {
+  return { ...stacked(hand), range, intent, herDeck: herDeck.map((c, i) => ({ ...c, id: `her${i}` })) };
+}
+
+test('bearing away opens the range; opened past far, you are away, with what you came for', () => {
+  const s1 = act({ ...facing([flee('ship'), ...blank(2)], CLOSE), plunder: 4 }, keep01);
+  assert.equal(s1.outcome, null);
+  assert.equal(s1.range, FAR);
+  const s2 = act({ ...s1, hand: [flee('ship'), ...blank(2)] }, keep01);
+  assert.equal(s2.outcome, 'fled');
+  assert.equal(s2.payout, 4);
 });
 
-test('you can run with what you came for, threatened or not', () => {
-  // Plunder aboard, hull untouched: two flee cards and you're away with it.
-  const s0 = { ...stacked([flee('ship'), flee('ship'), ...blank(1)]), plunder: 4 };
-  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.outcome, 'fled');
-  assert.equal(s1.payout, 4);
+test('chase and grapnels close the range, down to grappled and no closer', () => {
+  const s1 = act(facing([chase('ship'), hold('ship'), ...blank(1)], FAR), keep01);
+  assert.equal(s1.range, GRAPPLED);
+  const s2 = act({ ...s1, hand: [chase('ship'), ...blank(2)] }, keep01);
+  assert.equal(s2.range, GRAPPLED);
 });
 
-test('a ship that has to run takes the rest of her hold with her', () => {
-  const s0 = { ...stacked([card('haul', 'target', [{ kind: 'plunder', amount: 2 }]), flee('target'), ...blank(1)]), target: { ...stacked(blank(3)).target, way: 2 } };
-  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
+test('her intent is face up, plays after yours, and the next turns up', () => {
+  const runs = card('she-runs', 'target', [{ kind: 'flee', amount: 1 }]);
+  const s0 = facing(blank(3), FAR, runs);
+  assert.equal(s0.intent!.id, 'she-runs');
+  const s1 = act(s0, keep01);
+  assert.equal(s1.outcome, 'escaped', 'from far, her bearing away is the end of it');
+  // Another round: her next card is up.
+  const s2 = act(facing(blank(3), CLOSE, card('fire', 'target', [{ kind: 'hurt', amount: 1 }])), keep01);
+  assert.equal(s2.ship.hull, 4);
+  assert.equal(s2.intent!.id, 'her0');
+  assert.deepEqual(s2.herDiscard.map((c) => c.id), ['fire']);
+});
+
+test('order matters: run her down before she bears away, and she falls short', () => {
+  const runs = card('she-runs', 'target', [{ kind: 'flee', amount: 1 }]);
+  // Her intent shown: she'll bear away from far. Chase first: far → close, then she runs: close → far. Still here.
+  const chased = act(facing([chase('ship'), ...blank(2)], FAR, runs), keep01);
+  assert.equal(chased.outcome, null);
+  assert.equal(chased.range, FAR);
+  // Without the chase she's away.
+  assert.equal(act(facing(blank(3), FAR, runs), keep01).outcome, 'escaped');
+});
+
+test('a card out of range does nothing, and says so', () => {
+  const broadside = card('broadside', 'ship', [{ kind: 'hit', amount: 3, at: ['close'] }]);
+  const atFar = act(facing([broadside, ...blank(2)], FAR), keep01);
+  assert.equal(atFar.target.hull, 5);
+  const e = atFar.events.find((x) => x.type === 'effect' && x.card.id === 'broadside');
+  assert.ok(e && e.type === 'effect' && e.note === 'range' && e.applied === 0);
+  assert.equal(act(facing([broadside, ...blank(2)], CLOSE), keep01).target.hull, 2);
+});
+
+test('a ship that runs takes the rest of her hold with her', () => {
+  const s0 = facing([card('haul', 'ship', [{ kind: 'plunder', amount: 2 }]), ...blank(2)], FAR, card('runs', 'target', [{ kind: 'flee', amount: 1 }]));
+  const s1 = act(s0, keep01);
   assert.equal(s1.outcome, 'escaped');
   assert.equal(s1.payout, 2);
 });
 
-test('order matters: chase her before she runs, and she falls short', () => {
-  // She has 1 way. Chase first: 1 → 0, then she runs: 2. Not away.
-  // She runs first: 1 → 3. Away, before the chase.
-  const s0 = { ...stacked([chase('ship'), flee('target'), ...blank(1)]), target: { ...stacked(blank(3)).target, way: 1 } };
-  const chasedFirst = act(s0, { type: 'keep', picks: [0, 1] });
-  assert.equal(chasedFirst.outcome, null);
-  assert.equal(chasedFirst.target.way, 2);
-  assert.equal(act(s0, { type: 'keep', picks: [1, 0] }).outcome, 'escaped');
-});
-
-test('chase and hold take way off the other side', () => {
-  const s0 = { ...stacked([chase('ship'), hold('ship'), ...blank(1)], 6), target: { ...stacked(blank(3)).target, way: 2 } };
-  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.target.way, 0, 'chase 2 took it all; hold had nothing left to take');
-  const s2 = act({ ...s1, hand: [flee('target'), ...blank(2)] }, { type: 'keep', picks: [0, 1] });
-  assert.equal(s2.outcome, null, 'she has to start again');
-});
-
-test('their hold takes your way', () => {
-  const s0 = { ...stacked([hold('target', 2), flee('ship'), ...blank(1)]), ship: { hull: 5, maxHull: 5, brace: 0, way: 2 } };
-  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.outcome, null, 'held to 0, then 2: not away');
-  assert.equal(s1.ship.way, 2);
+test('a town goes nowhere: its people can carry things inland, but it can’t bear away', () => {
+  const s0 = { ...facing(blank(3), CLOSE, card('run', 'target', [{ kind: 'flee', amount: 5 }])), target: { ...facing(blank(3), CLOSE).target, fixed: true } };
+  const s1 = act(s0, keep01);
+  assert.equal(s1.outcome, null);
+  assert.equal(s1.range, CLOSE);
 });
 
 test('prisoners give up rumors, which go down with you if you sink', () => {
@@ -187,109 +205,71 @@ test('prisoners give up rumors, which go down with you if you sink', () => {
   assert.deepEqual(s2.intel, []);
 });
 
-const damageIn = (cards: Card[], side: Card['side']) =>
-  cards.filter((c) => c.damage && c.side === side).length;
+const damageIn = (cards: Card[], side: Card['side']) => cards.filter((c) => c.damage && c.side === side).length;
 
 test('shot strikes the hull at once; brace soaks yours', () => {
-  const s0 = { ...stacked([card('broadside', 'ship', [{ kind: 'hit', amount: 3 }]), card('return', 'target', [{ kind: 'hurt', amount: 2 }]), ...blank(1)]), ship: { hull: 5, maxHull: 5, brace: 1, way: 0 } };
-  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
+  const s0 = { ...facing([card('broadside', 'ship', [{ kind: 'hit', amount: 3 }]), ...blank(2)], CLOSE, card('return', 'target', [{ kind: 'hurt', amount: 2 }])), ship: { hull: 5, maxHull: 5, brace: 1 } };
+  const s1 = act(s0, keep01);
   assert.equal(s1.target.hull, 2);
   assert.equal(s1.ship.hull, 4, 'one of the two braced');
-  assert.equal(damageIn([...s1.deck, ...s1.hand], 'target'), 0, 'plain shot leaves no wound');
+  assert.equal(damageIn([...s1.herDeck, ...(s1.intent ? [s1.intent] : [])], 'target'), 0, 'plain shot leaves no wound');
 });
 
-test('some shot leaves a wound, on top of the deck against the side it struck', () => {
-  const s0 = stacked([card('heated', 'ship', [{ kind: 'hit', amount: 1 }, { kind: 'wound', what: 'fire' }]), card('chain', 'target', [{ kind: 'wound', what: 'sails' }]), ...blank(1)]);
-  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
-  // Wounds go on top, so they're in the very next hand.
-  const fire = s1.hand.find((c) => c.wound === 'fire')!;
-  const sails = s1.hand.find((c) => c.wound === 'sails')!;
-  assert.equal(fire.side, 'target');
-  assert.equal(sails.side, 'ship');
-  const all = [...s1.deck, ...s1.hand];
-  assert.equal(new Set(all.map((c) => c.id)).size, all.length, 'ids stay unique');
+test('a wound to her goes on top of her deck: her next card is dealing with it, and it costs her', () => {
+  const leak = card('leaky', 'ship', [{ kind: 'wound', what: 'leak' }]);
+  const s1 = act(facing([leak, ...blank(2)], CLOSE), keep01);
+  assert.equal(s1.intent!.wound, 'leak');
+  assert.equal(s1.intent!.side, 'target');
+  const s2 = act({ ...s1, hand: blank(3) }, keep01);
+  assert.equal(s2.target.hull, 5 - 2, 'a leak costs two');
 });
 
-test('a wound costs its hull when kept, and is spent', () => {
-  const s0 = stacked([woundCard('ship', 'leak', 'leak'), woundCard('target', 'fire', 'fire'), ...blank(1)]);
-  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.ship.hull, 3, 'a leak: 2');
-  assert.equal(s1.target.hull, 2, 'a fire: 3');
-  assert.deepEqual(s1.discard.map((c) => c.id), ['leak', 'fire']);
+test('a wound to you goes on top of your deck: in your next hand, it costs its hull when kept', () => {
+  const s1 = act(facing(blank(3), CLOSE, card('fireship', 'target', [{ kind: 'wound', what: 'fire' }])), keep01);
+  assert.equal(s1.hand[0].wound, 'fire');
+  assert.equal(s1.hand[0].side, 'ship');
+  const s2 = act(s1, keep01);
+  assert.equal(s2.ship.hull, 5 - 3, 'a fire costs three');
+  assert.ok(s2.discard.some((c) => c.wound === 'fire'), 'and it is spent');
 });
 
-test('sent to the bottom, a wound comes round again; two in a hand, one gets through', () => {
-  const s0 = stacked([woundCard('ship', 'l1', 'leak'), woundCard('ship', 'l2', 'leak'), ...blank(1)]);
-  for (const a of legalActions(s0)) assert.ok(act(s0, a).ship.hull <= 3, 'at least one lands, whatever is kept');
-  const s1 = act(stacked([woundCard('ship', 'l1', 'leak'), ...blank(2)]), { type: 'keep', picks: [1, 2] });
-  assert.equal(s1.deck.at(-1)!.id, 'l1', 'put off, not gone');
-});
-
-test('shot-away sails: no hull, but no running till they are dealt with', () => {
-  const flee = card('flee', 'ship', [{ kind: 'flee', amount: 3 }]);
-  const hurt3 = card('hurt3', 'ship', [{ kind: 'breach', amount: 3 }]);
-  // Threatened (hull 2 of 5), sails shot away and still in the deck: the flee fails.
-  const rigged = { ...stacked([hurt3, flee, ...blank(1)]), deck: [woundCard('ship', 'sails', 'sails'), ...blank(5)] };
-  const s1 = act(rigged, { type: 'keep', picks: [0, 1] });
-  assert.equal(s1.outcome, null);
+test('shot-away sails: no bearing away till they are dealt with, for either side', () => {
+  const sails = woundCard('ship', 'sails-ship#1', 'sails');
+  const s0 = { ...facing([flee('ship'), ...blank(2)], FAR), deck: [sails, ...blank(6)] };
+  const s1 = act(s0, keep01);
+  assert.equal(s1.outcome, null, 'you could not get away');
   const e = s1.events.find((x) => x.type === 'effect' && x.effect.kind === 'flee');
-  assert.equal(e?.type === 'effect' && e.note, 'rigging');
-  // Repaired aloft — the sails kept, and spent — and the same flee works.
-  const fixed = act(stacked([woundCard('ship', 'sails', 'sails'), hurt3, ...blank(1)]), { type: 'keep', picks: [0, 1] });
-  assert.equal(fixed.ship.hull, 2, 'sails cost no hull');
-  const away = act({ ...fixed, hand: [flee, ...blank(2)] }, { type: 'keep', picks: [0, 1] });
-  assert.equal(away.outcome, 'fled');
+  assert.ok(e && e.type === 'effect' && e.note === 'rigging');
+  // Hers: sails against her in her deck, and her bearing away fails.
+  const hers = facing(blank(3), FAR, card('runs', 'target', [{ kind: 'flee', amount: 1 }]), [woundCard('target', 'sails-t#1', 'sails'), ...blank(4, 'target')]);
+  assert.equal(act(hers, keep01).outcome, null);
 });
 
-test('the same seed makes the same damage', () => {
-  const run = () => {
-    let s = merchantEncounter(9);
-    while (!s.outcome) s = act(s, legalActions(s)[0]);
-    return s.events;
-  };
-  assert.deepEqual(run(), run());
-});
-
-test('the two kept are spent into the discard; the third goes under the deck', () => {
-  const [a, b, c] = blank(3).map((x, i) => ({ ...x, id: `h${i}` }));
-  const s0 = stacked([a, b, c]);
-  const s1 = act(s0, { type: 'keep', picks: [1, 0] });
-  assert.deepEqual(s1.discard.map((x) => x.id), ['h1', 'h0'], 'in the order played');
-  assert.equal(s1.deck.at(-1)!.id, 'h2');
-  assert.ok(![...s1.deck, ...s1.hand].some((x) => x.id === 'h0' || x.id === 'h1'), 'spent cards are out of play');
+test('the two kept are spent; the third goes under your deck; her card goes to her discard', () => {
+  const s0 = facing(blank(3).map((c, i) => ({ ...c, id: `h${i}` })), CLOSE, card('hers', 'target', []));
+  const s1 = act(s0, keep01);
+  assert.deepEqual(s1.discard.map((c) => c.id), ['h0', 'h1']);
+  assert.ok(s1.deck.some((c) => c.id === 'h2'));
+  assert.deepEqual(s1.herDiscard.map((c) => c.id), ['hers']);
 });
 
 test('a card that ends the fight is spent too', () => {
-  const kill = card('kill', 'target', [{ kind: 'breach', amount: 9 }]);
-  const s1 = act(stacked([kill, ...blank(2)]), { type: 'keep', picks: [0, 1] });
+  const s1 = act(facing([card('kill', 'ship', [{ kind: 'hit', amount: 9 }]), ...blank(2)], CLOSE), keep01);
   assert.equal(s1.outcome, 'destroyed');
-  assert.equal(s1.discard.at(-1)!.id, 'kill');
+  assert.ok(s1.discard.some((c) => c.id === 'kill'));
 });
 
-test('recall brings back the side’s own spent cards, most recent first — never damage, never theirs', () => {
+test('recall brings back your own spent cards, most recent first, never wounds', () => {
   const recall = card('recall', 'ship', [{ kind: 'recall', amount: 2 }]);
-  const s0 = {
-    ...stacked([recall, ...blank(2)]),
-    discard: [
-      card('old', 'ship', []),
-      card('theirs', 'target', []),
-      woundCard('ship', 'dmg', 'leak'),
-      card('recent', 'ship', []),
-    ],
-  };
-  const s1 = act(s0, { type: 'keep', picks: [0, 1] });
-  // The deck was blanks; the hand dealt from its top, so look at the bottom.
-  const back = [...s1.deck, ...s1.hand].map((x) => x.id);
-  assert.ok(back.includes('recent') && back.includes('old'));
-  assert.ok(!back.includes('dmg') && !back.includes('theirs'));
-  assert.deepEqual(s1.discard.map((x) => x.id), ['theirs', 'dmg', 'recall', 'blank0']);
-  const e = s1.events.find((x) => x.type === 'effect' && x.effect.kind === 'recall');
-  assert.equal(e?.type === 'effect' && e.applied, 2);
+  const spent = [card('a', 'ship', []), woundCard('ship', 'leak-ship#9', 'leak'), card('b', 'ship', [])];
+  const s1 = act({ ...facing([recall, ...blank(2)], CLOSE), discard: spent }, keep01);
+  assert.deepEqual(s1.discard.map((c) => c.id).filter((id) => id !== 'recall' && !id.startsWith('blank')), ['leak-ship#9']);
+  assert.deepEqual(s1.deck.slice(-3).map((c) => c.id).filter((id) => id === 'a' || id === 'b'), ['b', 'a']);
 });
 
 test('with nothing spent, a recall brings nothing', () => {
   const recall = card('recall', 'ship', [{ kind: 'recall', amount: 3 }]);
-  const s1 = act(stacked([recall, ...blank(2)]), { type: 'keep', picks: [0, 1] });
+  const s1 = act(facing([recall, ...blank(2)], CLOSE), keep01);
   const e = s1.events.find((x) => x.type === 'effect' && x.effect.kind === 'recall');
   assert.equal(e?.type === 'effect' && e.applied, 0);
 });
@@ -300,7 +280,7 @@ test('a garrison’s relief is a fixed number of cards, every so often — not a
   const rounds: number[] = [];
   while (!s.outcome && s.round < 20) {
     const before = s.reinforced;
-    s = act(s, { type: 'keep', picks: [0, 1] });
+    s = act(s, keep01);
     if (s.reinforced > before) rounds.push(s.round);
   }
   assert.deepEqual(rounds, [2, 4, 6], 'from round 2, every other round, three in all');

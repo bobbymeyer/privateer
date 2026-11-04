@@ -23,7 +23,7 @@ function takeHer(w: WorldState): WorldState {
     const f = s.encounter.fight;
     const score = (a: ReturnType<typeof legalActions>[number]) => {
       const n = act(f, a);
-      return n.outcome === 'destroyed' ? -1e6 : n.outcome === 'fled' || n.outcome === 'escaped' ? 1e6 : n.target.hull - n.target.way;
+      return n.outcome === 'destroyed' ? -1e6 : n.outcome === 'fled' || n.outcome === 'escaped' ? 1e6 : n.target.hull + n.range;
     };
     const best = legalActions(f).reduce((a, b) => (score(b) < score(a) ? b : a));
     s = fight(sea, s, best);

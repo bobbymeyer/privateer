@@ -2,11 +2,13 @@
   import type { Card } from '../cards.ts';
   import { explainCard } from '../describe.ts';
 
-  let { card, order, disabled = false, onpick }: {
+  let { card, order, disabled = false, note = '', onpick }: {
     card: Card;
     /** 1 or 2 when picked, null when not. */
     order: number | null;
     disabled?: boolean;
+    /** A word on the card's corner: `out of range`, `her next card`. */
+    note?: string;
     onpick: () => void;
   } = $props();
 
@@ -22,6 +24,7 @@
   <span class="side">{card.damage ? (card.side === 'ship' ? 'a wound to you' : 'a wound to them') : card.side === 'ship' ? 'yours' : 'theirs'}</span>
   <span class="name">{card.name}{#if copy}<span class="copy"> #{copy}</span>{/if}</span>
   <span class="text">{card.text}</span>
+  {#if note}<span class="note">{note}</span>{/if}
   {#if order !== null}<span class="order" aria-label="resolves {order === 1 ? 'first' : 'second'}">{order}</span>{/if}
 </button>
 
@@ -42,6 +45,7 @@
   .side { font-size: 0.75rem; letter-spacing: 0.08em; }
   .copy { font-size: 0.8em; opacity: 0.6; }
   .name { font-size: 1.15rem; }
+  .note { font-size: 0.75rem; letter-spacing: 0.06em; opacity: 0.7; }
   .text { margin-top: auto; font-variant-numeric: tabular-nums; }
   /* The resolve order, set in paper on an ink disc. */
   .order {

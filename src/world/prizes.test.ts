@@ -26,7 +26,7 @@ function takeHer(w: WorldState): WorldState {
     const f = s.encounter.fight;
     const score = (a: ReturnType<typeof legalActions>[number]) => {
       const n = act(f, a);
-      return n.outcome === 'destroyed' ? -1e6 : n.outcome === 'fled' || n.outcome === 'escaped' ? 1e6 : n.target.hull - n.target.way;
+      return n.outcome === 'destroyed' ? -1e6 : n.outcome === 'fled' || n.outcome === 'escaped' ? 1e6 : n.target.hull + n.range;
     };
     s = fight(sea, s, legalActions(f).reduce((a, b) => (score(b) < score(a) ? b : a)));
   }
@@ -122,6 +122,8 @@ test('a ship read before you meet her: her hull, her hold, how she fights', () =
   assert.ok(armada.traits.includes('a light hold'));
   assert.ok(read('monster').traits.includes('nothing to take'));
   assert.ok(read('hunter').traits.includes('well gunned'));
+  assert.ok(read('hunter').traits.includes('deadly alongside'));
+  assert.ok(armada.traits.includes('her guns reach you far off'));
   assert.ok(merchant.traits.includes('lightly armed'));
   assert.equal(read('hunter', { hull: 4 }).hull, TARGETS.hunter.hull + 4);
   assert.ok(read('corsair').traits.includes('a light hold'));

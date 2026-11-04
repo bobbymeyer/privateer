@@ -24,7 +24,7 @@
  * end of you.
  */
 
-import { act, type Action, type EncounterState, type Outcome } from '../rules.ts';
+import { act, type Action, CLOSE, type EncounterState, FAR, type Outcome } from '../rules.ts';
 import { PRIZE_CARDS, deckOf } from '../outfit.ts';
 import { encounterWith, type Extra, TARGETS, type TargetKind } from '../setup.ts';
 import { NOTABLE, sighting } from './bar.ts';
@@ -146,7 +146,8 @@ function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, force
   const seed = Math.floor(roll(r) * 2 ** 31);
   // What you saw of her is what you fight: a warship better found against a captain with a name, a corsair laden.
   const ship = who.shipId >= 0 ? s.ships.find((x) => x.id === who.shipId) : undefined;
-  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit), extra ?? (ship ? extraFor(s, ship) : {}));
+  // She came at you: she's bearing down from far. You fired first: within hail.
+  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit), extra ?? (ship ? extraFor(s, ship) : {}), forced && who.port === null ? FAR : CLOSE);
   return { ...s, rng: r.rng, hail: null, encounter: { ...who, fight, forced } };
 }
 

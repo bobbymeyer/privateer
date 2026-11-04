@@ -177,52 +177,62 @@ did before the engraving.
 
 ## the loop
 
-1. Your ship's cards and the target's cards are shuffled into one deck.
-2. Three are dealt. Keep two, in the order they should resolve; then
-   they're spent, into the discard. The third goes to the bottom of the
-   deck. A spent card comes back only when a card says so: `recall` brings
-   back that side's most recently spent cards, under the deck, never
-   damage. The boatswain's *all hands* recalls one of yours; a fortress
-   mending its walls recalls one of its guns.
-3. It ends when either side **flees**, when either hull reaches 0, or when
-   the deck can't deal a full hand and the ships **part**.
+A fight is two ships, two decks, and the range between them (`src/rules.ts`).
 
-Every action and decision in combat is a card. There is no stop button.
+- **The range**: grappled, close or far. Most cards care. Long guns reach
+  at far, a broadside is heavy close, boarders only go across grappled.
+  Chase and grapnels close the range; bearing away opens it. Opened past
+  far, whoever opened it is away. So cards set each other up: give chase,
+  then grapple, then sweep the hold. A card out of range does nothing, and
+  the fight says so; your hand marks those cards *out of range now*.
+- **Her intent is face up**: the top card of her deck, shown before you
+  choose. You play first, then she plays it, then her next card turns up.
+  She's about to bear away from far? Chase first, and she falls short.
+- **Your hand**: three dealt from your deck. Keep two; they resolve in the
+  order you name them and are spent. The third goes under your deck. Spent
+  cards come back only by `recall`, so a deck of fifteen runs out in about
+  seven rounds, and fights last five or six.
+- **Where it starts**: close when you fire first, within hail; far when
+  she comes at you, bearing down, which gives you a chance to bear away
+  before she closes. A town can't move: close is the boats offshore,
+  grappled is the party ashore, and it never gets away.
+- **Wounds**: some shot leaves a leak (2 hull), a fire (3) or shot-away
+  sails (no hull, but that ship can't bear away till they're dealt with),
+  as a card on top of the wounded ship's deck. Yours comes into your hand:
+  keep it to deal with it, or send it under. Hers becomes her next card, a
+  round she spends on it — chain shot is how you stop a ship that runs.
+- **Each kind fights its own way**, from its deck: a merchant runs, a
+  guard ship closes and grapples and is deadly alongside, a galleon's
+  great guns ruin you close, an armada's long guns reach you far off, a
+  town mends its barricades and calls its relief. The read of a ship before
+  you engage says which.
 
-- **shot** — `hit` and `hurt` strike the hull at once; brace soaks yours.
-- **wounds** — some shot also leaves a wound that outlasts it, a card on
-  top of the deck against the side it struck:
-  - **a leak below** costs 2 hull when it's kept;
-  - **fire aboard** costs 3;
-  - **sails shot away** cost nothing, but while they're in a side's deck or
-    hand, its flee cards don't work.
+Card text is written from the effects (`cardText` in `src/cards.ts`), so a
+card can't say other than it does: *far: hit 1 · close or grappled: hit 3 ·
+close: leak*.
 
-  Keeping a wound deals with it, pumping or fighting the fire or repairing
-  aloft, at its cost, and it's spent. Sending it to the bottom only puts it
-  off. Two in a hand, and one gets through. Your broadside leaves a leak,
-  your chain shot their sails. A galleon's great guns, an escort's or an
-  armada's broadside leave leaks. A fort fires heated shot. A guard ship
-  fires chain and bar at your rigging, to stop you running.
+What the simulator says, a pinnace with the balanced bot:
 
-- **way** — a side gets away by making way: three of it and she's away.
-  A flee card makes 2, so it takes two, unless the other side takes way back
-  in between. Anyone may run at any time, you included, with plunder in the
-  hold; shot-away sails stop it.
-- **chase** and **hold** take way off the other side: give chase, crowd on
-  sail, grapnels, boarders, marksmen in the tops, a fleet cutting off your
-  retreat, an armada with the weather gauge. Whoever hunts carries them.
+| against | rounds | taken | she got away | sunk |
+| --- | --- | --- | --- | --- |
+| a merchant | 5.7 | 75% | 14% | 0% |
+| a guard ship, coming at you | 6.9 | 21% | — | 1% |
+| …running, the bot that bears away when it can | 3.2 | 9% | — | 0.4% (73% away) |
 
-Threat is checked when the card resolves, so order matters. If you play a
-merchant's flee card before you hurt it, it does nothing. Play it after your
-broadside and the merchant gets away.
+Before the rework a fight ran eleven rounds, and how you played hardly
+mattered: four sensible bots came within a hair of each other. Now running
+and fighting are different games. Over a whole run the captain bot does
+worse than before (4 wins and 19 sunk of 30, against 7 and 14), partly
+because it plays a round at a time and never sets up a combination or
+reads her intent the way a person will; your logbook will say more.
 
 | ending | payout |
 | --- | --- |
-| you flee | your plunder |
-| the target flees | your plunder; the rest of its hold goes with it |
-| the target is destroyed | plunder plus bounty; its hold sinks |
+| you get away | your plunder |
+| she gets away | your plunder; the rest of her hold goes with her |
+| she is destroyed | plunder plus bounty; her hold sinks |
 | you are sunk | nothing |
-| the ships part | your plunder |
+| the ships part (your deck runs out) | your plunder |
 
 ## the world
 
@@ -549,7 +559,7 @@ same cards. Now most of it is chosen.
 
 **The fight moves** a little, so a round can be read without reading it.
 A new hand deals in from the deck, a card at a time; a wound card drops
-onto it from above. Hull, morale and way are rows of pips: a pip lost
+onto it from above. Hull and morale are rows of pips: a pip lost
 drains, a pip gained fills, and the difference floats up off the count.
 The round's lines come in one by one. None of it plays when the reader has
 asked for reduced motion.

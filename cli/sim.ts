@@ -11,7 +11,7 @@
  *   npm run sim -- --runs 10000
  */
 
-import { type Action, type EncounterState, type Outcome, act, legalActions } from '../src/rules.ts';
+import { type Action, CLOSE, type EncounterState, FAR, type Outcome, act, legalActions } from '../src/rules.ts';
 import { lookahead } from './bots.ts';
 import { TARGETS, encounterWith } from '../src/setup.ts';
 import type { TargetKind } from '../src/setup.ts';
@@ -45,6 +45,8 @@ if (!SHIP_CLASSES[outfit.ship]) throw new Error(`no ship ${outfit.ship}; try ${O
 const deck = deckOf(outfit);
 const hullFlag = process.argv.indexOf('--hull');
 const hull = hullFlag >= 0 ? Number(process.argv[hullFlag + 1]) : maxHullOf(outfit);
+const rangeFlag = process.argv.indexOf('--range');
+const startAt = rangeFlag >= 0 && process.argv[rangeFlag + 1] === 'far' ? FAR : CLOSE;
 const flag = process.argv.indexOf('--runs');
 const runs = flag >= 0 ? Number(process.argv[flag + 1]) : 2000;
 const outcomes: Outcome[] = ['fled', 'escaped', 'destroyed', 'sunk', 'parted'];
@@ -57,7 +59,7 @@ for (const bot of bots) {
   let rounds = 0;
   const counts = Object.fromEntries(outcomes.map((o) => [o, 0])) as Record<Outcome, number>;
   for (let seed = 0; seed < runs; seed++) {
-    let s = encounterWith(target, seed, { hull, maxHull: hull }, deck);
+    let s = encounterWith(target, seed, { hull, maxHull: hull }, deck, {}, startAt);
     while (!s.outcome) s = act(s, bot.choose(s));
     payout += s.payout;
     rounds += s.round;

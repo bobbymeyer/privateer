@@ -18,7 +18,7 @@ const rich = (w: WorldState, gold = 500): WorldState => ({ ...w, gold });
 
 test('your deck is your ship, its refits and your crew', () => {
   const bare = deckOf(START_OUTFIT).length;
-  assert.equal(bare, 14);
+  assert.equal(bare, 15);
   const kitted = { ...START_OUTFIT, ship: 'sloop', upgrades: ['guns'], crew: ['gunner', 'marksmen'] };
   const cards = cardsOf(kitted);
   assert.equal(cards['raking-fire'], 2 + 1 + 1);

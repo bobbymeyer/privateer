@@ -4,40 +4,43 @@
  * hiring and refitting all change the cards you draw.
  */
 
-import { type Card, type CardDef, SHIP_CARDS, buildDeck } from './cards.ts';
+import { type Card, type CardDef, type Effect, type Reach, SHIP_CARDS, buildDeck, cardText } from './cards.ts';
 
-type CardFace = Omit<CardDef, 'copies'>;
+type CardFace = Omit<CardDef, 'copies'> & { text: string };
 
-/** Every card you can come to hold. The first nine are the pinnace's; the rest come aboard with crew and refits. */
+const near = ['close', 'grappled'] as Reach[];
+const face = (key: string, name: string, effects: Effect[]): CardFace => ({ key, name, effects, text: cardText(effects) });
+
+/** Every card you can come to hold: the pinnace's, then what comes aboard with crew, refits and prizes. Their text is written from their effects. */
 export const PLAYER_CARDS: Record<string, CardFace> = {
-  ...Object.fromEntries(SHIP_CARDS.map(({ copies: _, ...face }) => [face.key, face])),
-  'double-shot': { key: 'double-shot', name: 'double-shotted guns', text: 'hit 4, hurt 1', effects: [{ kind: 'hit', amount: 4 }, { kind: 'hurt', amount: 1 }] },
-  marksmen: { key: 'marksmen', name: 'marksmen in the tops', text: 'hit 1, hold 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'hold', amount: 1 }] },
-  'prize-crew': { key: 'prize-crew', name: 'prize crew', text: 'plunder 3, interrogate', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'interrogate', reliability: 0.8 }] },
-  'all-hands': { key: 'all-hands', name: 'all hands', text: 'brace 3, recall 1', effects: [{ kind: 'brace', amount: 3 }, { kind: 'recall', amount: 1 }] },
-  'surgeons-mate': { key: 'surgeons-mate', name: "surgeon's mate", text: 'repair 1, brace 1, recall 1', effects: [{ kind: 'repair', amount: 1 }, { kind: 'brace', amount: 1 }, { kind: 'recall', amount: 1 }] },
-  reload: { key: 'reload', name: 'run out the guns again', text: 'recall 2', effects: [{ kind: 'recall', amount: 2 }] },
-  drilled: { key: 'drilled', name: 'drilled crews', text: 'hit 1, recall 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'recall', amount: 1 }] },
+  ...Object.fromEntries(SHIP_CARDS.map(({ copies: _, ...f }) => [f.key, { ...f, text: f.text ?? cardText(f.effects) }])),
+  'double-shot': face('double-shot', 'double-shotted guns', [{ kind: 'hit', amount: 4, at: near }, { kind: 'hurt', amount: 1 }]),
+  marksmen: face('marksmen', 'marksmen in the tops', [{ kind: 'hit', amount: 1, at: ['far'] }, { kind: 'hit', amount: 2, at: near }]),
+  'prize-crew': face('prize-crew', 'prize crew', [{ kind: 'plunder', amount: 4, at: ['grappled'] }, { kind: 'interrogate', reliability: 0.8, at: ['grappled'] }]),
+  'all-hands': face('all-hands', 'all hands', [{ kind: 'brace', amount: 3 }, { kind: 'recall', amount: 1 }]),
+  'surgeons-mate': face('surgeons-mate', "surgeon's mate", [{ kind: 'repair', amount: 1 }, { kind: 'brace', amount: 1 }, { kind: 'recall', amount: 1 }]),
+  reload: face('reload', 'run out the guns again', [{ kind: 'recall', amount: 2 }]),
+  drilled: face('drilled', 'drilled crews', [{ kind: 'hit', amount: 1 }, { kind: 'recall', amount: 1 }]),
 
   // Prizes: what you can take off a ship you've taken, one card a prize.
   // Three ways to fight run through them — the guns (hit and wounds), the
-  // boarders (plunder and hold), and the runner (flee and chase) — and most
-  // pay for what they give.
-  'spare-canvas': { key: 'spare-canvas', name: 'her spare canvas', text: 'repair 1, flee 1', effects: [{ kind: 'repair', amount: 1 }, { kind: 'flee', amount: 1 }] },
-  'her-pilot': { key: 'her-pilot', name: 'her pilot, pressed', text: 'flee 2, interrogate', effects: [{ kind: 'flee', amount: 2 }, { kind: 'interrogate', reliability: 0.8 }] },
-  'stern-chasers': { key: 'stern-chasers', name: 'her stern chasers', text: 'hit 1, flee 1', effects: [{ kind: 'hit', amount: 1 }, { kind: 'flee', amount: 1 }] },
-  grapnels: { key: 'grapnels', name: 'her grapnels', text: 'plunder 2, hold 2', effects: [{ kind: 'plunder', amount: 2 }, { kind: 'hold', amount: 2 }] },
-  pikes: { key: 'pikes', name: 'boarding pikes', text: 'plunder 5, hurt 2', effects: [{ kind: 'plunder', amount: 5 }, { kind: 'hurt', amount: 2 }] },
-  'chain-and-bar': { key: 'chain-and-bar', name: 'chain and bar', text: 'hit 1, sails', effects: [{ kind: 'hit', amount: 1 }, { kind: 'wound', what: 'sails' }] },
-  'long-guns': { key: 'long-guns', name: 'her long guns', text: 'hit 2, chase 1', effects: [{ kind: 'hit', amount: 2 }, { kind: 'chase', amount: 1 }] },
-  'great-guns': { key: 'great-guns', name: 'a Spanish great gun', text: 'hit 4, leak, hurt 1', effects: [{ kind: 'hit', amount: 4 }, { kind: 'wound', what: 'leak' }, { kind: 'hurt', amount: 1 }] },
-  'her-carpenters': { key: 'her-carpenters', name: 'her carpenters', text: 'repair 3', effects: [{ kind: 'repair', amount: 3 }] },
-  sweeps: { key: 'sweeps', name: 'galley sweeps', text: 'chase 3', effects: [{ kind: 'chase', amount: 3 }] },
-  'renegades': { key: 'renegades', name: 'renegades who know the trade', text: 'plunder 3, hold 1, recall 1', effects: [{ kind: 'plunder', amount: 3 }, { kind: 'hold', amount: 1 }, { kind: 'recall', amount: 1 }] },
-  'town-guns': { key: 'town-guns', name: 'guns off the walls', text: 'hit 3, hurt 1', effects: [{ kind: 'hit', amount: 3 }, { kind: 'hurt', amount: 1 }] },
-  'powder': { key: 'powder', name: 'powder from the magazine', text: 'hit 2, fire', effects: [{ kind: 'hit', amount: 2 }, { kind: 'wound', what: 'fire' }] },
-  'island-guides': { key: 'island-guides', name: 'island guides', text: 'flee 1, chase 1, recall 1', effects: [{ kind: 'flee', amount: 1 }, { kind: 'chase', amount: 1 }, { kind: 'recall', amount: 1 }] },
-  whalebone: { key: 'whalebone', name: 'its bones for knees and timbers', text: 'brace 3, repair 1', effects: [{ kind: 'brace', amount: 3 }, { kind: 'repair', amount: 1 }] },
+  // boarders (close, grapple, plunder), and the runner (open the range and
+  // go) — and most pay for what they give.
+  'spare-canvas': face('spare-canvas', 'her spare canvas', [{ kind: 'repair', amount: 1 }, { kind: 'flee', amount: 1 }]),
+  'her-pilot': face('her-pilot', 'her pilot, pressed', [{ kind: 'flee', amount: 1 }, { kind: 'interrogate', reliability: 0.8 }]),
+  'stern-chasers': face('stern-chasers', 'her stern chasers', [{ kind: 'hit', amount: 2, at: ['far'] }, { kind: 'flee', amount: 1, at: ['far'] }]),
+  grapnels: face('grapnels', 'her grapnels', [{ kind: 'hold', amount: 1, at: ['close'] }, { kind: 'plunder', amount: 2, at: ['grappled'] }]),
+  pikes: face('pikes', 'boarding pikes', [{ kind: 'plunder', amount: 5, at: ['grappled'] }, { kind: 'hurt', amount: 2, at: ['grappled'] }]),
+  'chain-and-bar': face('chain-and-bar', 'chain and bar', [{ kind: 'hit', amount: 1, at: ['far', 'close'] }, { kind: 'wound', what: 'sails', at: ['far', 'close'] }]),
+  'long-guns': face('long-guns', 'her long guns', [{ kind: 'hit', amount: 3, at: ['far'] }, { kind: 'hit', amount: 1, at: ['close'] }]),
+  'great-guns': face('great-guns', 'a Spanish great gun', [{ kind: 'hit', amount: 5, at: near }, { kind: 'wound', what: 'leak', at: near }, { kind: 'hurt', amount: 1 }]),
+  'her-carpenters': face('her-carpenters', 'her carpenters', [{ kind: 'repair', amount: 3 }]),
+  sweeps: face('sweeps', 'galley sweeps', [{ kind: 'chase', amount: 2 }]),
+  renegades: face('renegades', 'renegades who know the trade', [{ kind: 'hold', amount: 1, at: ['close'] }, { kind: 'plunder', amount: 3, at: ['grappled'] }, { kind: 'recall', amount: 1 }]),
+  'town-guns': face('town-guns', 'guns off the walls', [{ kind: 'hit', amount: 3, at: near }, { kind: 'hurt', amount: 1 }]),
+  powder: face('powder', 'powder from the magazine', [{ kind: 'hit', amount: 2 }, { kind: 'wound', what: 'fire', at: ['close'] }]),
+  'island-guides': face('island-guides', 'island guides', [{ kind: 'chase', amount: 1 }, { kind: 'recall', amount: 1 }]),
+  whalebone: face('whalebone', 'its bones for knees and timbers', [{ kind: 'brace', amount: 3 }, { kind: 'repair', amount: 1 }]),
 };
 
 /**
@@ -75,10 +78,10 @@ export interface ShipClass {
 }
 
 export const SHIP_CLASSES: Record<string, ShipClass> = {
-  pinnace: { name: 'pinnace', cost: 0, hull: 10, berths: 2, cards: {} },
-  sloop: { name: 'sloop', cost: 40, hull: 12, berths: 3, cards: { 'raking-fire': 1 } },
-  brigantine: { name: 'brigantine', cost: 90, hull: 14, berths: 4, cards: { broadside: 1, 'raking-fire': 1 } },
-  frigate: { name: 'frigate', cost: 180, hull: 18, berths: 6, cards: { broadside: 2, 'chain-shot': 1 } },
+  pinnace: { name: 'pinnace', cost: 0, hull: 12, berths: 2, cards: {} },
+  sloop: { name: 'sloop', cost: 40, hull: 14, berths: 3, cards: { 'raking-fire': 1 } },
+  brigantine: { name: 'brigantine', cost: 90, hull: 17, berths: 4, cards: { broadside: 1, 'raking-fire': 1 } },
+  frigate: { name: 'frigate', cost: 180, hull: 22, berths: 6, cards: { broadside: 2, 'chain-shot': 1 } },
 };
 
 export interface CrewRole {
