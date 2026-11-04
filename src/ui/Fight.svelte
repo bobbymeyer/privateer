@@ -1,7 +1,7 @@
 <script lang="ts">
   import { describeEvent, GLOSSARY, OUTCOME_TEXT, RAID_OUTCOME_TEXT } from '../describe.ts';
-  import { threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
-  import { type Card, REACHES } from '../cards.ts';
+  import { chained, linksFor, threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
+  import { type Card, REACHES, cardType } from '../cards.ts';
   import type { Reckoning } from '../world/meet.ts';
   import { adjective, type Nation } from '../world/ports.ts';
   import Flag from './Flag.svelte';
@@ -43,6 +43,25 @@
   /** The round's lines, one at a time, as they happened. */
   const told = (node: Element, { i }: { i: number }) => fade(node, still ? { duration: 0 } : { duration: 200, delay: i * 90 });
   const waiting = (side: 'ship' | 'target') => (side === 'ship' ? fight.deck : fight.herDeck).filter((c) => c.damage && c.side === side).length;
+  /**
+   * The links each card in hand would make: a picked card, in the order
+   * picked; an unpicked one, if it were picked next.
+   */
+  const links = $derived.by(() => {
+    let chain = fight.chain;
+    const out = fight.hand.map(() => 0);
+    for (const i of picks) {
+      const c = fight.hand[i];
+      const t = cardType(c);
+      out[i] = inRange(c) ? linksFor(chain, t) : 0;
+      chain = inRange(c) ? chained(chain, t) : t === 'hands' ? chain : { last: null, links: 0 };
+    }
+    fight.hand.forEach((c, i) => {
+      if (!picks.includes(i) && picks.length < 2 && inRange(c)) out[i] = linksFor(chain, cardType(c));
+    });
+    return out;
+  });
+  const NEXT: Record<string, string> = { sail: 'shot', shot: 'board' };
   /** Whether any of a card's effects works at the range as it stands. */
   const inRange = (card: Card) => !card.effects.length || card.effects.some((e) => !e.at || e.at.includes(REACHES[fight.range]));
   const RANGE_WORDS = ['grappled: alongside and made fast, where boarders go across', 'close: broadside range', 'far: long guns only, and one more stretch of open water and a ship is away'];
@@ -117,6 +136,9 @@
     {/each}
     <span class="stop away">away</span>
   </div>
+  <p class="status">
+    the chain: sail → shot → board. {fight.chain.last ? `your last was ${fight.chain.last}${fight.chain.links ? `, ${fight.chain.links} in order` : ''}: ${NEXT[fight.chain.last]} next makes ${fight.chain.links + 1}` : 'start it with sail'}.
+  </p>
   <p class="status">{RANGE_WORDS[fight.range]}{fight.target.fixed ? ' · a town goes nowhere: close is the boats offshore, grappled is the party ashore' : ''}</p>
 
   {#if fight.outcome}
@@ -133,7 +155,7 @@
       <div class="hand">
         {#each fight.hand as card, i (card.id)}
           <div class="slot" in:deal={{ i, wound: !!card.damage }}>
-            <CardView {card} order={picks.includes(i) ? picks.indexOf(i) + 1 : null} disabled={picks.length === 2 && !picks.includes(i)} note={inRange(card) ? '' : 'out of range now'} onpick={() => toggle(i)} />
+            <CardView {card} order={picks.includes(i) ? picks.indexOf(i) + 1 : null} disabled={picks.length === 2 && !picks.includes(i)} note={inRange(card) ? '' : 'out of range now'} link={links[i]} onpick={() => toggle(i)} />
           </div>
         {/each}
       </div>

@@ -1,14 +1,16 @@
 <script lang="ts">
-  import type { Card } from '../cards.ts';
+  import { type Card, cardType } from '../cards.ts';
   import { explainCard } from '../describe.ts';
 
-  let { card, order, disabled = false, note = '', onpick }: {
+  let { card, order, disabled = false, note = '', link = 0, onpick }: {
     card: Card;
     /** 1 or 2 when picked, null when not. */
     order: number | null;
     disabled?: boolean;
     /** A word on the card's corner: `out of range`, `her next card`. */
     note?: string;
+    /** Links in the chain it would make, played as picked: shown as a bonus. */
+    link?: number;
     onpick: () => void;
   } = $props();
 
@@ -21,9 +23,10 @@
 </script>
 
 <button class="card" class:theirs={card.side === 'target'} class:damage={card.damage} class:picked={order !== null} {disabled} onclick={onpick} aria-pressed={order !== null} title={explainCard(card.text)}>
-  <span class="side">{card.damage ? (card.side === 'ship' ? 'a wound to you' : 'a wound to them') : card.side === 'ship' ? 'yours' : 'theirs'}</span>
+  <span class="side">{card.damage ? (card.side === 'ship' ? 'a wound to you' : 'a wound to them') : `${card.side === 'ship' ? 'yours' : 'theirs'} · ${cardType(card)}`}</span>
   <span class="name">{card.name}{#if copy}<span class="copy"> #{copy}</span>{/if}</span>
   <span class="text">{card.text}</span>
+  {#if link}<span class="link">in order: +{link}</span>{/if}
   {#if note}<span class="note">{note}</span>{/if}
   {#if order !== null}<span class="order" aria-label="resolves {order === 1 ? 'first' : 'second'}">{order}</span>{/if}
 </button>
@@ -46,6 +49,7 @@
   .copy { font-size: 0.8em; opacity: 0.6; }
   .name { font-size: 1.15rem; }
   .note { font-size: 0.75rem; letter-spacing: 0.06em; opacity: 0.7; }
+  .link { align-self: flex-start; font-size: 0.8rem; padding: 0.05rem 0.4rem; border: 1px solid currentColor; }
   .text { margin-top: auto; font-variant-numeric: tabular-nums; }
   /* The resolve order, set in paper on an ink disc. */
   .order {

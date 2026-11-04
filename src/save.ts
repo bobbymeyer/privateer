@@ -11,7 +11,7 @@
 
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 /** From each version to the next. A run from before a feature simply goes without it. */
 const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<string, unknown>> = {
@@ -29,6 +29,11 @@ const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<stri
   6: (w) => ({ ...w, tally: { fights: 0, taken: 0, sacks: 0, fled: 0, escaped: 0, best: null }, lastFight: null }),
   // 8: the fight reworked, two decks and the range. A fight left half-fought under the old rules is broken off.
   7: (w) => ({ ...w, encounter: null }),
+  // 9: the chain of cards in order. A fight in progress starts with none.
+  8: (w) => {
+    const m = w.encounter as { fight: Record<string, unknown> } | null;
+    return m ? { ...w, encounter: { ...m, fight: { chain: { last: null, links: 0 }, ...m.fight } } } : w;
+  },
 };
 export const SAVE_KEY = 'privateer:run';
 

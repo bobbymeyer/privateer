@@ -1,7 +1,7 @@
 /** Run with `npm test`. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { type Card, woundCard } from './cards.ts';
+import { type Card, cardType, woundCard } from './cards.ts';
 import { act, type Action, CLOSE, createEncounter, FAR, GRAPPLED, legalActions, type EncounterState, type Range } from './rules.ts';
 import { merchantEncounter } from './setup.ts';
 
@@ -284,4 +284,58 @@ test('a garrison’s relief is a fixed number of cards, every so often — not a
     if (s.reinforced > before) rounds.push(s.round);
   }
   assert.deepEqual(rounds, [2, 4, 6], 'from round 2, every other round, three in all');
+});
+
+// The chain: sail → shot → board.
+const sail = (id = 'sail') => card(id, 'ship', [{ kind: 'chase', amount: 1 }]);
+const shot = (id = 'shot', n = 2) => card(id, 'ship', [{ kind: 'hit', amount: n }]);
+const board = (id = 'board', n = 2) => card(id, 'ship', [{ kind: 'plunder', amount: n }]);
+const patch = (id = 'patch') => card(id, 'ship', [{ kind: 'repair', amount: 1 }]);
+
+test('every card has a type, from what it does', () => {
+  assert.equal(cardType(sail()), 'sail');
+  assert.equal(cardType(shot()), 'shot');
+  assert.equal(cardType(board()), 'board');
+  assert.equal(cardType(patch()), 'hands');
+  assert.equal(cardType(woundCard('ship', 'leak#1', 'leak')), 'hands');
+});
+
+test('shot after sail is a link: +1 to its hits', () => {
+  const s1 = act({ ...facing([sail(), shot(), ...blank(1)], FAR), target: { ...stacked(blank(3)).target, hull: 9, maxHull: 9 } }, keep01);
+  assert.equal(s1.target.hull, 9 - 3, 'two, and one for the link');
+  assert.ok(s1.events.some((e) => e.type === 'chain' && e.links === 1));
+  // The other way round, no link.
+  const s2 = act({ ...facing([sail(), shot(), ...blank(1)], FAR), target: { ...stacked(blank(3)).target, hull: 9, maxHull: 9 } }, { type: 'keep', picks: [1, 0] });
+  assert.equal(s2.target.hull, 9 - 2);
+});
+
+test('the chain carries across rounds, her card between doesn’t break it, and a full chain scales the board +2', () => {
+  // Round one: sail, then shot (+1). Round two: board follows the shot: +2.
+  const s0 = { ...facing([sail(), shot(), ...blank(1)], GRAPPLED), target: { ...stacked(blank(3)).target, hull: 20, maxHull: 20, cargo: 20 } };
+  const s1 = act(s0, keep01);
+  assert.deepEqual(s1.chain, { last: 'shot', links: 1 });
+  const s2 = act({ ...s1, hand: [board(), ...blank(2)] }, keep01);
+  assert.equal(s2.plunder, 2 + 2);
+  assert.deepEqual(s2.chain, { last: null, links: 0 }, 'a full chain closes');
+});
+
+test('hands keep the chain; anything out of order starts it again', () => {
+  const kept = act(facing([sail(), patch(), ...blank(1)], CLOSE), keep01);
+  assert.deepEqual(kept.chain, { last: 'sail', links: 0 });
+  const broken = act({ ...facing([shot(), shot('shot2'), ...blank(1)], CLOSE) }, keep01);
+  assert.deepEqual(broken.chain, { last: 'shot', links: 0 }, 'shot after shot is no link');
+});
+
+test('a link never adds to bearing away or closing the range', () => {
+  const run = card('run', 'ship', [{ kind: 'flee', amount: 1 }]);
+  // A chain at board can't be followed, and sail starts one; so try a link on a sail card by hand.
+  const s1 = act({ ...facing([run, ...blank(2)], CLOSE), chain: { last: 'board', links: 2 } }, keep01);
+  assert.equal(s1.range, FAR, 'one step, no more');
+});
+
+test('a card that does nothing at this range is no link: it breaks the chain', () => {
+  const longShot = card('long', 'ship', [{ kind: 'hit', amount: 2, at: ['far'] }]);
+  const s1 = act({ ...facing([longShot, ...blank(2)], CLOSE), chain: { last: 'sail', links: 0 } }, keep01);
+  assert.deepEqual(s1.chain, { last: null, links: 0 });
+  assert.ok(!s1.events.some((e) => e.type === 'chain'));
 });

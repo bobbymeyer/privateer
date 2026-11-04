@@ -61,8 +61,8 @@ export function whatOf(kind: TargetKind, nation: Nation, place: string | null, s
 export function recordFight(f: EncounterState, what: string, kind: TargetKind, nation: Nation, hullIn: number): FightRecord {
   const rounds: Map<number, string[]> = new Map();
   for (const e of f.events) {
-    if (e.type !== 'played' && e.type !== 'effect' && e.type !== 'ended') continue;
-    const line = e.type === 'played' ? describeEvent(e) : e.type === 'effect' ? `  ${describeEvent(e)}` : describeEvent(e);
+    if (e.type !== 'played' && e.type !== 'effect' && e.type !== 'chain' && e.type !== 'ended') continue;
+    const line = e.type === 'effect' ? `  ${describeEvent(e)}` : describeEvent(e);
     if (!line) continue;
     if (!rounds.has(e.round)) rounds.set(e.round, []);
     rounds.get(e.round)!.push(line);
