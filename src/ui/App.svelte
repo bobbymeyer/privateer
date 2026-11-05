@@ -13,14 +13,14 @@
   import { choices, choose, describe as describeDilemma } from '../world/dilemmas.ts';
   import { choices as legsFrom, daysTo, makeFor, onward } from '../world/journey.ts';
   import { HOME_LANDMARK, landmark } from '../world/landmarks.ts';
-  import { attack, fight, letPass, raid, raidHere, type Reckoning } from '../world/meet.ts';
+  import { attack, fight, hailExtra, letPass, raid, raidHere, type Reckoning } from '../world/meet.ts';
   import { adjective, article, type Nation } from '../world/ports.ts';
   import { read } from '../world/reading.ts';
   import { HAND_WORTH, LIKE_TITLES, score } from '../world/score.ts';
   import {
     CHANDLER, ISLANDERS_COST, SPICE_WORTH, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade,
   } from '../world/stores.ts';
-  import { plateExtra } from '../world/treasure.ts';
+  import { PRIZES, followed } from '../world/rumors.ts';
   import { advance, createSea, createWorld, dateOf, type Sea, type WorldState, waiting } from '../world/world.ts';
   import { forget, load, store } from '../save.ts';
   import { type Entry, best, dailySeed, entryFor, isWin, loadLog, raised, saveLog, scoreOf, today, withEntry } from '../logbook.ts';
@@ -221,7 +221,7 @@
       isRaid = m.raid !== null;
       nation = m.nation;
       const flag = adjective(m.nation);
-      title = m.raid ? `the raid on ${landmark(m.raid).name}` : m.plate ? 'the treasure ship from Callao' : `${article(flag)} ${flag} ${m.kind === 'treasure-ship' ? 'carrack' : TARGETS[m.kind].name}`;
+      title = m.raid ? `the raid on ${landmark(m.raid).name}` : m.plate ? 'the treasure ship from Callao' : m.prize ? PRIZES[m.prize].name : `${article(flag)} ${flag} ${m.kind === 'treasure-ship' ? 'carrack' : TARGETS[m.kind].name}`;
       lastRound = [];
       reckoning = null;
       stop();
@@ -262,7 +262,7 @@
   /** At a fork with nothing chosen: the way divides, and you choose. */
   const atFork = $derived.by(() => {
     const w = now();
-    return !!w && !w.voyage.bound && !onward(w.voyage);
+    return !!w && !w.voyage.bound && !onward(w.voyage, followed(w));
   });
   const canContinue = $derived.by(() => {
     const w = now();
@@ -271,7 +271,7 @@
   /** Where you're making for: chosen, or the next where the way is one. */
   const making = $derived.by(() => {
     const w = now();
-    return w ? (w.voyage.bound ?? onward(w.voyage)) : null;
+    return w ? (w.voyage.bound ?? onward(w.voyage, followed(w))) : null;
   });
   const days = $derived(now() ? daysOf(now()!) : { food: 0, water: 0 });
   const RATIONS: [WorldState['rations'], string][] = [['full', 'full'], ['short', 'short'], ['starving', 'starvation']];
@@ -370,8 +370,8 @@
         <div class="row primary">
           {#if atFork}
             <span class="faint">the way divides:</span>
-            {#each legsFrom(world.voyage) as k (k)}
-              <button onclick={() => setFor(k)}>{k === HOME_LANDMARK ? 'turn for home' : landmark(k).name}, {daysTo(sea, world, k)} days</button>
+            {#each legsFrom(world.voyage, followed(world)) as k (k)}
+              <button onclick={() => setFor(k)}>{k === HOME_LANDMARK ? 'turn for home' : landmark(k).name}{landmark(k).detour ? ' (rumored)' : ''}, {daysTo(sea, world, k)} days</button>
             {/each}
           {:else if sailing}
             <button onclick={() => stop('hove to')}>heave to</button>
@@ -384,8 +384,11 @@
         </div>
         {#if atFork}
           <ul class="plain legs">
-            {#each legsFrom(world.voyage).filter((k) => k !== HOME_LANDMARK) as k (k)}<li><em>{landmark(k).name}.</em> <span class="faint">{landmark(k).text}</span></li>{/each}
+            {#each legsFrom(world.voyage, followed(world)).filter((k) => k !== HOME_LANDMARK) as k (k)}<li><em>{landmark(k).name}{landmark(k).detour ? ', by rumor' : ''}.</em> <span class="faint">{landmark(k).text}</span></li>{/each}
           </ul>
+        {/if}
+        {#if followed(world).length}
+          <p class="faint">you've heard of: {followed(world).map((k) => `${landmark(k).name}, from ${landmark(k).detour!.from.map((f) => landmark(f).name).join(' or ')}`).join('; ')}.</p>
         {/if}
         <ul class="plain log">
           {#each recent as l, i (i)}<li class:faint={i > 0}>{dateOf(l.turn)}: {l.text}</li>{/each}
@@ -479,11 +482,14 @@
       </div>
     {:else if world?.hail}
       {@const h = world.hail}
-      {@const r = read(h.kind, h.plate ? plateExtra(h.plate === 'warned') : {})}
+      {@const r = read(h.kind, hailExtra(h))}
       {@const flag = adjective(h.nation)}
       <div class="overlay">
         <div class="sheet">
-          <h2>{h.plate ? 'the treasure ship' : `a sail: ${article(flag)} ${flag} ${h.kind === 'treasure-ship' ? 'carrack' : TARGETS[h.kind].name}`}</h2>
+          <h2>{h.plate ? 'the treasure ship' : h.prize ? PRIZES[h.prize].name : `a sail: ${article(flag)} ${flag} ${h.kind === 'treasure-ship' ? 'carrack' : TARGETS[h.kind].name}`}</h2>
+          {#if h.prize}
+            <p>{PRIZES[h.prize].text}</p>
+          {/if}
           {#if h.plate}
             <p>the treasure ship of the South Sea, with the year's silver from Callao for Panama. {h.plate === 'warned' ? 'word of your raids on the coast has gone ahead of you, and she is ready for you.' : 'she has never seen an enemy in these waters, and takes you for one of her own.'}</p>
           {/if}

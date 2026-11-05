@@ -7,6 +7,7 @@
 
 import { FAR, type NodeId } from './map.ts';
 import { makeFor, onward, raise } from './journey.ts';
+import { followed } from './rumors.ts';
 import { noWay } from './weather.ts';
 import { type Sea, type WorldState, advance } from './world.ts';
 
@@ -38,7 +39,7 @@ export type Halt = 'landmark' | 'choice' | 'sail' | 'fight' | 'won' | 'sunk' | '
 /** Bound somewhere: the landmark you chose, or the next where the way doesn't divide. Throws at a fork. */
 export function bound(s: WorldState): WorldState {
   if (s.voyage.bound) return s;
-  const next = onward(s.voyage);
+  const next = onward(s.voyage, followed(s));
   if (!next) throw new Error('the way divides here: choose which way');
   return makeFor(s, next);
 }

@@ -13,7 +13,11 @@
  * - meets a storm by riding it out on a sound hull, fever by nursing, foul
  *   water and weevils by heaving them over while there's plenty.
  *
- *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--runs 40] [--from 0] [--raid] [--wake] [--trace]
+ * - follows every rumor, and takes the detour where it branches, unless
+ *   --no-rumors; attacks a rumored prize on a sound hull;
+ * - lies at an island a storm drives her to as at any landmark.
+ *
+ *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--runs 40] [--from 0] [--raid] [--wake] [--no-rumors] [--trace]
  */
 
 import { threatened } from '../src/rules.ts';
@@ -24,8 +28,11 @@ import { choices as legsOf, daysTo, howHome, makeFor } from '../src/world/journe
 import { HOME_LANDMARK, landmark } from '../src/world/landmarks.ts';
 import { attack, fight, letPass, raid, raidHere } from '../src/world/meet.ts';
 import { score } from '../src/world/score.ts';
-import { ashore, buy, CHANDLER, daysOf, marketHere, price, room, shoreHere, trade, type Ware, buySpice, spiceHere, spiceRoom } from '../src/world/stores.ts';
+import { ashore, buy, CHANDLER, daysOf, landmarkHere, marketHere, price, room, shoreHere, trade, type Ware, buySpice, spiceHere, spiceRoom } from '../src/world/stores.ts';
 import { coastAwake, PACIFIC_TOWNS } from '../src/world/treasure.ts';
+import { followed } from '../src/world/rumors.ts';
+import { LANDFALL_WATERS } from '../src/world/landfalls.ts';
+const LANDFALL_KEYS = Object.keys(LANDFALL_WATERS);
 import { advance, createSea, createWorld, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
 
@@ -40,6 +47,10 @@ const SHIP = arg('ship', 'all');
 const RAID = flag('raid');
 const WAKE = flag('wake');
 const TRACE = flag('trace');
+const RUMORS = !flag('no-rumors');
+/** What rumored prizes paid this ship's runs: payouts, and how many fought. */
+const PRIZE_PAY: number[] = [];
+const PRIZE_FOUGHT: Record<string, number> = {};
 /** A voyage that hasn't ended in this many days is called off. */
 const DAYS = 1500;
 const DEAD: Record<string, number> = {};
@@ -91,14 +102,21 @@ function answer(w: WorldState): WorldState {
         : w.dilemma.kind === 'reef' ? (w.spice > 0 && w.hull > 6 ? 'wait' : 'lighten')
         : w.dilemma.kind === 'gentleman' ? 'try'
         : w.dilemma.kind === 'deserters' ? 'watch'
+        : w.dilemma.kind === 'rumor' ? (RUMORS ? 'follow' : 'ignore')
         : open[0];
       w = choose(sea, w, want);
     } else if (w.hail) {
-      const worth = w.hull >= w.maxHull * (w.hail.plate === 'asleep' ? 0.4 : 0.6);
+      // The treasure ship asleep, or a rumored prize come all this way for: worth it on a hull still a quarter sound. Anything else wants more.
+      const worth = w.hull >= w.maxHull * (w.hail.plate === 'asleep' ? 0.4 : w.hail.prize ? 0.25 : 0.6);
       w = worth ? attack(w) : letPass(w);
     } else if (w.encounter) {
       const f = w.encounter.fight;
+      const prize = w.encounter.prize ?? (w.encounter.raid === 'goa' ? 'goa' : null);
       w = fight(sea, w, fightBot(threatened(f.ship, f.target))(f));
+      if (prize && !w.encounter) {
+        PRIZE_FOUGHT[`${prize} ${w.reckoning!.outcome}`] = (PRIZE_FOUGHT[`${prize} ${w.reckoning!.outcome}`] ?? 0) + 1;
+        PRIZE_PAY.push(w.reckoning!.payout);
+      }
     }
   }
   return w;
@@ -115,7 +133,7 @@ function atLandmark(w: WorldState): WorldState {
   const town = raidHere(sea, w);
   // The coast of Chile and Peru left asleep for the treasure ship, unless told to wake it.
   const sleeping = !WAKE && PACIFIC_TOWNS.includes(town?.key ?? '') && !w.voyage.visited.includes('cacafuego');
-  if (!w.sunk && RAID && town && !sleeping && w.hull >= w.maxHull * 0.8) w = answer(raid(sea, w));
+  if (!w.sunk && RAID && town && !sleeping && w.hull >= w.maxHull * 0.8 && (town.key !== 'goa' || (w.ship === 'brigantine' && w.hull === w.maxHull))) w = answer(raid(sea, w));
   return w;
 }
 
@@ -139,21 +157,30 @@ interface Result {
   gold: number;
   crew: number;
   took: boolean;
+  /** Rumors heard; rumored detours sailed and found true, or false; storm landfalls. */
+  heard: number;
+  followedTrue: number;
+  followedFalse: number;
+  landfalls: number;
 }
 
 function sail(ship: string, seed: number): Result {
   let w = createWorld(sea, seed, ship);
   let lastAt = '';
   while (!w.sunk && !w.won && w.turn < DAYS) {
-    if (w.voyage.at !== lastAt) {
-      lastAt = w.voyage.at;
+    // A landmark newly raised, or an island a storm put her on.
+    const here = `${w.voyage.at}|${landmarkHere(sea, w)?.landfall ? w.landfall : ''}`;
+    if (here !== lastAt) {
+      lastAt = here;
       if (flag('where')) console.log('  ', w.turn, w.voyage.at, 'crew', w.crew, 'food', daysOf(w).food, 'water', daysOf(w).water, 'fresh', w.fresh, 'hull', w.hull, 'gold', w.gold);
       w = atLandmark(w);
       if (flag('where')) console.log('     after: crew', w.crew, 'food', daysOf(w).food, 'water', daysOf(w).water, 'fresh', w.fresh, 'hull', w.hull, 'gold', w.gold);
       if (w.sunk || w.won) break;
       if (!w.voyage.bound) {
-        const legs = legsOf(w.voyage).filter((k) => k !== HOME_LANDMARK || landmark(w.voyage.at).next.includes(HOME_LANDMARK));
-        w = makeFor(w, legs[(seed + w.turn) % legs.length]);
+        const legs = legsOf(w.voyage, followed(w)).filter((k) => k !== HOME_LANDMARK || landmark(w.voyage.at).next.includes(HOME_LANDMARK));
+        // A rumored detour first; else a fork at random.
+        const detour = legs.find((k) => landmark(k).detour);
+        w = makeFor(w, detour ?? legs[(seed + w.turn) % legs.length]);
       }
     }
     w = ration(w);
@@ -166,7 +193,8 @@ function sail(ship: string, seed: number): Result {
     if (m) { const n = m[1] === 'a hand' ? 1 : Number(m[1].split(' ')[0]); const k = (m[2] ?? 'fights/events').replace(/ and .*/, ''); DEAD[k] = (DEAD[k] ?? 0) + n; }
   }
   if (TRACE) console.log(seed, ship, w.won ? 'HOME' : why, 'day', w.turn, 'gold', w.gold, 'crew', w.crew, took ? 'took her' : '', w.voyage.visited.join('>'));
-  return { ship, won: w.won, day: w.turn, like: score(w).like, at: w.voyage.at, why, gold: w.gold, crew: w.crew, took };
+  const heard = w.rumors.filter((r) => r.followed && w.voyage.visited.includes(r.key));
+  return { ship, won: w.won, day: w.turn, like: score(w).like, at: w.voyage.at, why, gold: w.gold, crew: w.crew, took, followedTrue: heard.filter((r) => r.truth).length, followedFalse: heard.filter((r) => !r.truth).length, heard: w.rumors.length, landfalls: w.seen.filter((k) => LANDFALL_KEYS.includes(k)).length };
 }
 
 const count = <T>(xs: T[], key: (x: T) => string) => JSON.stringify(xs.reduce((t, x) => ((t[key(x)] = (t[key(x)] ?? 0) + 1), t), {} as Record<string, number>));
@@ -182,6 +210,10 @@ for (const ship of SHIP === 'all' ? SHIPS : [SHIP]) {
   console.log('  like', count(won, (r) => r.like), '· took the treasure ship', results.filter((r) => r.took).length);
   console.log('  lost', count(lost, (r) => r.why), '· last landmark', count(lost, (r) => r.at));
   console.log('  dead of', JSON.stringify(DEAD));
+  const sum = (f: (r: Result) => number) => results.reduce((t, r) => t + f(r), 0);
+  console.log(`  rumors heard ${sum((r) => r.heard)}, detours sailed ${sum((r) => r.followedTrue + r.followedFalse)} (${sum((r) => r.followedTrue)} true, ${sum((r) => r.followedFalse)} false) · rumored prizes ${JSON.stringify(PRIZE_FOUGHT)}, paying ${mean(PRIZE_PAY.filter((x) => x > 0))} when they paid · storm landfalls ${sum((r) => r.landfalls)}`);
+  PRIZE_PAY.length = 0;
+  for (const k of Object.keys(PRIZE_FOUGHT)) delete PRIZE_FOUGHT[k];
   for (const k of Object.keys(DEAD)) delete DEAD[k];
   void howHome;
   void coastAwake;
