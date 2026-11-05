@@ -13,7 +13,7 @@ import { MORALE_MAX } from './events.ts';
 import { ACTS, describeLetter, intelligence, issue } from './letters.ts';
 import type { Roller } from './random.ts';
 
-import { type Stores, capacity } from './stores.ts';
+import { type Stores, capacity, topUp } from './stores.ts';
 
 /** Gold per point of standing raised, times how far below zero you are. */
 export const BRIBE_COST = 10;
@@ -68,7 +68,7 @@ export function provision(sea: Sea, s: WorldState): WorldState {
   return {
     ...paid,
     // Casks filled, and fresh food: three weeks of it, against the scurvy.
-    stores: { ...s.stores, water: cap.water, food: Math.min(cap.food, s.stores.food + s.crew * 21) },
+    stores: { ...s.stores, water: Math.max(s.stores.water, cap.water), food: topUp(s.stores.food, s.crew * 21, cap.food) },
     fresh: 0,
     rounds: s.rounds + 1,
     morale: Math.min(MORALE_MAX, s.morale + PROVISION_CHEER),

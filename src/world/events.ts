@@ -22,6 +22,7 @@ import { refit } from './port.ts';
 import { SHARES_AT, sharesCost } from './dilemmas.ts';
 import { type WorldState, atIsland } from './world.ts';
 import { provisionDay } from './stores.ts';
+import { weatherDay } from './weather.ts';
 
 export const MORALE_MAX = 10;
 export const MORALE_START = 7;
@@ -64,6 +65,8 @@ export function stormChance(sea: Sea, node: number, turn: number): number {
   if (season === HURRICANE_SEASON && inBox(lon, lat, ANTILLES)) k = 3;
   if (season === MONSOON_SEASON && inBox(lon, lat, INDIAN_SEAS)) k = 3;
   if (Math.abs(lat) >= 40) k = Math.max(k, 2);
+  // The bottom of the world, where the two oceans meet: the Horn.
+  if (lat <= -55) k = Math.max(k, 10);
   return STORM_CHANCE * k;
 }
 
@@ -114,6 +117,8 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
     // Low enough, and they send a man aft to ask for their shares.
     if (w.morale === SHARES_AT && !w.dilemma) w = { ...w, dilemma: { kind: 'shares', cost: sharesCost(w.gold) } };
   }
+  // The weather and the ills of the way.
+  if (atSea && !atIsland(w)) w = weatherDay(sea, w, r);
   // Eating, drinking, and the dying that comes of too little of either.
   w = provisionDay(sea, w, r);
   if (w.sunk) return { ...w, rng: r.rng };

@@ -13,6 +13,7 @@ import type { Sea } from './ships.ts';
 import { cheer } from './events.ts';
 import { refit } from './port.ts';
 import { type WorldState, advance } from './world.ts';
+import { FEVER_NURSE, FEVER_NURSE_DAYS, FEVER_PRESS, FLUX, FOUL_LOST, WEEVIL_LOST, feverDeaths, fluxDeaths } from './weather.ts';
 
 export type Dilemma =
   /** A storm: ride it out, run before it, or lighten ship. */
@@ -20,7 +21,13 @@ export type Dilemma =
   /** The crew want their shares: pay, promise, or stand firm. */
   | { kind: 'shares'; cost: number }
   /** A man on the beach of an island nobody has charted, who says he's a `role`. */
-  | { kind: 'castaway'; role: string };
+  | { kind: 'castaway'; role: string }
+  /** Fever aboard: press on, or lie to and nurse the sick. */
+  | { kind: 'fever' }
+  /** The water gone foul in the casks: drink it, or heave it over. */
+  | { kind: 'foul' }
+  /** Weevils in the bread: eat it, or heave it over. */
+  | { kind: 'weevils' };
 
 export interface Choice {
   key: string;
@@ -64,6 +71,12 @@ export function describe(d: Dilemma): { title: string; text: string } {
       return { title: 'the crew want their shares', text: 'the hands have had nothing for weeks, and they have sent a man aft to say so.' };
     case 'castaway':
       return { title: 'a man on the beach', text: `there's a man on the beach waving a shirt. he says he's a ${CREW[d.role].name}, cast away from a ship that went down.` };
+    case 'fever':
+      return { title: 'fever aboard', text: 'a dozen hands in their hammocks, burning and raving. the surgeon, if you have one, wants them still and in the shade.' };
+    case 'foul':
+      return { title: 'the water gone foul', text: 'green and stinking in the casks, with things alive in it. the hands will drink it if they must.' };
+    case 'weevils':
+      return { title: 'weevils in the bread', text: 'the biscuit is crawling. the hands knock it on the table to get them out, and grumble.' };
   }
 }
 
@@ -90,6 +103,23 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
         { key: 'leave', label: 'leave him', stakes: 'sail on' },
       ];
     }
+    case 'fever': {
+      const half = s.outfit.crew.includes('surgeon') ? ', halved by your surgeon' : '';
+      return [
+        { key: 'press', label: 'press on', stakes: `${range(FEVER_PRESS)} hands dead of it${half}` },
+        { key: 'nurse', label: 'lie to and nurse them', stakes: `${FEVER_NURSE_DAYS} days making no way, and ${range(FEVER_NURSE)} dead${half}` },
+      ];
+    }
+    case 'foul':
+      return [
+        { key: 'drink', label: 'drink it', stakes: `the flux: ${range(FLUX)} hands dead of it${s.outfit.crew.includes('surgeon') ? ', halved by your surgeon' : ''}` },
+        { key: 'heave', label: 'heave it over', stakes: `lose half the water: ${Math.round(s.stores.water * FOUL_LOST)} rations` },
+      ];
+    case 'weevils':
+      return [
+        { key: 'eat', label: 'eat it anyway', stakes: 'morale down 1' },
+        { key: 'heave', label: 'heave the worst over', stakes: `lose a quarter of the food: ${Math.round(s.stores.food * WEEVIL_LOST)} rations` },
+      ];
   }
 }
 
@@ -156,6 +186,32 @@ export function choose(sea: Sea, s: WorldState, key: string): WorldState {
     }
     case 'castaway:leave':
       log('you left the castaway on his beach');
+      break;
+    case 'fever:press':
+    case 'fever:nurse': {
+      const how = key as 'press' | 'nurse';
+      const dead = feverDeaths(w, how, r);
+      w = { ...w, crew: w.crew - dead, ...(how === 'nurse' ? { calm: w.turn + FEVER_NURSE_DAYS } : {}) };
+      log(`${how === 'nurse' ? 'lying to while the sick are nursed' : 'pressing on through the fever'}: ${dead ? `${dead === 1 ? 'a hand' : `${dead} hands`} dead of it` : 'nobody lost'}`);
+      break;
+    }
+    case 'foul:drink': {
+      const dead = fluxDeaths(w, r);
+      w = { ...w, crew: w.crew - dead };
+      log(dead ? `the foul water drunk, and the flux: ${dead === 1 ? 'a hand' : `${dead} hands`} dead of it` : 'the foul water drunk, and nobody the worse');
+      break;
+    }
+    case 'foul:heave':
+      w = { ...w, stores: { ...w.stores, water: Math.round(w.stores.water * (1 - FOUL_LOST)) } };
+      log('the foul casks heaved over the side');
+      break;
+    case 'weevils:eat':
+      w = { ...w, morale: w.morale - 1 };
+      log('the weevils eaten with the bread, and the hands grumbling');
+      break;
+    case 'weevils:heave':
+      w = { ...w, stores: { ...w.stores, food: Math.round(w.stores.food * (1 - WEEVIL_LOST)) } };
+      log('the worst of the bread heaved over the side');
       break;
   }
   return { ...w, rng: r.rng };

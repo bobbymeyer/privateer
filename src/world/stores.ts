@@ -59,6 +59,9 @@ export const capacity = (s: WorldState): Stores => {
   return { food: c * 180, water: c * 90, spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) };
 };
 
+/** Add to what's aboard, as far as there's room; never less than there was. */
+export const topUp = (have: number, add: number, cap: number) => Math.max(have, Math.min(cap, have + add));
+
 /** Days of food and water left at this crew and ration. */
 export const daysOf = (s: WorldState) => ({
   food: s.crew ? Math.floor(s.stores.food / (s.crew * EAT[s.rations])) : Infinity,
@@ -168,11 +171,11 @@ export function ashore(sea: Sea, s: WorldState, what: keyof typeof SHORE_DAYS, a
   let w: WorldState = { ...s, rng: r.rng };
   const cap = capacity(w);
   const text = { water: 'casks filled', forage: '', careen: '', rest: 'the crew rested' }[what];
-  if (what === 'water') w = { ...w, stores: { ...w.stores, water: cap.water } };
+  if (what === 'water') w = { ...w, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water) } };
   if (what === 'forage') {
     // Fish, fowl, seals, penguins, fruit, roots: a week's worth some days, a month's others. Fresh, whatever it is.
     const got = Math.round(w.crew * (8 + roll(r) * 22));
-    w = { ...w, rng: r.rng, fresh: 0, stores: { ...w.stores, food: Math.min(cap.food, w.stores.food + got) }, morale: Math.min(10, w.morale + 1) };
+    w = { ...w, rng: r.rng, fresh: 0, stores: { ...w.stores, food: topUp(w.stores.food, got, cap.food) }, morale: Math.min(10, w.morale + 1) };
     w = { ...w, log: [...w.log, { turn: w.turn, text: `foraging: fresh food, ${Math.round(got / Math.max(1, w.crew))} days of it` }] };
   }
   if (what === 'careen') {

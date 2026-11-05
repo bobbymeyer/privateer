@@ -171,7 +171,13 @@ function answer(w: WorldState): WorldState {
         ? w.hull > 3 ? 'ride' : open.includes('lighten') ? 'lighten' : 'run'
         : w.dilemma.kind === 'shares'
           ? open.includes('pay') && w.gold >= w.dilemma.cost + 20 ? 'pay' : 'promise'
-          : open.includes('take') ? 'take' : 'leave';
+          : w.dilemma.kind === 'fever'
+            ? 'nurse'
+            : w.dilemma.kind === 'foul'
+              ? daysOf(w).water > 30 ? 'heave' : 'drink'
+              : w.dilemma.kind === 'weevils'
+                ? w.morale > 4 ? 'eat' : 'heave'
+                : open.includes('take') ? 'take' : 'leave';
     w = decide(sea, w, want);
   }
   return w;

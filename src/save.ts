@@ -36,7 +36,7 @@ const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<stri
   // 10 → 11: stores and survival. An old run is given a full ship and full holds.
   10: (w) => {
     const c = SHIP_CLASSES[(w.outfit as { ship?: string })?.ship ?? 'pinnace']?.complement ?? 30;
-    return { ...w, crew: c, stores: { food: c * 180, water: c * 90, spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) }, fresh: 0, rations: 'full', pace: 'steady' };
+    return { ...w, crew: c, stores: { food: c * 180, water: c * 90, spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) }, fresh: 0, rations: 'full', pace: 'steady', calm: 0 };
   },
   8: (w) => {
     const m = w.encounter as { fight: Record<string, unknown> } | null;

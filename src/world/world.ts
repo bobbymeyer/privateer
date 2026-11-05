@@ -104,6 +104,8 @@ export interface WorldState {
   fresh: number;
   rations: Rations;
   pace: Pace;
+  /** Becalmed, or anchored against the williwaws: no way made until this turn. */
+  calm: number;
   /** Towns that turned out a raid short of a sack, on `since`: on their guard till `until`, shut to raiding till `shutUntil`, `level` steps on it, with `cargo` left in the treasury then. */
   guarded: Record<NodeId, { since: number; until: number; shutUntil: number; level: number; cargo: number }>;
   /** An event waiting on your choice: a storm, the crew's shares, a castaway. While there is one, the world waits. */
@@ -299,6 +301,7 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     fresh: 0,
     rations: 'full',
     pace: 'steady',
+    calm: 0,
   };
   const r1: Roller = { rng: world.rng };
   const letter = issue(sea, world, 1, r1);

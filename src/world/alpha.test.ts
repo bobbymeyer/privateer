@@ -9,6 +9,7 @@ import { ISLANDS, CHARTING_BOUNTY, GOAL, STANDING_DECAY, type WorldState, advanc
 import { buyRound } from './bar.ts';
 import { repair } from './meet.ts';
 import { victualled } from './testing.ts';
+import { choices, choose } from './dilemmas.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -121,6 +122,11 @@ test('a course sails a day at a time to where you set it', () => {
     const { world, halt } = sailToward(sea, w, dest);
     w = world;
     days++;
+    // The way asks things of you: the water foul, weevils. Take the first answer and sail on.
+    if (halt === 'choice') {
+      w = choose(sea, w, choices(w, w.dilemma!)[0].key);
+      continue;
+    }
     if (halt) {
       assert.ok(halt === 'arrived' || halt === 'sighted', halt);
       if (halt === 'arrived') break;

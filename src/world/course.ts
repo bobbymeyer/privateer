@@ -11,6 +11,7 @@ import type { Sea } from './ships.ts';
 import { inSight } from './scout.ts';
 import { type WorldState, advance, knowledge, observe } from './world.ts';
 import { raise } from './journey.ts';
+import { noWay } from './weather.ts';
 
 /** Tomorrow's step toward `dest`, or null if you're there or can't get there. */
 export function nextStep(sea: Sea, s: WorldState, dest: NodeId): NodeId | null {
@@ -55,9 +56,10 @@ export function sailToward(sea: Sea, s: WorldState, dest: NodeId): { world: Worl
   const step = nextStep(sea, s, dest);
   if (step === null) return { world: s, halt: s.player === dest ? 'arrived' : 'stuck' };
   // Easy sailing: one day in three, she lies to under short sail and makes no way.
-  let world = advance(sea, s, s.pace === 'easy' && s.turn % 3 === 2 ? s.player : step);
+  // Becalmed, or anchored against the williwaws, she makes no way at all.
+  let world = advance(sea, s, noWay(s) || (s.pace === 'easy' && s.turn % 3 === 2) ? s.player : step);
   // Cracking on: one day in three, she makes two days' way.
-  if (s.pace === 'hard' && s.turn % 3 === 2 && !halted(world)) world = glide(sea, world, dest);
+  if (s.pace === 'hard' && s.turn % 3 === 2 && !noWay(s) && !halted(world)) world = glide(sea, world, dest);
   if (world.won) return { world, halt: 'won' };
   if (world.encounter) return { world, halt: 'encounter' };
   if (world.hail) return { world, halt: 'hail' };
