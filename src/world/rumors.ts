@@ -35,7 +35,7 @@ export interface Rumor {
   turn: number;
   /** 0..1. The chance the report was exactly right. */
   reliability: number;
-  /** Where a corsair was said to be bound: the town it's raiding, or home. */
+  /** Where a corsair was said to be bound: her cruising ground, or home. */
   bound?: NodeId | null;
 }
 
@@ -65,7 +65,7 @@ export function makeRumor(sea: Sea, r: Roller, id: number, ship: Ship, turn: num
       }
     }
   }
-  const bound = ship.kind === 'corsair' ? (ship.captives ? ship.home : (ship.raid ?? ship.home)) : undefined;
+  const bound = ship.kind === 'corsair' ? (ship.dest ?? ship.home) : undefined;
   return { id, shipId: ship.id, kind: ship.kind, route: ship.route, home: ship.home, nation: ship.nation, reported, turn, reliability, ...(bound !== undefined ? { bound } : {}) };
 }
 

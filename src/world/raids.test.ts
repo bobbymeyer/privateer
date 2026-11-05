@@ -8,7 +8,7 @@ import { portNamed } from './map.ts';
 import { ALARM_DAYS, GUARD_DAYS, GUARD_HULL, GUARD_RELIEF, GUARD_SHUT, SACK_DAYS, TREASURY_REFILL, treasury, attack, fight, meeting, raid, raidable } from './meet.ts';
 import { isHaven, leavePrize, retire, serves } from './port.ts';
 import { HUNT_RANGE, hunterGoal } from './ships.ts';
-import { CASUS_BELLI, STANDING_WARS, atWar, declare, drift, enemiesOf, isEnemy, makePeace, openingWars } from './wars.ts';
+import { CASUS_BELLI, STANDING_WARS, atWar, declare, isEnemy, makePeace, openingWars } from './wars.ts';
 import { GOAL, advance, createSea, createWorld, type WorldState } from './world.ts';
 
 const sea = createSea();
@@ -32,24 +32,12 @@ const fightOut = (w: WorldState) => {
 };
 
 test('1580: England opens against the one crown of Spain and Portugal, and the corsairs; the Dutch and French are not enemies', () => {
-  for (let seed = 0; seed < 10; seed++) {
-    const wars = openingWars({ rng: seed * 7 + 1 });
-    for (const [a, b] of STANDING_WARS) assert.ok(atWar(wars, a, b) && atWar(wars, b, a), 'symmetric');
-    for (const n of ['spain', 'portugal', 'barbary', 'morocco'] as const) assert.ok(isEnemy(wars, n), n);
-    for (const n of ['netherlands', 'france'] as const) assert.ok(!isEnemy(wars, n), n);
-    assert.ok(atWar(wars, 'spain', 'netherlands'), 'the Dutch Revolt');
-  }
-});
-
-test('the wars drift, season by season', () => {
-  let wars = openingWars({ rng: 1 });
-  const r = { rng: 99 };
-  const seen = new Set<string>();
-  for (let season = 0; season < 40; season++) {
-    wars = drift(wars, r).wars;
-    seen.add(enemiesOf(wars, 'england').sort().join(','));
-  }
-  assert.ok(seen.size > 3, `England's enemies change over ten years: ${[...seen].join(' | ')}`);
+  const wars = openingWars();
+  for (const [a, b] of STANDING_WARS) assert.ok(atWar(wars, a, b) && atWar(wars, b, a), 'symmetric');
+  for (const n of ['spain', 'portugal', 'barbary', 'morocco'] as const) assert.ok(isEnemy(wars, n), n);
+  for (const n of ['netherlands', 'france'] as const) assert.ok(!isEnemy(wars, n), n);
+  assert.ok(atWar(wars, 'spain', 'netherlands'), 'the Dutch Revolt');
+  assert.deepEqual(createWorld(sea, 1).wars, createWorld(sea, 2).wars, 'history, not a roll');
 });
 
 /** On turn 1, with a ship of the given kind and flag lying one step off Plymouth (she won't move: it's her destination). */

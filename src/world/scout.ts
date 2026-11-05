@@ -11,11 +11,10 @@
 
 import { type CardDef, REACHES, type Reach, WOUNDS } from '../cards.ts';
 import { type Extra, TARGETS, type TargetKind } from '../setup.ts';
-import { hostile, CAPTIVES_CARGO } from './meet.ts';
+import { hostile } from './meet.ts';
 import type { NodeId } from './map.ts';
 import { type Sea, type Ship, pursues } from './ships.ts';
-import { HULL_PER_RENOWN, renown, type WorldState } from './world.ts';
-import { PLATE_CARGO, PLATE_HULL } from './letters.ts';
+import type { WorldState } from './world.ts';
 
 /** Ships are seen this many steps beyond the water you can read. */
 export const LOOKOUT_BEYOND = 2;
@@ -63,18 +62,8 @@ export function read(kind: TargetKind, extra: Extra = {}): Reading {
   return { hull: t.hull + (extra.hull ?? 0), cargo, bounty: t.bounty, traits };
 }
 
-/** What she'd bring to a fight with you now: her renown-hardened hull, her captives. */
-export function extraFor(s: WorldState, ship: Ship): Extra {
-  const warship = ['hunter', 'privateer', 'armada', 'corsair'].includes(ship.kind);
-  // The plate ship your letter names: stronger and richer than her sisters.
-  const plate = s.letter?.task.kind === 'take' && s.letter.task.shipId === ship.id;
-  return {
-    hull: (warship ? HULL_PER_RENOWN * renown(s) : 0) + (plate ? PLATE_HULL : 0),
-    cargo: (ship.captives ? CAPTIVES_CARGO : 0) + (plate ? PLATE_CARGO : 0),
-  };
-}
-
-export const readShip = (s: WorldState, ship: Ship) => read(ship.kind, extraFor(s, ship));
+/** What you can tell of her from her look. */
+export const readShip = (ship: Ship) => read(ship.kind);
 
 export interface Sighting {
   ship: Ship;

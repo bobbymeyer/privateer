@@ -33,10 +33,13 @@ const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<stri
   // 9: the chain of cards in order. A fight in progress starts with none.
   // 10: the voyage. A run from before it starts at Plymouth, whatever it has done.
   9: (w) => ({ ...w, voyage: { at: 'plymouth', bound: null, visited: ['plymouth'] } }),
-  // 10 → 11: stores and survival. An old run is given a full ship and full holds.
+  // 10 → 11: stores and survival, and the sandbox cut. An old run is given a full ship and full holds,
+  // and loses its letters, its renown, the word of its homeward fortune, and its corsairs' captives.
   10: (w) => {
     const c = SHIP_CLASSES[(w.outfit as { ship?: string })?.ship ?? 'pinnace']?.complement ?? 30;
-    return { ...w, crew: c, stores: { food: c * 180, water: c * 90, spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) }, fresh: 0, rations: 'full', pace: 'steady', calm: 0 };
+    const { letter: _l, acts: _a, commission: _c, fame: _f, homewardNoised: _h, ...rest } = w;
+    const ships = (w.ships as Record<string, unknown>[]).map(({ raid: _r, captives: _k, ...ship }) => ship);
+    return { ...rest, ships, crew: c, stores: { food: c * 180, water: c * 90, spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) }, fresh: 0, rations: 'full', pace: 'steady', calm: 0 };
   },
   8: (w) => {
     const m = w.encounter as { fight: Record<string, unknown> } | null;

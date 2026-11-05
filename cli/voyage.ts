@@ -2,14 +2,14 @@
  * Whole runs, played by a captain bot, to see whether a run can be won and
  * how long it takes. The captain:
  *
- * - in port: repairs, buys a couple of rounds, hires crew and buys a
- *   bigger ship when it can spare the gold, keeping enough for repairs;
- * - at sea: chases the best rumor (treasure and merchants over warships),
- *   sailing for where the prediction says the ship is likeliest now;
- *   with no rumor worth it, sails for a port to buy some;
+ * - in port: repairs, provisions, buys a couple of rounds, hires crew and
+ *   buys a bigger ship when it can spare the gold;
+ * - at sea: sails the voyage, a fork at random, turning aside for a prize
+ *   close by; waters, forages and careens where there's a shore, and
+ *   rations by the leg ahead;
  * - goes to port to mend when the hull is low;
  * - fights by one-step lookahead, and runs whenever outgunned;
- * - sails home to London once it has the score.
+ * - comes home to Plymouth at the end of the way.
  *
  *   npm run voyage -- [--runs 20] [--days 730]
  */
@@ -19,16 +19,15 @@ import { threatened } from '../src/rules.ts';
 import { buyRound, ROUND_COST } from '../src/world/bar.ts';
 import { sailToward } from '../src/world/course.ts';
 import { type NodeId, portNamed, ports } from '../src/world/map.ts';
-import { attack, fight, letPass, onGuard, raid, raidable, repair, REPAIR_COST } from '../src/world/meet.ts';
+import { attack, fight, letPass, raid, raidable, repair, REPAIR_COST } from '../src/world/meet.ts';
 import { isEnemy } from '../src/world/wars.ts';
 import { choices, choose as decide } from '../src/world/dilemmas.ts';
-import { inRegion, reprisal } from '../src/world/letters.ts';
 import { choices as choicesOf, daysTo, howHome, makeFor } from '../src/world/journey.ts';
 import { landmark as landmarkOf } from '../src/world/landmarks.ts';
 import { buyShip, isHaven, leavePrize, retire, PROVISION_COST, provision, provisions, recruit, serves, takePrize } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
-import { advance, createSea, createWorld, GOAL, homeward, HOME, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
+import { advance, createSea, createWorld, GOAL, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
 import { ashore, buy, daysOf, price, room, shore, type Ware } from '../src/world/stores.ts';
 
@@ -42,7 +41,7 @@ const FROM = arg('from', '0');
 
 const sea = createSea();
 const { map } = sea;
-const london = portNamed(map, HOME);
+const plymouth = portNamed(map, 'Plymouth');
 const harbours = ports(map);
 
 const WORTH: Record<ShipKind, number> = { 'treasure-ship': 3, merchant: 2, 'treasure-fleet': 1.5, hunter: 0, privateer: 0.5, corsair: 1, armada: 0, monster: 0 };
@@ -93,7 +92,6 @@ function choose(w: WorldState): NodeId {
     const away = harbours.filter((p) => fromIt[p] > fromIt[w.player] && serves(sea, { ...w, player: p })).sort((a, b) => d[a] - d[b]);
     if (away.length) return away[0];
   }
-  if (homeward(w)) return london;
   if (w.pirate && w.gold >= GOAL) return portNamed(map, 'Baltimore');
   if (w.hull < w.maxHull * 0.6) {
     const near = harbours.filter((p) => p !== w.player && serves(sea, { ...w, player: p })).sort((a, b) => d[a] - d[b]);
@@ -111,37 +109,13 @@ function choose(w: WorldState): NodeId {
   }
   if (prize) return prize.node;
   if (w.voyage.bound) return map.landmarks[w.voyage.bound];
-  // The letter, if the voyage has nowhere to go (it always has: this is the old sandbox's fallback).
-  const l = w.letter;
-  if (l) {
-    if (l.task.kind === 'take') {
-      // The plate ship: where the freshest word of her says she is now; a big enough ship first.
-      const word = w.rumors.filter((r) => r.shipId === (l.task as { shipId: number }).shipId).at(-1);
-      if (word && SHIP_CLASSES[w.outfit.ship].hull >= 12) {
-        // Intercept: where she's likeliest to be in k days, that we can reach in k days.
-        let best = { node: w.player, p: -1 };
-        for (let k = 0; k <= 30; k += 3) {
-          const p = predict(sea, word, w.turn + k, knowledge(w), w.player, pursuitOf(w, sea));
-          for (let n = 0; n < p.length; n++) if (p[n] > best.p && d[n] <= k && !map.nodes[n].port) best = { node: n, p: p[n] };
-        }
-        if (best.p > 0) return best.node;
-      }
-    } else if (l.task.kind === 'sack') {
-      const towns = harbours.filter((p) => inRegion(sea, l.region!, p) && map.nodes[p].port!.nation === l.nation && !map.nodes[p].port!.fort && (w.sacked[p] ?? -1) < w.turn && !onGuard(w, p));
-      if (towns.length && w.hull >= w.maxHull * 0.9) return towns.sort((a, b) => d[a] - d[b])[0];
-    } else if (!inRegion(sea, l.region!, w.player)) {
-      // Into the region: its nearest port that will deal with you, else its nearest water.
-      const inside = harbours.filter((p) => inRegion(sea, l.region!, p) && serves(sea, { ...w, player: p }));
-      return (inside.length ? inside : map.nodes.filter((n) => n.kind === 'ocean' && map.adj[n.id].length && inRegion(sea, l.region!, n.id)).map((n) => n.id)).sort((a, b) => d[a] - d[b])[0];
-    }
-  }
   if (w.hull < w.maxHull * 0.6) {
     const near = harbours.filter((p) => p !== w.player && serves(sea, { ...w, player: p })).sort((a, b) => d[a] - d[b]);
     return near[0];
   }
   let best: { node: NodeId; value: number } | null = null;
   for (const r of w.rumors) {
-    if (!isEnemy(w.wars, r.nation) && !reprisal(w, r.nation)) continue; // only enemies are fair game
+    if (!isEnemy(w.wars, r.nation)) continue; // only enemies are fair game
     const value = WORTH[r.kind] * markerStrength(r, w.turn);
     if (value <= 0.3 || (best && value <= best.value)) continue;
     const p = predict(sea, r, w.turn, knowledge(w), w.player, pursuitOf(w, sea));
@@ -159,7 +133,7 @@ function choose(w: WorldState): NodeId {
   }
   // Else a port within a fortnight, for the bar.
   const near = harbours.filter((p) => p !== w.player && d[p] <= 14 && serves(sea, { ...w, player: p }));
-  return near.length ? near[(w.turn * 7) % near.length] : london;
+  return near.length ? near[(w.turn * 7) % near.length] : plymouth;
 }
 
 /** The bot's answer to an event that asks: ride out a storm on a sound hull, pay shares it can spare, take any castaway. */
@@ -205,7 +179,7 @@ function fightItOut(w: WorldState): WorldState {
   return w;
 }
 
-const results: { won: boolean; sunk: boolean; day: number; gold: number; fights: number; ship: string; acts: number; ending: string }[] = [];
+const results: { won: boolean; sunk: boolean; day: number; gold: number; fights: number; ship: string; raised: number; ending: string }[] = [];
 const met: Record<string, number> = {};
 const ends: Record<string, number> = {};
 const killedBy: Record<string, number> = {};
@@ -230,8 +204,7 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
       // An enemy port, on a sound hull: raid it. A fortified one only in a ship that can take it.
       const port = map.nodes[w.player].port!;
       const able = !port.fort || SHIP_CLASSES[w.outfit.ship].hull >= 14;
-      const lettered = w.letter?.task.kind === 'sack' && w.letter.nation === port.nation && inRegion(sea, w.letter.region!, w.player);
-      if ((isEnemy(w.wars, port.nation) || lettered) && raidable(sea, w) && able && w.hull >= w.maxHull * 0.9 && !homeward(w)) {
+      if (isEnemy(w.wars, port.nation) && raidable(sea, w) && able && w.hull >= w.maxHull * 0.9) {
         w = fightItOut(raid(sea, w));
         raids++;
       } else w = inPort(w);
@@ -269,8 +242,7 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
     // A ship alongside: foreign prizes worth the risk, on a sound hull; never your own flag.
     if (w.hail) {
       const h = w.hail;
-      const plate = w.letter?.task.kind === 'take' && w.letter.task.shipId === h.shipId;
-      const worth = plate || ((h.kind === 'merchant' || h.kind === 'treasure-ship') && (isEnemy(w.wars, h.nation) || reprisal(w, h.nation)));
+      const worth = (h.kind === 'merchant' || h.kind === 'treasure-ship') && isEnemy(w.wars, h.nation);
       w = worth && w.hull >= w.maxHull * 0.6 ? attack(w) : letPass(w);
       if (!w.encounter) passed++;
     }
@@ -290,13 +262,13 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
   omens += w.log.filter((l) => l.text.startsWith('a good omen')).length;
   hows[w.won ? howHome(w.voyage) : w.sunk ? 'sunk' : 'adrift'] = (hows[w.won ? howHome(w.voyage) : w.sunk ? 'sunk' : 'adrift'] ?? 0) + 1;
   reached[w.voyage.at] = (reached[w.voyage.at] ?? 0) + 1;
-  results.push({ won: w.won, sunk: w.sunk, day: w.turn, gold: w.gold, fights, ship: w.outfit.ship, acts: w.acts, ending: w.ending ?? (w.commission === 'revoked' ? 'revoked' : '') });
+  results.push({ won: w.won, sunk: w.sunk, day: w.turn, gold: w.gold, fights, ship: w.outfit.ship, raised: w.voyage.visited.length - 1, ending: w.ending ?? (w.pirate ? 'pirate' : '') });
 }
 
 const n = results.length;
 const won = results.filter((r) => r.won);
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
-console.log(`${n} runs of up to ${DAYS} days, goal ${GOAL} home to ${HOME}\n`);
+console.log(`${n} runs of up to ${DAYS} days, home to Plymouth\n`);
 console.log(`won    ${won.length} (${Math.round((100 * won.length) / n)}%), on day ${Math.round(mean(won.map((r) => r.day)))} on average`);
 console.log(`sunk   ${results.filter((r) => r.sunk).length}, on day ${Math.round(mean(results.filter((r) => r.sunk).map((r) => r.day)))} on average`);
 console.log(`adrift ${results.filter((r) => !r.won && !r.sunk).length} (out of time), with ${Math.round(mean(results.filter((r) => !r.won && !r.sunk).map((r) => r.gold)))} gold`);
@@ -306,7 +278,7 @@ console.log('sunk by', killedBy, '· hull going in', hullIn);
 console.log(`let pass ${(passed / RUNS).toFixed(1)} a run`);
 console.log(`raids ${(raids / RUNS).toFixed(1)} a run`);
 console.log(`mutinies ${(mutinies / RUNS).toFixed(1)}, storms ${(storms / RUNS).toFixed(1)}, omens ${(omens / RUNS).toFixed(1)} a run`);
-console.log('letters done', results.reduce((t, r) => ((t[r.acts] = (t[r.acts] ?? 0) + 1), t), {} as Record<number, number>), '· endings', results.reduce((t, r) => ((t[r.ending || 'none'] = (t[r.ending || 'none'] ?? 0) + 1), t), {} as Record<string, number>));
+console.log('landmarks raised', results.reduce((t, r) => ((t[r.raised] = (t[r.raised] ?? 0) + 1), t), {} as Record<number, number>), '· endings', results.reduce((t, r) => ((t[r.ending || 'none'] = (t[r.ending || 'none'] ?? 0) + 1), t), {} as Record<string, number>));
 console.log(`gold at a win ${Math.round(mean(won.map((r) => r.gold)))}`);
 console.log('lost', lostTo, `· hands dead of want ${mean(dead).toFixed(1)} a run`, of);
 console.log('voyages', hows, '· last landmark raised', reached);

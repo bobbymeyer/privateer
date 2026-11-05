@@ -126,10 +126,9 @@ test('fire on an English ship and you are a pirate', () => {
 
 });
 
-test('a pirate: English ports shut, no grudge fades, no bribe works, and London is the gallows — until a pardon', () => {
+test('a pirate: English ports shut, no grudge fades, no bribe works, and Plymouth is the gallows — until a pardon', () => {
   const plymouth = createWorld(sea, 1).player;
-  // Letters all done, so London would be a win but for the noose.
-  let w: WorldState = { ...victualled(createWorld(sea, 1)), ships: [], trail: [], pirate: true, standing: { england: -3 }, gold: GOAL + PARDON_COST + 50, letter: null, acts: 3, commission: 'done' };
+  let w: WorldState = { ...victualled(createWorld(sea, 1)), ships: [], trail: [], pirate: true, standing: { england: -3 }, gold: GOAL + PARDON_COST + 50 };
   assert.equal(serves(sea, w), false);
   assert.throws(() => bribe(sea, w), /pardon/);
   // Two months in port: the crew will ask for their shares, and be refused, for this.

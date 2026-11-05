@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { act, type Action, type EncounterState, type GameEvent } from '../rules.ts';
-  import { CREW, PLAYER_CARDS, SHIP_CLASSES, UPGRADES, WAGE_DAYS, cardWords, deckSize, wagesOf } from '../outfit.ts';
+  import { CREW, PLAYER_CARDS, SHIP_CLASSES, UPGRADES, cardWords, deckSize } from '../outfit.ts';
   import { buyRound, ROUND_COST } from '../world/bar.ts';
   import { plotCourse, sailToward } from '../world/course.ts';
   import type { NodeId } from '../world/map.ts';
@@ -14,13 +14,12 @@
   import { inSight, lookout, readShip } from '../world/scout.ts';
   import { choices as choicesOf, daysTo, makeFor } from '../world/journey.ts';
   import { LANDMARKS, landmark } from '../world/landmarks.ts';
-  import { ACTS, REGIONS, describeLetter, reprisal } from '../world/letters.ts';
   import { choices, choose, describe as describeDilemma } from '../world/dilemmas.ts';
   import CardView from './CardView.svelte';
   import { adjective, article, nationName, sailName } from '../world/ports.ts';
   import { markerStrength, predict } from '../world/rumors.ts';
   import type { Sea } from '../world/ships.ts';
-  import { advance, atIsland, createSea, createWorld, GOAL, START_GOLD, HOME, homeward, knowledge, pursuitOf, renown, type WorldState } from '../world/world.ts';
+  import { advance, atIsland, createSea, createWorld, GOAL, START_GOLD, knowledge, pursuitOf, type WorldState } from '../world/world.ts';
   import Fight from './Fight.svelte';
   import Flag from './Flag.svelte';
   import { COLORS } from '../world/colors.ts';
@@ -32,7 +31,7 @@
   import { CHANDLER, SHORE_DAYS, type Ware, ashore, buy, price, room, shore } from '../world/stores.ts';
   import { forget, load, store } from '../save.ts';
   import { ambient, bell, coin, gun, knell, setSound, soundOn, storm } from './sound.ts';
-  import { type Entry, best, dailySeed, entryFor, loadLog, saveLog, today, withEntry } from '../logbook.ts';
+  import { type Entry, best, dailySeed, entryFor, loadLog, raised, saveLog, today, withEntry } from '../logbook.ts';
 
   function seedFromUrl(): number | null {
     const raw = new URLSearchParams(location.search).get('seed');
@@ -356,8 +355,6 @@
     chart?.recentre();
   }
 
-  const captivesOf = (id: number) => world?.ships.find((x) => x.id === id)?.captives ?? null;
-  const RENOWN_WORDS = ['unknown', 'getting about', 'known in every port', 'a legend'];
   /** Make for a landmark: bound for it, and the course plotted to it. */
   function setFor(key: string) {
     attempt(() => makeFor(world!, key));
@@ -401,7 +398,7 @@
     <div class="layout">
       <div class="map">
         <div class="chartbox">
-          <SeaChart bind:this={chart} {sea} {world} {course} {cloud} {focus} {visible} region={world.letter?.region ? REGIONS[world.letter.region] : null} onpick={(n) => ((dest = n), (halted = ''))} />
+          <SeaChart bind:this={chart} {sea} {world} {course} {cloud} {focus} {visible} onpick={(n) => ((dest = n), (halted = ''))} />
           <!-- Why the ship stopped, said on the chart where you're looking. -->
           {#if halted || (said && !port)}
             {#key halted + said}
@@ -481,7 +478,7 @@
                 {#each Object.entries(CREW).filter(([k]) => !world!.outfit.crew.includes(k)) as [key, c]}
                   <li>
                     <button onclick={() => attempt(() => recruit(sea!, world!, key), `the ${c.name} signs on`)} disabled={world.gold < c.cost || world.outfit.crew.length >= SHIP_CLASSES[world.outfit.ship].berths}>hire a {c.name} ({c.cost})</button>
-                    <span class="faint">{[cardWords(c.cards) && `+ ${cardWords(c.cards)}`, c.sight ? `sight +${c.sight}` : ''].filter(Boolean).join(' · ')} · wage {c.wage}</span>
+                    <span class="faint">{[cardWords(c.cards) && `+ ${cardWords(c.cards)}`, c.sight ? `sight +${c.sight}` : ''].filter(Boolean).join(' · ')}</span>
                   </li>
                 {/each}
               </ul>
@@ -525,7 +522,7 @@
               <p class="faint">
                 {port.fort ? 'a fortified port: not for a small ship.' : 'an open town.'}
                 the {adjective(port.nation)} will remember it three times over and their guard ships will hunt twice as far.
-                {port.nation === YOUR_NATION ? ' it is your own flag: you would be a pirate.' : isEnemy(world.wars, port.nation) || reprisal(world, port.nation) ? ' they are at war with England, or named in your letter: fair game.' : ' they are at peace with England: the Crown will hear of it.'}
+                {port.nation === YOUR_NATION ? ' it is your own flag: you would be a pirate.' : isEnemy(world.wars, port.nation) ? ' they are at war with England: fair game.' : ' they are at peace with England: the Crown will hear of it.'}
               </p>
               <div class="row"><button onclick={() => attempt(() => raid(sea!, world!))}>raid {port.name}</button></div>
             {/if}
@@ -552,7 +549,6 @@
             {#each enemiesOf(world.wars, YOUR_NATION) as n}<span class="chip"><Flag nation={n} />{nationName(n)}</span>{/each}
             {#if !enemiesOf(world.wars, YOUR_NATION).length}<span class="faint">England is at peace with everyone.</span>{/if}
           </p>
-          {#if world.letter && !isEnemy(world.wars, world.letter.nation)}<p><span class="chip"><Flag nation={world.letter.nation} />{nationName(world.letter.nation)}</span> <span class="faint">at peace, but named in your letter</span></p>{/if}
           <p class="faint">their ships and towns are fair game; anyone else's, the Crown hears of.</p>
           {#each Object.entries(world.tension).filter(([, v]) => v) as [n, v]}
             <p class="wanted"><Flag nation={n as Nation} />the peace with {nationName(n as Nation)} is strained: {v} of {CASUS_BELLI}</p>
@@ -564,9 +560,7 @@
               <li class:wanted={v! < 0}><Flag nation={n as Nation} />{adjective(n as Nation)}: {v! > 0 ? '+' : ''}{v}{v! < 0 ? ', and their guard ships are out' : ''}</li>
             {/each}
           </ul>
-            <h3>your name</h3>
-            <p>{RENOWN_WORDS[renown(world)]}{renown(world) ? ': hunters and privateers come farther for you, and better found.' : '.'}</p>
-            {#if world.pirate}<p class="wanted">a pirate: English ports are shut to you and London would hang you, until you buy a pardon ({PARDON_COST}) in an English port.</p>{/if}
+            {#if world.pirate}<h3>a pirate</h3><p class="wanted">English ports are shut to you and Plymouth would hang you, until you buy a pardon ({PARDON_COST}) in an English port.</p>{/if}
             <h3>the flags</h3>
             <ul class="key" aria-label="the nations' colours">
               {#each Object.keys(COLORS) as n}<li><Flag nation={n as Nation} size={12} />{adjective(n as Nation)}</li>{/each}
@@ -585,9 +579,7 @@
           <Stores {sea} {world} set={(w) => (world = w)} />
           {#if world.morale <= 2}<p class="wanted">the crew are close to mutiny. a prize, a round ashore or fresh water would steady them.</p>{:else if world.turn - world.lastSpoils >= IDLE_DAYS}<p class="faint">{world.turn - world.lastSpoils} days since the last prize: the crew are souring.</p>{/if}
           <p>a {SHIP_CLASSES[world.outfit.ship].name}, {world.outfit.crew.length ? world.outfit.crew.map((c) => CREW[c].name).join(', ') : 'no hands of note'}</p>
-          {#if wagesOf(world.outfit)}<p class="faint">wages {wagesOf(world.outfit)} every {WAGE_DAYS} days, next on day {(Math.floor(world.turn / WAGE_DAYS) + 1) * WAGE_DAYS + 1}</p>{/if}
           <div class="row"><button onclick={() => (tab = 'ship')}>ship &amp; crew · deck of {deckSize(world.outfit)}</button></div>
-          {#if homeward(world)}<p class="wanted">homeward bound with the score: every enemy privateer is out for you.</p>{/if}
           {#if atIsland(world)}<p>at anchor off an uncharted isle: taking on water, mending the hull.</p>{/if}
           {#if world.pirate}<p class="wanted">a pirate. see politics.</p>{/if}
           {#if port}<p><button class="link" onclick={() => (tab = 'location')}>{port.name}: the bar, the yard, a raid</button></p>{/if}
@@ -626,27 +618,11 @@
         </details>
 
         <details class="panel" open>
-          <summary><h2>your letter</h2></summary>
-          {#if world.letter}
-            {@const told = describeLetter(sea, world, world.letter)}
-            <p><Flag nation={world.letter.nation} />{told.title}</p>
-            <p>{told.task}</p>
-            <p class:wanted={world.letter.deadline - world.turn <= 20} class:faint={world.letter.deadline - world.turn > 20}>{told.terms}</p>
-          {:else if world.commission === 'done'}
-            <p>every letter done. home to {HOME} and the run is won.</p>
-          {:else if world.commission === 'revoked'}
-            <p class="wanted">revoked: you sail without a letter, and whatever you take is piracy. a pardon in an English port would bring a new one; or retire rich, {GOAL}, in a pirate's haven.</p>
-          {:else}
-            <p class="faint">a run from before letters: bring {GOAL} home to {HOME}.</p>
-          {/if}
-        </details>
-
-        <details class="panel" open>
           <summary><h2>in sight</h2></summary>
           {#if !inSight(sea, world).length}<p class="faint">nothing on the horizon.</p>{/if}
           <ul class="plain sightings">
             {#each inSight(sea, world) as x (x.ship.id)}
-              {@const r = readShip(world, x.ship)}
+              {@const r = readShip(x.ship)}
               <li class:wanted={x.hostile}>
                 <Flag nation={x.ship.nation} />{sailName(x.ship.kind, x.ship.nation)}, {x.days === 0 ? 'here' : `${x.days} ${x.days === 1 ? 'day' : 'days'} off`}{x.closing ? ', bearing down' : x.hostile ? ', hostile' : ''}
                 <span class="faint">hull {r.hull} · {r.traits.join(' · ')}</span>
@@ -693,12 +669,10 @@
             <dd>The landmarks of the way are on the chart. Choose the next under "the voyage", and where the way divides, which way; set sail and the ship sails the lanes a day at a time, heaving to when a ship comes alongside, when you raise land, or when there is news worth stopping for. You can turn aside for a port or a prize, and turn for home whenever you like.</dd>
             <dt>stores</dt>
             <dd>Every day at sea the hands eat and drink a ration each, water faster in the tropics. Short rations stretch both, at the crew's temper. Six weeks without fresh food and the scurvy starts to kill. Water, forage and careen at the landmarks with a shore; buy at a chandler where they'll deal with you. Spares take a storm's damage before the hull. Pace: easy spares the ship and crew, cracking on gains a day in three.</dd>
-            <dt>letters</dt>
-            <dd>Each letter names a nation, a region, a task and a deadline: two prizes near home, then a town to sack farther out, then a Spanish plate ship, named, with word of where she is. The region is drawn on the chart. The letter's nation is fair game while it lasts, at war or not. Miss a deadline and the Admiralty grants more time once; miss it again and the letter is revoked, and you are a pirate.</dd>
             <dt>rumors</dt>
             <dd>Buy rounds in a port's bar and somebody may have seen a ship. Rumors show as rings that fade; pick one to see where her ship could be by now. The more of the current and wind you have seen, the tighter the guess.</dd>
             <dt>fair game</dt>
-            <dd>England's enemies, listed under "at war", are fair game, and the Crown thinks the better of you for taking them. Anyone else's ships, the Crown hears of, and enough of that starts a war. Fire on an English ship and you are a pirate: London will hang you, but Baltimore and the Barbary coast will let you retire there, rich.</dd>
+            <dd>England's enemies, listed under "at war", are fair game, and the Crown thinks the better of you for taking them. Anyone else's ships, the Crown hears of, and enough of that starts a war. Fire on an English ship and you are a pirate: Plymouth will hang you, but Baltimore and the Barbary coast will let you retire there, rich.</dd>
             <dt>fighting</dt>
             <dd>A fight is cards, yours and hers in one deck. Each round three are dealt: keep two, which play in the order you pick them; the third goes to the bottom. A hull at nothing is sunk; three way and a ship is away. Hover a card, or open "what the cards say", for what its words mean.</dd>
             <dt>in port</dt>
@@ -718,16 +692,16 @@
           {#if !log.length}
             <p class="faint">no run has ended yet. every one that does is written here.</p>
           {:else}
-            <p>your best: {top!.ending === 'home' || top!.ending === 'retired' ? `${top!.gold}, ${top!.ending === 'home' ? 'home to London' : 'retired'} on day ${top!.day}` : `letter ${top!.acts} of ${ACTS} done, ${top!.gold} gold`}{top!.daily ? `, on the voyage of ${top!.daily}` : ''}</p>
+            <p>your best: {top!.ending === 'home' || top!.ending === 'retired' ? `${top!.gold}, ${top!.ending === 'home' ? 'home to Plymouth' : 'retired'} on day ${top!.day}` : `${raised(top!)} landmarks raised, ${top!.gold} gold`}{top!.daily ? `, on the voyage of ${top!.daily}` : ''}</p>
             <table class="logbook">
-              <thead><tr><th>ended</th><th>how</th><th class="num">gold</th><th class="num">letters</th><th class="num">days</th><th>ship</th><th></th></tr></thead>
+              <thead><tr><th>ended</th><th>how</th><th class="num">gold</th><th class="num">landmarks</th><th class="num">days</th><th>ship</th><th></th></tr></thead>
               <tbody>
                 {#each log as e, i (i)}
                   <tr class:wanted={e.ending === 'sunk'}>
                     <td>{e.when}{e.daily ? ' · today’s voyage' : ''}</td>
                     <td>{e.ending === 'sunk' ? `sunk${e.sunkBy ? ` by ${e.sunkBy}` : ''}` : e.ending === 'home' ? 'home' : e.ending === 'retired' ? 'retired' : 'given up'}</td>
                     <td class="num">{e.gold}</td>
-                    <td class="num">{e.acts}</td>
+                    <td class="num">{raised(e)}</td>
                     <td class="num">{e.day}</td>
                     <td>{e.ship}</td>
                     <td class="faint">seed {e.seed}</td>
@@ -751,13 +725,12 @@
         <div class="sheet">
           <h2><Flag nation={h.nation} size={18} />{article(flagName)} {flagName} {what} alongside</h2>
           {#if world.ships.find((x) => x.id === h.shipId)}
-            {@const r = readShip(world, world.ships.find((x) => x.id === h.shipId)!)}
+            {@const r = readShip(world.ships.find((x) => x.id === h.shipId)!)}
             <p class="reading">hull {r.hull} to your {world.hull} · {r.traits.join(' · ')}{r.bounty ? ` · a price of ${r.bounty} on her` : ''}</p>
           {/if}
-          {#if captivesOf(h.shipId)}{@const laden = captivesOf(h.shipId)!}<p>she's laden with {adjective(laden)} captives. take her and they go free, and the {adjective(laden)} and the Crown will think the better of you.</p>{/if}
           {#if h.nation === YOUR_NATION}
-            <p class="wanted">she flies your flag. fire on her and you are a pirate: England will want you, its ports will shut, and London will hang you until you're pardoned.</p>
-          {:else if isEnemy(world.wars, h.nation) || reprisal(world, h.nation)}
+            <p class="wanted">she flies your flag. fire on her and you are a pirate: England will want you, its ports will shut, and Plymouth will hang you until you're pardoned.</p>
+          {:else if isEnemy(world.wars, h.nation)}
             <p>the {flagName} are at war with England: she's fair game, and the Crown will think the better of you for taking her. the {flagName} will remember it, and their guard ships will be out for you.</p>
           {:else}
             <p>the {flagName} are at peace with England. fire on her and the Crown will hear of it, and the {flagName} will remember it{h.nation === 'local' ? '' : ': their guard ships will be out for you'}.</p>
@@ -813,7 +786,7 @@
             {world.ending === 'retired'
               ? `you retired to ${sea.map.nodes[world.player].port?.name} on day ${world.turn + 1} with ${world.gold}, a pirate rich enough to grow old.`
               : world.won
-                ? `you came home to ${HOME} on day ${world.turn + 1} with ${world.gold}${world.commission === 'done' ? ', every letter done' : ''}.`
+                ? `you came home to Plymouth on day ${world.turn + 1} with ${world.gold}.`
                 : `the sea took you on day ${world.turn + 1}, ${world.gold} in the purse.`}
           </p>
           {#if world.sunk && world.lastFight}
@@ -833,8 +806,8 @@
           <p>
             {world.tally.fights} {world.tally.fights === 1 ? 'fight' : 'fights'} · {world.tally.taken} taken · {world.tally.sacks} {world.tally.sacks === 1 ? 'town' : 'towns'} sacked · {world.tally.fled} times you got away · {world.tally.escaped} that got away from you
           </p>
-          <p>letters done: {world.acts} of {ACTS} · ended in a {SHIP_CLASSES[world.outfit.ship].name}{world.tally.best ? ` · best prize: ${world.tally.best.what}, ${world.tally.best.payout}` : ''}</p>
-          {#if best(log)}<p class="faint">your best: {best(log)!.ending === 'home' || best(log)!.ending === 'retired' ? `${best(log)!.gold}, won` : `letter ${best(log)!.acts} done, ${best(log)!.gold} gold`}.</p>{/if}
+          <p>{world.voyage.visited.length - 1} landmarks raised · ended in a {SHIP_CLASSES[world.outfit.ship].name}{world.tally.best ? ` · best prize: ${world.tally.best.what}, ${world.tally.best.payout}` : ''}</p>
+          {#if best(log)}<p class="faint">your best: {best(log)!.ending === 'home' || best(log)!.ending === 'retired' ? `${best(log)!.gold}, won` : `${raised(best(log)!)} landmarks raised, ${best(log)!.gold} gold`}.</p>{/if}
           <div class="row">
             <button onclick={() => newRun()}>a new run</button>
             <button onclick={() => newRun(today())}>today's voyage</button>

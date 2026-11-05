@@ -89,8 +89,6 @@ export const SHIP_CLASSES: Record<string, ShipClass> = {
 export interface CrewRole {
   name: string;
   cost: number;
-  /** Paid every WAGE_DAYS from the purse. Unpaid, the crew sour. */
-  wage: number;
   cards: Cards;
   /** Steps of sight it adds: how far out you see current and wind. */
   sight?: number;
@@ -98,13 +96,13 @@ export interface CrewRole {
 
 /** Hired in the bar: one of each. */
 export const CREW: Record<string, CrewRole> = {
-  gunner: { name: 'master gunner', cost: 12, wage: 2, cards: { 'double-shot': 1, reload: 1 } },
-  marksmen: { name: 'marksmen', cost: 10, wage: 1, cards: { marksmen: 2 } },
-  quartermaster: { name: 'quartermaster', cost: 10, wage: 1, cards: { 'prize-crew': 1 } },
-  boatswain: { name: 'boatswain', cost: 8, wage: 1, cards: { 'all-hands': 1 } },
-  surgeon: { name: 'surgeon', cost: 10, wage: 1, cards: { 'surgeons-mate': 1 } },
-  pilot: { name: 'pilot', cost: 12, wage: 1, cards: { 'bear-away': 1 } },
-  navigator: { name: 'navigator', cost: 15, wage: 2, cards: {}, sight: 1 },
+  gunner: { name: 'master gunner', cost: 12, cards: { 'double-shot': 1, reload: 1 } },
+  marksmen: { name: 'marksmen', cost: 10, cards: { marksmen: 2 } },
+  quartermaster: { name: 'quartermaster', cost: 10, cards: { 'prize-crew': 1 } },
+  boatswain: { name: 'boatswain', cost: 8, cards: { 'all-hands': 1 } },
+  surgeon: { name: 'surgeon', cost: 10, cards: { 'surgeons-mate': 1 } },
+  pilot: { name: 'pilot', cost: 12, cards: { 'bear-away': 1 } },
+  navigator: { name: 'navigator', cost: 15, cards: {}, sight: 1 },
 };
 
 export interface Upgrade {
@@ -137,9 +135,6 @@ export interface Outfit {
 
 export const START_OUTFIT: Outfit = { ship: 'pinnace', upgrades: [], crew: [], prizes: [], struck: [] };
 
-/** Every this many days, the hands of note are paid. */
-export const WAGE_DAYS = 60;
-export const wagesOf = (o: Outfit) => o.crew.reduce((t, c) => t + CREW[c].wage, 0);
 /** What it costs at a yard to strike a card from the deck, and the fewest cards a deck may come down to. */
 export const STRIKE_COST = 6;
 export const MIN_DECK = 10;

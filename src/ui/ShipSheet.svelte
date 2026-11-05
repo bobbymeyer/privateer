@@ -5,7 +5,7 @@
    * laid out as cards and grouped by where each came from. In a port with a
    * yard, a card can be struck out from here.
    */
-  import { CREW, MIN_DECK, PLAYER_CARDS, SHIP_CLASSES, STRIKE_COST, UPGRADES, WAGE_DAYS, cardWords, deckSize, deckSources, maxHullOf } from '../outfit.ts';
+  import { CREW, MIN_DECK, PLAYER_CARDS, SHIP_CLASSES, STRIKE_COST, UPGRADES, cardWords, deckSize, deckSources, maxHullOf } from '../outfit.ts';
   import { explainCard } from '../describe.ts';
   import { MORALE_MAX } from '../world/events.ts';
   import type { Sea } from '../world/ships.ts';
@@ -60,7 +60,7 @@
         {@const c = CREW[key]}
         <li>
           <span>the {c.name}</span>
-          <span class="faint">{cardWords(c.cards)}{c.sight ? `${Object.keys(c.cards).length ? ', ' : ''}sight +${c.sight}` : ''} · wage {c.wage} every {WAGE_DAYS} days</span>
+          <span class="faint">{cardWords(c.cards)}{c.sight ? `${Object.keys(c.cards).length ? ', ' : ''}sight +${c.sight}` : ''}</span>
           <button onclick={() => act(() => dismiss(world, key), `the ${c.name} goes ashore`)}>let go</button>
         </li>
       {/each}

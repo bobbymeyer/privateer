@@ -10,8 +10,6 @@ import { YOUR_NATION } from './meet.ts';
 import { type Sea, wantedBy } from './ships.ts';
 import { GOAL, type WorldState } from './world.ts';
 import { MORALE_MAX } from './events.ts';
-import { ACTS, describeLetter, intelligence, issue } from './letters.ts';
-import type { Roller } from './random.ts';
 
 import { type Stores, capacity, topUp } from './stores.ts';
 
@@ -86,19 +84,12 @@ export function buyPardon(sea: Sea, s: WorldState): WorldState {
   if (!s.pirate) throw new Error('you have nothing to be pardoned for');
   if (port.nation !== YOUR_NATION) throw new Error('a pardon is bought in an English port');
   const paid = pay(s, PARDON_COST);
-  const pardoned: WorldState = {
+  return {
     ...paid,
     pirate: false,
     standing: { ...s.standing, [YOUR_NATION]: 0 },
     log: [...s.log, { turn: s.turn, text: 'a royal pardon, bought dear: you are no pirate' }],
   };
-  // A letter revoked comes back with the pardon: the next act's, as if the last were done.
-  if (s.commission !== 'revoked') return pardoned;
-  if (s.acts >= ACTS) return { ...pardoned, commission: 'done' };
-  const r: Roller = { rng: pardoned.rng };
-  const letter = issue(sea, pardoned, s.acts + 1, r);
-  const w: WorldState = { ...pardoned, rng: r.rng, letter, commission: 'active', log: [...pardoned.log, { turn: s.turn, text: `and with it a new letter: ${describeLetter(sea, pardoned, letter).task}`, stop: true }] };
-  return intelligence(sea, w, letter);
 }
 
 const mustServe = (sea: Sea, s: WorldState) => {
@@ -175,7 +166,7 @@ export function bribe(sea: Sea, s: WorldState): WorldState {
 
 /**
  * Retire, a pirate in one of his havens, with the score: a win, the
- * pirate's way. London would hang him; Baltimore and the Barbary coast
+ * pirate's way. Plymouth would hang him; Baltimore and the Barbary coast
  * will let him grow old.
  */
 export function retire(sea: Sea, s: WorldState): WorldState {

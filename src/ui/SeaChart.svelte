@@ -20,7 +20,6 @@
     focus,
     visible,
     onpick,
-    region = null,
   }: {
     sea: Sea;
     world: WorldState;
@@ -32,8 +31,6 @@
     focus: number | null;
     /** Ships you can see. */
     visible: number[];
-    /** The region your letter names: drawn as a dashed border, lettered. */
-    region?: { name: string; box: [number, number, number, number] } | null;
     onpick: (node: NodeId) => void;
   } = $props();
 
@@ -394,13 +391,6 @@
         <text x={X(n.lon) + px * 7} y={Y(n.lat) - px * 6} font-size={px * 12} font-style="italic" fill="var(--ink)">{l.name}</text>
       </g>
     {/each}
-
-    <!-- The region your letter names. -->
-    {#if region}
-      {@const [w0, s0, e0, n0] = region.box}
-      <rect x={X(w0)} y={Y(n0)} width={e0 - w0} height={n0 - s0} fill="none" stroke="var(--ink)" stroke-width={px * 1.4} stroke-dasharray="{px * 8} {px * 5}" />
-      <text x={X(w0) + px * 6} y={Y(n0) + px * 16} font-size={px * 12} fill="var(--ink)">your letter: {region.name}</text>
-    {/if}
 
     <!-- Ships in sight. -->
     {#each visible as id (id)}
