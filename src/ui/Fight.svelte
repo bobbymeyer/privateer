@@ -3,7 +3,7 @@
   import { chained, linksFor, threatened, type Action, type EncounterState, type GameEvent } from '../rules.ts';
   import { type Card, REACHES, cardType } from '../cards.ts';
   import type { Reckoning } from '../world/meet.ts';
-  import { adjective, type Nation } from '../world/ports.ts';
+  import type { Nation } from '../world/ports.ts';
   import Flag from './Flag.svelte';
   import CardView from './CardView.svelte';
   import Gauge from './Gauge.svelte';
@@ -145,9 +145,8 @@
     <div class="outcome">
       <h3>{(isRaid ? RAID_OUTCOME_TEXT : OUTCOME_TEXT)[fight.outcome]}</h3>
       <p>you come away with {fight.payout}</p>
-      {#if reckoning?.heard}<p>prisoners talked: {reckoning.heard} {reckoning.heard === 1 ? 'rumor' : 'rumors'}</p>{/if}
-      {#if reckoning?.attacked}<p>the {adjective(reckoning.nation)} will remember this</p>{/if}
-      <button onclick={oncontinue}>{fight.outcome === 'sunk' ? 'the end' : 'back to sea'}</button>
+      {#each reckoning?.said ?? [] as line}<p>{line}</p>{/each}
+      <button onclick={oncontinue}>{fight.outcome === 'sunk' ? 'the end' : 'continue'}</button>
     </div>
   {:else}
     <p class="prompt">her next card is face up. keep two of yours: they play first, in the order you pick them, then hers. the third goes under your deck. a card does only what works at the range as it stands, so close or open it first.</p>

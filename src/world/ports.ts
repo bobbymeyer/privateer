@@ -168,20 +168,6 @@ export const PORTS: PortDef[] = [
 /** How far a nation's protected waters reach from each of its forts, in days. */
 export const WATERS_DAYS = 4;
 
-/** Who comes out when a foreign warship nears a nation's forts. */
-export const NAVIES: Partial<Record<Nation, string>> = {
-  england: 'the Royal Navy',
-  france: 'the Marine royale',
-  netherlands: 'the Dutch admiralties',
-  spain: 'the Spanish guard',
-  portugal: 'the Portuguese guard',
-  denmark: 'the Danish navy',
-  sweden: 'the Swedish navy',
-  venice: 'the Venetian galleys',
-  ottoman: 'the Ottoman fleet',
-};
-export const navyOf = (n: Nation) => NAVIES[n] ?? `${n} guard ships`;
-
 const ADJECTIVES: Record<Nation, string> = {
   spain: 'Spanish', portugal: 'Portuguese', england: 'English', france: 'French', netherlands: 'Dutch',
   denmark: 'Danish', sweden: 'Swedish', hanse: 'Hanseatic', italy: 'Italian', venice: 'Venetian',
@@ -193,19 +179,3 @@ export const adjective = (n: Nation) => ADJECTIVES[n];
 
 /** `a` or `an`, for the word that follows. */
 export const article = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a');
-
-const NAMES: Record<Nation, string> = {
-  spain: 'Spain', portugal: 'Portugal', england: 'England', france: 'France', netherlands: 'the Dutch Republic',
-  denmark: 'Denmark', sweden: 'Sweden', hanse: 'the Hanse', italy: 'the Italian states', venice: 'Venice',
-  malta: 'the Knights of Malta', ottoman: 'the Ottomans', barbary: 'the Barbary corsairs', morocco: 'Morocco',
-  persia: 'Persia', oman: 'Oman', mughal: 'the Mughals', china: 'China', japan: 'Japan', native: 'the islanders', local: 'the independent harbours',
-};
-/** `Spain`, `the Dutch Republic`: a nation by name, for the news. */
-export const nationName = (n: Nation) => NAMES[n];
-
-/** What to call a ship you've seen or heard of, with its article: `a Dutch merchant`, `an English guard ship`, `a sea monster`. */
-export function sailName(kind: string, nation: Nation): string {
-  if (kind === 'monster') return 'a sea monster';
-  const flag = adjective(nation);
-  return `${article(flag)} ${flag} ${kind === 'hunter' ? 'guard ship' : kind.replace('-', ' ')}`;
-}
