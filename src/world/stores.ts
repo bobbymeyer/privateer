@@ -231,3 +231,55 @@ export function buy(sea: Sea, s: WorldState, ware: Ware, serves: boolean): World
 /** A new run's ship: a pinnace two thirds manned, with two months' food and a month's water. The rest is for you to buy. */
 export const START_CREW = 20;
 export const START_STORES: Stores = { food: START_CREW * 60, water: START_CREW * 30, spares: 2, powder: 3 };
+
+// --- The fight -----------------------------------------------------------------
+
+/** Shots a barrel of powder serves. */
+export const SHOTS_PER_BARREL = 3;
+/** Hands killed for each point of hull she lost, a share of those aboard. */
+export const KILLED_PER_HULL = 0.03;
+
+/** What a fight cost in powder and hands: shots fired, hull lost. */
+export function fightCost(s: WorldState, shots: number, hullLost: number, r: Roller): WorldState {
+  const powder = Math.min(s.stores.powder, Math.ceil(shots / SHOTS_PER_BARREL));
+  const dead = Math.min(s.crew, deaths(r, Math.max(0, hullLost) * s.crew * KILLED_PER_HULL));
+  const said = [powder && `${powder} ${powder === 1 ? 'barrel' : 'barrels'} of powder`, dead && `${dead === 1 ? 'a hand' : `${dead} hands`} killed`].filter(Boolean).join(', ');
+  const w = { ...s, crew: s.crew - dead, stores: { ...s.stores, powder: s.stores.powder - powder } };
+  return said ? { ...w, log: [...w.log, { turn: w.turn, text: `the fight cost ${said}` }] } : w;
+}
+
+/** A prize's hold, in days of food and water for a crew like yours, bundles of spares and barrels of powder. */
+const HOLDS: Record<string, { food: number; water: number; spares: number; powder: number }> = {
+  merchant: { food: 25, water: 20, spares: 2, powder: 1 },
+  'treasure-ship': { food: 30, water: 25, spares: 2, powder: 2 },
+  'treasure-fleet': { food: 40, water: 30, spares: 3, powder: 3 },
+  hunter: { food: 15, water: 15, spares: 2, powder: 4 },
+  privateer: { food: 15, water: 15, spares: 2, powder: 3 },
+  corsair: { food: 15, water: 15, spares: 1, powder: 2 },
+  armada: { food: 30, water: 20, spares: 3, powder: 6 },
+  town: { food: 45, water: 0, spares: 2, powder: 2 },
+  fortress: { food: 45, water: 0, spares: 3, powder: 5 },
+};
+
+/**
+ * Her stores, or the town's: biscuit, wine, water, canvas, powder — as much
+ * as your hold has room for. A town's storehouses are fresh food, and the
+ * casks filled at its well.
+ */
+export function prizeStores(s: WorldState, kind: string, town: boolean, r: Roller): WorldState {
+  const hold = HOLDS[town ? (kind === 'fortress' ? 'fortress' : 'town') : kind];
+  if (!hold) return s;
+  const cap = capacity(s);
+  const crew = Math.max(s.crew, 1);
+  const vary = () => 0.6 + roll(r) * 0.8;
+  const stores: Stores = {
+    food: topUp(s.stores.food, Math.round(hold.food * crew * vary()), cap.food),
+    water: town ? Math.max(s.stores.water, cap.water) : topUp(s.stores.water, Math.round(hold.water * crew * vary()), cap.water),
+    spares: topUp(s.stores.spares, hold.spares, cap.spares),
+    powder: topUp(s.stores.powder, hold.powder, cap.powder),
+  };
+  const got = { food: Math.round((stores.food - s.stores.food) / crew), water: Math.round((stores.water - s.stores.water) / crew), spares: stores.spares - s.stores.spares, powder: stores.powder - s.stores.powder };
+  const said = [got.food > 0 && `${got.food} days of food`, got.water > 0 && `${got.water} of water`, got.spares > 0 && `${got.spares} of spares`, got.powder > 0 && `${got.powder} of powder`].filter(Boolean).join(', ');
+  const w = { ...s, stores, ...(town ? { fresh: 0 } : {}) };
+  return said ? { ...w, log: [...w.log, { turn: w.turn, text: `${town ? 'the storehouses' : 'her hold'}: ${said}` }] } : w;
+}

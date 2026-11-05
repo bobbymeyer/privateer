@@ -41,6 +41,8 @@ import { type Sea, type ShipKind, wantedBy } from './ships.ts';
 import { CASUS_BELLI, YOUR_NATION, declare, isEnemy } from './wars.ts';
 import { extraFor } from './scout.ts';
 import { renown, type WorldState } from './world.ts';
+import { cardType } from '../cards.ts';
+import { fightCost, prizeStores } from './stores.ts';
 
 /** What a laden corsair carries over the usual: captives, and what was taken with them. */
 export const CAPTIVES_CARGO = 12;
@@ -147,8 +149,11 @@ function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, force
   // What you saw of her is what you fight: a warship better found against a captain with a name, a corsair laden.
   const ship = who.shipId >= 0 ? s.ships.find((x) => x.id === who.shipId) : undefined;
   // She came at you: she's bearing down from far. You fired first: within hail.
-  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit), extra ?? (ship ? extraFor(s, ship) : {}), forced && who.port === null ? FAR : CLOSE);
-  return { ...s, rng: r.rng, hail: null, encounter: { ...who, fight, forced } };
+  // No powder, no guns: the shot cards stay in the locker.
+  const deck = s.stores.powder > 0 ? deckOf(s.outfit) : deckOf(s.outfit).filter((c) => cardType(c) !== 'shot');
+  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deck, extra ?? (ship ? extraFor(s, ship) : {}), forced && who.port === null ? FAR : CLOSE);
+  const log = s.stores.powder > 0 ? s.log : [...s.log, { turn: s.turn, text: 'no powder aboard: the guns are silent, and it is sails and boarders' }];
+  return { ...s, rng: r.rng, hail: null, log, encounter: { ...who, fight, forced } };
 }
 
 /**
@@ -279,6 +284,11 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
 
   let w: WorldState = { ...s, rng: r.rng, rumors, nextRumor: next };
 
+  // What it cost: powder for every shot fired, hands for every point of hull lost.
+  const shots = f.events.filter((e) => e.type === 'played' && e.card.side === 'ship' && cardType(e.card) === 'shot').length;
+  w = fightCost(w, shots, s.hull - f.ship.hull, r);
+  w = { ...w, rng: r.rng };
+
   // A nation remembers. If you attacked, that was counted when you fired;
   // taking her, or sacking the town, counts again. If she attacked you,
   // what you did in your own defence still counts.
@@ -332,6 +342,11 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
 
   if (f.payout > 0 && outcome !== 'sunk') w = fameFor(w, f.payout);
   if (f.payout > 0 && outcome !== 'sunk') w = spoils(w, m.port !== null && taken && m.kind !== 'canoes' ? SACK_CHEER : PRIZE_CHEER);
+  // Her hold, or the town's storehouses: food, water, spares, powder.
+  if (taken && m.kind !== 'monster' && m.kind !== 'canoes') {
+    const r3: Roller = { rng: w.rng };
+    w = { ...prizeStores(w, m.kind, m.port !== null, r3), rng: r3.rng };
+  }
   // Her stores: three cards to choose from, if she was taken and had anything worth having.
   const pool = PRIZE_CARDS[m.kind];
   if (taken && pool?.length) {

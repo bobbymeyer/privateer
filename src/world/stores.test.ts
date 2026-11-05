@@ -5,7 +5,7 @@ import { sailToward } from './course.ts';
 import { choose } from './dilemmas.ts';
 import { portNamed } from './map.ts';
 import {
-  CHANDLER, EAT, MIN_HANDS, SCURVY_DAYS, START_CREW, ashore, buy, capacity, daysOf, price, provisionDay, scurvy, shore,
+  CHANDLER, EAT, MIN_HANDS, SCURVY_DAYS, START_CREW, ashore, buy, capacity, daysOf, fightCost, price, prizeStores, provisionDay, scurvy, shore,
 } from './stores.ts';
 import { advance, createSea, createWorld, type WorldState } from './world.ts';
 
@@ -117,4 +117,28 @@ test('pace: easy makes less way, hard makes more', () => {
   const [easy, steady, hard] = [sail('easy'), sail('steady'), sail('hard')];
   assert.ok(easy > steady, `easy ${easy}, steady ${steady}`);
   assert.ok(hard < steady, `hard ${hard}, steady ${steady}`);
+});
+
+test('a fight spends powder by the shot and hands by the hull lost', () => {
+  const w = fresh({ crew: 30, stores: { food: 0, water: 0, spares: 0, powder: 5 } });
+  const r = { rng: 1 };
+  const after = fightCost(w, 7, 10, r);
+  assert.equal(after.stores.powder, 2);
+  assert.ok(after.crew >= 30 - 10 && after.crew <= 30 - 8, `crew ${after.crew}`);
+  assert.equal(fightCost(w, 30, 0, r).stores.powder, 0, 'never below none');
+  assert.deepEqual(fightCost(w, 0, 0, r), w, 'nothing fired, nothing lost');
+});
+
+test('a prize fills the hold as far as there is room; a town’s storehouses are fresh, and its well fills the casks', () => {
+  const w = fresh({ crew: 20, fresh: 50, stores: { food: 100, water: 100, spares: 0, powder: 0 } });
+  const r = { rng: 2 };
+  const prize = prizeStores(w, 'merchant', false, r);
+  assert.ok(prize.stores.food > 100 && prize.stores.water > 100 && prize.stores.spares > 0);
+  assert.equal(prize.fresh, 50, 'biscuit is not fresh food');
+  const town = prizeStores(w, 'town', true, r);
+  assert.equal(town.fresh, 0);
+  assert.equal(town.stores.water, capacity(w).water);
+  const full = prizeStores({ ...w, stores: capacity(w) }, 'armada', false, r);
+  assert.deepEqual(full.stores, capacity(w));
+  assert.equal(prizeStores(w, 'monster', false, r), w);
 });
