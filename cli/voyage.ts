@@ -33,6 +33,7 @@ import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
 import { advance, createSea, createWorld, GOAL, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
+import { score } from '../src/world/score.ts';
 import { ashore, buy, daysOf, price, room, shore, type Ware } from '../src/world/stores.ts';
 
 const arg = (name: string, fallback: string) => {
@@ -200,6 +201,7 @@ let omens = 0;
 const hullIn: Record<string, string[]> = {};
 const lostTo: Record<string, number> = {};
 const dead: number[] = [];
+const likes: Record<string, number> = {};
 const of: Record<string, number> = {};
 for (let seed = FROM; seed < FROM + RUNS; seed++) {
   let w = createWorld(sea, seed);
@@ -260,6 +262,7 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
     }
   }
   if (process.argv.includes('--trace')) console.log(seed, w.log.filter((l) => /you raise|dead of|the fight cost|Plymouth|too few/.test(l.text)).map((l) => `${l.turn}:${l.text}`).join('\n  '));
+  if (w.won) likes[score(w).like] = (likes[score(w).like] ?? 0) + 1;
   if (w.sunk) {
     const why = w.log.at(-1)?.text.includes('too few hands') ? 'too few hands' : 'in a fight';
     lostTo[why] = (lostTo[why] ?? 0) + 1;
@@ -290,4 +293,5 @@ console.log(`mutinies ${(mutinies / RUNS).toFixed(1)}, storms ${(storms / RUNS).
 console.log('landmarks raised', results.reduce((t, r) => ((t[r.raised] = (t[r.raised] ?? 0) + 1), t), {} as Record<number, number>), '· endings', results.reduce((t, r) => ((t[r.ending || 'none'] = (t[r.ending || 'none'] ?? 0) + 1), t), {} as Record<string, number>));
 console.log(`gold at a win ${Math.round(mean(won.map((r) => r.gold)))}`);
 console.log('lost', lostTo, `· hands dead of want ${mean(dead).toFixed(1)} a run`, of);
+console.log('like', likes);
 console.log('voyages', hows, '· last landmark raised', reached);

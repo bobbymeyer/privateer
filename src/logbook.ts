@@ -8,6 +8,7 @@
  */
 
 import type { WorldState } from './world/world.ts';
+import { type Like, score } from './world/score.ts';
 
 export const LOG_KEY = 'privateer:logbook';
 /** Runs kept, newest first. */
@@ -32,6 +33,9 @@ export interface Entry {
   sunkBy: string | null;
   taken: number;
   sacks: number;
+  /** Treasure, hands and ship, all told; and the voyage of the time it was like. A run from before the score reads as its gold. */
+  score?: number;
+  like?: Like;
 }
 
 export function entryFor(w: WorldState, seed: number, daily: string | null, when: Date): Entry {
@@ -48,6 +52,8 @@ export function entryFor(w: WorldState, seed: number, daily: string | null, when
     sunkBy: w.sunk ? (w.lastFight?.what ?? null) : null,
     taken: w.tally.taken,
     sacks: w.tally.sacks,
+    score: score(w).total,
+    like: score(w).like,
   };
 }
 
@@ -60,12 +66,15 @@ export const isWin = (e: Entry) => e.ending === 'home' || e.ending === 'retired'
 /** Landmarks raised, reading an entry from before the voyage as none. */
 export const raised = (e: Entry) => e.raised ?? 0;
 
-/** The best run: the richest win; failing any win, the furthest the voyage went, then the most gold. */
+/** An entry's score, reading one from before the score as its gold if it was won. */
+export const scoreOf = (e: Entry) => e.score ?? (isWin(e) ? e.gold : 0);
+
+/** The best run: the highest-scoring win; failing any win, the furthest the voyage went, then the most gold. */
 export function best(log: Entry[]): Entry | null {
   if (!log.length) return null;
   const wins = log.filter(isWin);
   const pool = wins.length ? wins : log;
-  return pool.reduce((a, b) => (wins.length ? (b.gold > a.gold ? b : a) : raised(b) > raised(a) || (raised(b) === raised(a) && b.gold > a.gold) ? b : a));
+  return pool.reduce((a, b) => (wins.length ? (scoreOf(b) > scoreOf(a) ? b : a) : raised(b) > raised(a) || (raised(b) === raised(a) && b.gold > a.gold) ? b : a));
 }
 
 /** Today's date, as the logbook writes it. */

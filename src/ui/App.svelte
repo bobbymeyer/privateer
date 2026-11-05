@@ -31,7 +31,8 @@
   import { CHANDLER, SHORE_DAYS, type Ware, ashore, buy, price, room, shore } from '../world/stores.ts';
   import { forget, load, store } from '../save.ts';
   import { ambient, bell, coin, gun, knell, setSound, soundOn, storm } from './sound.ts';
-  import { type Entry, best, dailySeed, entryFor, loadLog, raised, saveLog, today, withEntry } from '../logbook.ts';
+  import { HAND_WORTH, LIKE_TITLES, score } from '../world/score.ts';
+  import { type Entry, best, isWin, scoreOf, dailySeed, entryFor, loadLog, raised, saveLog, today, withEntry } from '../logbook.ts';
 
   function seedFromUrl(): number | null {
     const raw = new URLSearchParams(location.search).get('seed');
@@ -692,14 +693,15 @@
           {#if !log.length}
             <p class="faint">no run has ended yet. every one that does is written here.</p>
           {:else}
-            <p>your best: {top!.ending === 'home' || top!.ending === 'retired' ? `${top!.gold}, ${top!.ending === 'home' ? 'home to Plymouth' : 'retired'} on day ${top!.day}` : `${raised(top!)} landmarks raised, ${top!.gold} gold`}{top!.daily ? `, on the voyage of ${top!.daily}` : ''}</p>
+            <p>your best: {isWin(top!) ? `${scoreOf(top!)}, ${top!.like ? LIKE_TITLES[top!.like] : top!.ending === 'home' ? 'home to Plymouth' : 'retired'}, on day ${top!.day}` : `${raised(top!)} landmarks raised, ${top!.gold} gold`}{top!.daily ? `, on the voyage of ${top!.daily}` : ''}</p>
             <table class="logbook">
-              <thead><tr><th>ended</th><th>how</th><th class="num">gold</th><th class="num">landmarks</th><th class="num">days</th><th>ship</th><th></th></tr></thead>
+              <thead><tr><th>ended</th><th>how</th><th class="num">score</th><th class="num">gold</th><th class="num">landmarks</th><th class="num">days</th><th>ship</th><th></th></tr></thead>
               <tbody>
                 {#each log as e, i (i)}
                   <tr class:wanted={e.ending === 'sunk'}>
                     <td>{e.when}{e.daily ? ' · today’s voyage' : ''}</td>
-                    <td>{e.ending === 'sunk' ? `sunk${e.sunkBy ? ` by ${e.sunkBy}` : ''}` : e.ending === 'home' ? 'home' : e.ending === 'retired' ? 'retired' : 'given up'}</td>
+                    <td>{e.ending === 'sunk' ? `sunk${e.sunkBy ? ` by ${e.sunkBy}` : ''}` : e.ending === 'home' ? (e.like ? LIKE_TITLES[e.like].replace('a voyage like ', 'like ') : 'home') : e.ending === 'retired' ? 'retired' : 'given up'}</td>
+                    <td class="num">{scoreOf(e)}</td>
                     <td class="num">{e.gold}</td>
                     <td class="num">{raised(e)}</td>
                     <td class="num">{e.day}</td>
@@ -779,16 +781,30 @@
         </div>
       </div>
     {:else if world.sunk || world.won}
+      {@const sc = score(world)}
       <div class="overlay">
         <div class="sheet">
-          <h2>{world.ending === 'retired' ? 'retired' : world.won ? 'home' : 'lost with all hands'}</h2>
+          <h2>{sc.title}</h2>
           <p>
             {world.ending === 'retired'
-              ? `you retired to ${sea.map.nodes[world.player].port?.name} on day ${world.turn + 1} with ${world.gold}, a pirate rich enough to grow old.`
+              ? `you retired to ${sea.map.nodes[world.player].port?.name} on day ${world.turn + 1} with ${world.gold}.`
               : world.won
-                ? `you came home to Plymouth on day ${world.turn + 1} with ${world.gold}.`
-                : `the sea took you on day ${world.turn + 1}, ${world.gold} in the purse.`}
+                ? `you came home to Plymouth on day ${world.turn + 1}.`
+                : `the sea took you on day ${world.turn + 1}, ${world.voyage.visited.length - 1} landmarks out.`}
+            {sc.text}
           </p>
+          {#if world.won && world.ending !== 'retired'}
+            <table class="score">
+              <tbody>
+                <tr><td>treasure home</td><td class="num">{sc.treasure}</td></tr>
+                <tr><td>{world.crew} hands home, {HAND_WORTH} each</td><td class="num">{sc.hands}</td></tr>
+                <tr><td>the ship, {world.hull} hull of {world.maxHull}</td><td class="num">{sc.ship}</td></tr>
+                <tr class="total"><td>the score</td><td class="num">{sc.total}</td></tr>
+              </tbody>
+            </table>
+          {:else if world.ending === 'retired'}
+            <p>the score: {sc.total}</p>
+          {/if}
           {#if world.sunk && world.lastFight}
             {@const f = world.lastFight}
             <h3>the last fight: {f.what}</h3>
@@ -807,7 +823,7 @@
             {world.tally.fights} {world.tally.fights === 1 ? 'fight' : 'fights'} · {world.tally.taken} taken · {world.tally.sacks} {world.tally.sacks === 1 ? 'town' : 'towns'} sacked · {world.tally.fled} times you got away · {world.tally.escaped} that got away from you
           </p>
           <p>{world.voyage.visited.length - 1} landmarks raised · ended in a {SHIP_CLASSES[world.outfit.ship].name}{world.tally.best ? ` · best prize: ${world.tally.best.what}, ${world.tally.best.payout}` : ''}</p>
-          {#if best(log)}<p class="faint">your best: {best(log)!.ending === 'home' || best(log)!.ending === 'retired' ? `${best(log)!.gold}, won` : `${raised(best(log)!)} landmarks raised, ${best(log)!.gold} gold`}.</p>{/if}
+          {#if best(log)}<p class="faint">your best: {isWin(best(log)!) ? `${scoreOf(best(log)!)}${best(log)!.like ? `, ${LIKE_TITLES[best(log)!.like!]}` : ''}` : `${raised(best(log)!)} landmarks raised, ${best(log)!.gold} gold`}.</p>{/if}
           <div class="row">
             <button onclick={() => newRun()}>a new run</button>
             <button onclick={() => newRun(today())}>today's voyage</button>
@@ -820,6 +836,10 @@
 {/if}
 
 <style>
+  .score { border-collapse: collapse; margin: 0.5rem 0; min-width: 16rem; }
+  .score td { padding: 0.15rem 1rem 0.15rem 0; text-align: left; }
+  .score td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .score .total td { border-top: 1px solid var(--ink); font-weight: 600; }
   main { max-width: 84rem; margin: 0 auto; padding: 1.25rem 16px 2rem; display: flex; flex-direction: column; gap: 1rem; }
   .loading { color: var(--faint); }
   h1 { margin: 0; font-size: 1.8rem; font-weight: 400; letter-spacing: -0.025em; }
