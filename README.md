@@ -59,6 +59,46 @@ line, rats, a fire in the galley, the worm in her planking.
 five of her complement; each sells for 20 on the quay at Plymouth. On a reef
 it's the spice you throw over first, as Drake did.
 
+**Rumors** (`src/world/rumors.ts`) open detours off the way. You hear one
+from prisoners after a prize, from islanders, from gossip at a chandler's,
+or from the Sultan's pilot; follow it, and the detour is among your choices
+where it branches, rejoining the way after. About one in three is false,
+settled when you hear it and shaded by who told you (a prisoner 55% true,
+gossip 65%, islanders 70%, the Sultan's pilot 85%); you learn which by
+going, and a false one is the days spent for nothing.
+
+| rumor | heard | from | days on | if true |
+| --- | --- | --- | --- | --- |
+| the Manila galleon, at Cabo San Lucas | Spanish prisoners on the Pacific coast | Guatulco (17), Nova Albion (20) | 103 to the Ladrones | the galleon comes in: +4 hull over a galleon, 280 more in her, taken whole |
+| the Isles of Solomon | islanders at the Ladrones, Spanish prisoners | Guatulco, Nova Albion, Cabo San Lucas, the Ladrones (28) | 41 to Ternate | water, food, a careen, islanders; one time in four, gold dust |
+| the Great Ship of Amacon, off Macau | gossip at Ternate, Portuguese prisoners in the East | the Ladrones, Manila (12), Ternate (26) | 31 to Java | the carrack for Nagasaki: +5 hull, 320 more, taken whole |
+| the Banda islands | the Sultan's pilot at Ternate | Ternate (9) | 25 to Java | nutmeg as a gift, half your spice room |
+| Goa | gossip at Bantam, Portuguese prisoners in the East | Java (46) | 80 to the Cape | a fortress to raid: +4 walls over a fortified port, 300 more in it |
+| the carrack from Goa, off the Azores | gossip at Bantam, a castaway at the Cape, prisoners off Brazil | Sierra Leone (35), Brazil (51) | 23 to Plymouth | the year's carrack: +6 hull, 400 more, taken whole |
+
+How the prizes go, on a sound hull, by the fight bot over 300 fights:
+
+| | pinnace | sloop | brigantine |
+| --- | --- | --- | --- |
+| the plate ship, asleep | 92% | 93% | 97% |
+| the Manila galleon | 24% | 50% | 78% |
+| the Great Ship | 13% | 34% | 71% |
+| the carrack from Goa | 6% | 24% | 64% |
+| Goa | 0% | 1% | 26% |
+
+**Storm landfalls** (`src/world/landfalls.ts`). A storm met in the right
+waters drives you onto an island one time in eight, one in five running
+before it: 2 to 5 days drifting, and there you lie, as at a landmark, until
+you continue on to where you were bound. Each comes once a run.
+
+| island | the waters | what's there |
+| --- | --- | --- |
+| Bermuda, the Isle of Devils | 80°W–50°W, 25°N–40°N | reefs coming in (even odds, 1 to 3 hull); hogs, birds, water, a careen. The Spanish keep away |
+| St Helena | 25°W–10°E, 30°S–2°S | the Portuguese secret: water, lemons, goats |
+| Mauritius | 45°E–80°E, 30°S–10°S | nobody: dodos, tortoises, water, ebony, a careen |
+| the Galápagos | 100°W–82°W, 10°S–5°N | tortoises, a month of fresh meat in the hold; little water |
+| Juan Fernández | 85°W–75°W, 40°S–28°S | goats and streams, a careen |
+
 **A sail** is a roll each day at sea, about one in 25, and who she is
 depends on the waters (`WATERS` in `src/world/meet.ts`): Spanish and
 Portuguese privateers and Barbary corsairs off Spain and Morocco, who come
@@ -205,24 +245,29 @@ it fits out (hands, water, food, then spares and powder), takes forks at
 random, rations by the leg ahead, waters, forages and careens where there's
 a shore, buys and trades where it can, attacks merchants and the treasure
 ship on a sound enough hull, leaves the coast of Peru asleep for the
-silver, and fights by one-step lookahead.
+silver, follows every rumor (and attacks a rumored prize on a hull still a
+quarter sound), and fights by one-step lookahead.
 
 ```
-npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--runs 40] [--from 0] [--raid] [--wake] [--trace]
+npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--runs 40] [--from 0] [--raid] [--wake] [--no-rumors] [--trace]
 ```
 
 Over 40 voyages a ship:
 
-| ship | home | on day | with | like Drake's / Cavendish's / Fenton's | took the treasure ship |
-| --- | --- | --- | --- | --- | --- |
-| pinnace | 16 (40%) | 542 | 182 gold, 12 hands | 1 / 7 / 8 | 22 |
-| sloop | 21 (53%) | 541 | 126 gold, 17 hands | 1 / 6 / 14 | 18 |
-| brigantine | 21 (53%) | 552 | 139 gold, 24 hands | 1 / 7 / 13 | 20 |
+| ship | home | on day | with | like Drake's / Cavendish's / Fenton's | rumors heard | detours sailed (true / false) |
+| --- | --- | --- | --- | --- | --- | --- |
+| pinnace | 16 (40%) | 633 | 148 gold, 15 hands | 2 / 4 / 10 | 24 | 20 (13 / 7) |
+| sloop | 21 (53%) | 571 | 117 gold, 22 hands | 0 / 7 / 14 | 24 | 12 (8 / 4) |
+| brigantine | 22 (55%) | 603 | 177 gold, 31 hands | 1 / 8 / 13 | 29 | 25 (12 / 13) |
 
 What ends the rest is almost always too few hands: scurvy on the long
-crossings above all, then hunger, the way's events and fights. A person
-who forages at every shore, hires hands where they can and keeps a sound
-hull for the cape will do better.
+crossings above all, then hunger, the way's events and fights. The bot
+seldom gets the good of a rumored prize: it met one 3 times in 120
+voyages, since the galleon and the carracks are mostly heard of from
+prisoners and it takes few prizes, and it comes to them with its hull worn
+down. A person who
+forages at every shore, hires hands where they can, careens before a
+detour and keeps a sound hull for the prizes will do better.
 
 ## running it
 
@@ -234,7 +279,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 100 tests
+npm test                     # the rules and the voyage, 116 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
@@ -272,6 +317,8 @@ src/
     stores.ts    hands, food, water, spares, powder; the shore; the market; a fight's cost and a prize's hold
     meet.ts      a sail sighted by the waters, attacking, raiding a town, settling a fight
     treasure.ts  the treasure ship off Cape San Francisco, asleep or warned
+    rumors.ts    rumors heard, the detours they open, and what's at the end of them
+    landfalls.ts storms that drive you onto an island
     reading.ts   what you can tell of a ship before you engage her
     record.ts    the voyage's tally, and the last fight told
     score.ts     the score, and the voyage of the time it was like
