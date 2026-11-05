@@ -1,24 +1,24 @@
 /** Stores and survival: eating, drinking, the scurvy, the shore and the chandler. Run with `npm test`. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { sailToward } from './course.ts';
+import { continueOn } from './course.ts';
 import { choose } from './dilemmas.ts';
-import { portNamed } from './map.ts';
 import {
-  CHANDLER, EAT, MIN_HANDS, SCURVY_DAYS, START_CREW, ashore, buy, capacity, daysOf, fightCost, price, prizeStores, provisionDay, scurvy, shore,
+  CHANDLER, EAT, ISLANDERS_COST, MIN_HANDS, SCURVY_DAYS, ashore, buy, capacity, daysOf, fightCost, marketHere, price, prizeStores, provisionDay, scurvy, shoreHere, startCrew, trade,
 } from './stores.ts';
+import { lyingAt } from './testing.ts';
 import { advance, createSea, createWorld, type WorldState } from './world.ts';
 
 const sea = createSea();
 const { map } = sea;
-const at = (name: string) => portNamed(map, name);
 /** A node out in the open Atlantic, no port, no landmark. */
 const open = () => map.nodes.find((n) => n.kind === 'ocean' && !n.port && Math.abs(n.lat - 45) < 2 && Math.abs(n.lon + 30) < 2)!.id;
-const fresh = (over: Partial<WorldState> = {}): WorldState => ({ ...createWorld(sea, 1), ships: [], trail: [], ...over });
+const fresh = (over: Partial<WorldState> = {}): WorldState => ({ ...createWorld(sea, 1), ...over });
 
 test('a new run sails from Plymouth two thirds manned, with two months of food and a month of water', () => {
   const w = fresh();
-  assert.equal(w.crew, START_CREW);
+  assert.equal(w.crew, startCrew('pinnace'));
+  assert.equal(w.crew, 20);
   assert.ok(w.crew < capacity(w).food / 180);
   assert.equal(daysOf(w).food, 60);
   assert.equal(daysOf(w).water, 30);
@@ -74,42 +74,55 @@ test('a storm takes the spares before the hull', () => {
 });
 
 test('at an anchorage you water, forage and careen; at sea, none of it', () => {
-  const s = fresh({ player: map.landmarks['san-julian'], hull: 5, maxHull: 12, fresh: 30, stores: { food: 100, water: 10, spares: 3, powder: 0 } });
-  const here = shore(sea, s);
-  assert.deepEqual([here.water, here.forage, here.careen], [true, true, true]);
-  assert.deepEqual([shore(sea, { ...s, player: open() }).water], [false]);
-  const step = (sea_: typeof sea, w: WorldState, to: number) => advance(sea_, w, to);
-  const watered = ashore(sea, s, 'water', step);
+  const s = { ...lyingAt(sea, fresh(), 'san-julian'), hull: 5, maxHull: 12, fresh: 30, stores: { food: 100, water: 10, spares: 3, powder: 0 } };
+  assert.deepEqual(shoreHere(sea, s), ['water', 'forage', 'careen']);
+  assert.deepEqual(shoreHere(sea, { ...s, player: open() }), []);
+  const watered = ashore(sea, s, 'water', advance);
   assert.ok(watered.stores.water > s.stores.water + 100);
   assert.ok(watered.turn >= s.turn + 1);
-  const fed = ashore(sea, s, 'forage', step);
+  const fed = ashore(sea, s, 'forage', advance);
   assert.ok(fed.fresh < 10, 'fresh food resets the scurvy');
-  const careened = ashore(sea, s, 'careen', step);
+  const careened = ashore(sea, s, 'careen', advance);
   assert.ok(careened.hull > s.hull);
   assert.ok(careened.stores.spares < s.stores.spares);
-  assert.throws(() => ashore(sea, { ...s, player: open() }, 'water', step), /nothing to water/);
+  assert.throws(() => ashore(sea, { ...s, player: open() }, 'water', advance), /nothing to water/);
+  assert.throws(() => ashore(sea, lyingAt(sea, fresh(), 'strait'), 'forage', advance), /nothing to forage/);
 });
 
 test('the chandler at Plymouth sells by the lot, dearer abroad, and no more than she carries', () => {
   const w = fresh({ gold: 100 });
-  const bought = buy(sea, w, 'food', true);
+  assert.equal(marketHere(sea, w), 'chandler');
+  const bought = buy(sea, w, 'food');
   assert.equal(bought.stores.food, w.stores.food + CHANDLER.food.lot);
   assert.equal(bought.gold, 100 - CHANDLER.food.cost);
-  const hands = buy(sea, w, 'hands', true);
+  const hands = buy(sea, w, 'hands');
   assert.equal(hands.crew, w.crew + CHANDLER.hands.lot);
-  assert.throws(() => buy(sea, { ...w, crew: 30 }, 'hands', true), /no room/);
-  assert.throws(() => buy(sea, w, 'food', false), /won't deal/);
-  assert.throws(() => buy(sea, { ...w, gold: 0 }, 'food', true), /purse/);
-  assert.ok(price(sea, { ...w, player: at('Bantam') }, 'food') > price(sea, w, 'food'));
-  assert.throws(() => buy(sea, { ...w, stores: capacity(w) }, 'water', true), /hold is full/);
+  assert.throws(() => buy(sea, { ...w, crew: 30 }, 'hands'), /no room/);
+  assert.throws(() => buy(sea, { ...w, gold: 0 }, 'food'), /purse/);
+  assert.throws(() => buy(sea, { ...w, stores: capacity(w) }, 'water'), /hold is full/);
+  const bantam = lyingAt(sea, w, 'java');
+  assert.equal(marketHere(sea, bantam), 'chandler');
+  assert.ok(price(bantam, 'food') > price(w, 'food'));
+  assert.throws(() => buy(sea, lyingAt(sea, w, 'brazil'), 'food'), /no chandler/);
+});
+
+test('islanders trade water and fresh food for a little', () => {
+  const w = { ...lyingAt(sea, fresh({ gold: 10, fresh: 60 }), 'ladrones'), stores: { food: 0, water: 0, spares: 0, powder: 0 } };
+  assert.equal(marketHere(sea, w), 'islanders');
+  const fed = trade(sea, w);
+  assert.equal(fed.gold, 10 - ISLANDERS_COST);
+  assert.equal(fed.fresh, 0);
+  assert.equal(fed.stores.water, capacity(w).water);
+  assert.ok(fed.stores.food > 0);
+  assert.throws(() => trade(sea, fresh()), /nobody here/);
 });
 
 test('pace: easy makes less way, hard makes more', () => {
-  const dest = map.landmarks['cape-verde'];
+  const dest = map.landmarks['canaries'];
   const sail = (pace: WorldState['pace']) => {
     let w = fresh({ pace, fresh: -1e6, stores: { food: 1e6, water: 1e6, spares: 99, powder: 0 } });
     for (let d = 0; d < 9; d++) {
-      const out = sailToward(sea, { ...w, dilemma: null }, dest);
+      const out = continueOn(sea, { ...w, dilemma: null, hail: null, encounter: null });
       w = { ...out.world, encounter: null, hail: null, dilemma: null };
     }
     return map.distTo(dest)[w.player];
@@ -138,7 +151,6 @@ test('a prize fills the hold as far as there is room; a town’s storehouses are
   const town = prizeStores(w, 'town', true, r);
   assert.equal(town.fresh, 0);
   assert.equal(town.stores.water, capacity(w).water);
-  const full = prizeStores({ ...w, stores: capacity(w) }, 'armada', false, r);
+  const full = prizeStores({ ...w, stores: capacity(w) }, 'privateer', false, r);
   assert.deepEqual(full.stores, capacity(w));
-  assert.equal(prizeStores(w, 'monster', false, r), w);
 });

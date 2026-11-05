@@ -7,9 +7,8 @@
  */
 
 import { type Roller, pick, roll } from './random.ts';
-import type { Sea } from './ships.ts';
 import { capacity, topUp } from './stores.ts';
-import type { WorldState } from './world.ts';
+import type { Sea, WorldState } from './world.ts';
 
 /** A rain squall, on a day in the tropics: sails spread to catch it. */
 export const RAIN_CHANCE = 1 / 20;
@@ -46,11 +45,7 @@ export const inStrait = (sea: Sea, s: WorldState) => {
 /** Becalmed or held: no way made today. */
 export const noWay = (s: WorldState) => s.calm > s.turn;
 
-const deaths = (s: WorldState, lo: number, hi: number, r: Roller) => {
-  const n = lo + Math.floor(roll(r) * (hi - lo + 1));
-  // A surgeon saves half of them.
-  return Math.min(s.crew, s.outfit.crew.includes('surgeon') ? Math.floor(n / 2) : n);
-};
+const deaths = (s: WorldState, lo: number, hi: number, r: Roller) => Math.min(s.crew, lo + Math.floor(roll(r) * (hi - lo + 1)));
 
 const FISH = ['a school of bonito, and fresh fish for every mess', 'flying fish come aboard in the night', 'a turtle hauled aboard, and soup for all hands', 'boobies taken on the yards, and fresh meat'];
 const RAIN = 'a rain squall: the sails spread to catch it, and the casks topped up';
@@ -106,7 +101,8 @@ export const FEVER_NURSE_DAYS = 3;
 /** Foul water: drink it and risk the flux; or heave half of it over. */
 export const FLUX = [1, 4] as const;
 export const FOUL_LOST = 0.5;
-/** Weevils: eat it anyway, at the crew's temper; or heave a quarter of it over. */
+/** Weevils: eat it anyway, at this chance of a hand sickening of it and dying; or heave a quarter of it over. */
+export const WEEVIL_SICK = 0.3;
 export const WEEVIL_LOST = 0.25;
 
 export function feverDeaths(s: WorldState, how: 'press' | 'nurse', r: Roller) {

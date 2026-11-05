@@ -14,6 +14,7 @@ export const LOG_KEY = 'privateer:logbook';
 /** Runs kept, newest first. */
 export const LOG_KEPT = 100;
 
+/** How a run ended. `retired`: a pirate's end, from before the voyage was simplified; read from old entries, never written. */
 export type Ending = 'home' | 'retired' | 'sunk' | 'abandoned';
 
 export interface Entry {
@@ -39,7 +40,7 @@ export interface Entry {
 }
 
 export function entryFor(w: WorldState, seed: number, daily: string | null, when: Date): Entry {
-  const ending: Ending = w.sunk ? 'sunk' : w.ending === 'retired' ? 'retired' : w.won ? 'home' : 'abandoned';
+  const ending: Ending = w.sunk ? 'sunk' : w.won ? 'home' : 'abandoned';
   return {
     when: when.toISOString().slice(0, 10),
     seed,
@@ -48,7 +49,7 @@ export function entryFor(w: WorldState, seed: number, daily: string | null, when
     gold: w.gold,
     raised: w.voyage.visited.length - 1,
     ending,
-    ship: w.outfit.ship,
+    ship: w.ship,
     sunkBy: w.sunk ? (w.lastFight?.what ?? null) : null,
     taken: w.tally.taken,
     sacks: w.tally.sacks,

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { type Entry, LOG_KEPT, best, dailySeed, entryFor, today, raised, withEntry } from './logbook.ts';
 import { legalActions } from './rules.ts';
-import { portNamed } from './world/map.ts';
 import { fight, raid } from './world/meet.ts';
 import { ROUNDS_KEPT } from './world/record.ts';
+import { lyingAt } from './world/testing.ts';
 import { createSea, createWorld, type WorldState } from './world/world.ts';
 
 const sea = createSea();
@@ -38,15 +38,14 @@ test('the log keeps the newest runs first, and only so many', () => {
 });
 
 test('a run sunk in a raid: the tally counts the fight, the record tells its last rounds, the entry names what sank you', () => {
-  const town = portNamed(sea.map, 'Maracaibo');
   for (let seed = 0; seed < 40; seed++) {
-    let w: WorldState = { ...createWorld(sea, 1), rng: seed, player: town, hull: 3, maxHull: 10 };
+    let w: WorldState = { ...lyingAt(sea, createWorld(sea, 1), 'valparaiso'), rng: seed, hull: 3, maxHull: 10 };
     w = raid(sea, w);
     while (w.encounter) w = fight(sea, w, legalActions(w.encounter.fight)[0]);
     if (!w.sunk) continue;
     assert.equal(w.tally.fights, 1);
     const f = w.lastFight!;
-    assert.equal(f.what, 'the raid on Maracaibo');
+    assert.equal(f.what, 'the raid on Valparaíso');
     assert.equal(f.outcome, 'sunk');
     assert.equal(f.hullIn, 3);
     assert.equal(f.hullOut, 0);
@@ -54,7 +53,7 @@ test('a run sunk in a raid: the tally counts the fight, the record tells its las
     assert.ok(f.lastRounds.at(-1)!.lines.length > 0);
     const e = entryFor(w, 7, '2026-11-03', new Date('2026-11-03T12:00:00Z'));
     assert.equal(e.ending, 'sunk');
-    assert.equal(e.sunkBy, 'the raid on Maracaibo');
+    assert.equal(e.sunkBy, 'the raid on Valparaíso');
     assert.equal(e.daily, '2026-11-03');
     return;
   }
@@ -62,9 +61,8 @@ test('a run sunk in a raid: the tally counts the fight, the record tells its las
 });
 
 test('a prize counts in the tally, and the best prize is kept', () => {
-  const town = portNamed(sea.map, 'Maracaibo');
   for (let seed = 0; seed < 40; seed++) {
-    let w: WorldState = { ...createWorld(sea, 1), rng: seed, player: town, hull: 60, maxHull: 60 };
+    let w: WorldState = { ...lyingAt(sea, createWorld(sea, 1), 'valparaiso'), rng: seed, hull: 60, maxHull: 60 };
     w = raid(sea, w);
     while (w.encounter) w = fight(sea, w, legalActions(w.encounter.fight)[0]);
     if (w.reckoning?.outcome !== 'destroyed') continue;

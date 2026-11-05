@@ -12,7 +12,7 @@ import type { TargetKind } from '../setup.ts';
 
 export interface Tally {
   fights: number;
-  /** Ships taken or sunk, monsters killed, canoes beaten off. */
+  /** Ships taken or sunk. */
   taken: number;
   sacks: number;
   /** You got away. */
@@ -26,7 +26,7 @@ export interface Tally {
 export const NO_TALLY: Tally = { fights: 0, taken: 0, sacks: 0, fled: 0, escaped: 0, best: null };
 
 export interface FightRecord {
-  /** Who: `a Spanish hunter`, `the raid on Maracaibo`. */
+  /** Who: `a Portuguese merchant`, `the raid on Callao`. */
   what: string;
   kind: TargetKind;
   nation: Nation;
@@ -48,13 +48,12 @@ export interface FightRecord {
 /** How many of the last rounds to keep. */
 export const ROUNDS_KEPT = 3;
 
-/** Who she was, in words. */
-export function whatOf(kind: TargetKind, nation: Nation, place: string | null, sea: string | null): string {
-  if (kind === 'monster') return `the monster of the ${sea ?? 'sea'}`;
-  if (kind === 'canoes') return `war canoes off ${place}`;
+/** Who she was, in words: `a Portuguese merchant`, `the treasure ship`, `the raid on Callao`. */
+export function whatOf(kind: TargetKind, nation: Nation, place: string | null, plate = false): string {
   if (place) return `the raid on ${place}`;
+  if (plate) return 'the treasure ship from Callao';
   const flag = adjective(nation);
-  return `${article(flag)} ${flag} ${kind === 'hunter' ? 'guard ship' : kind.replace('-', ' ')}`;
+  return `${article(flag)} ${flag} ${kind === 'treasure-ship' ? 'carrack' : kind}`;
 }
 
 /** The fight just ended, as a record: how it went, and its last rounds told. */
