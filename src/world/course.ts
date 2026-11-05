@@ -9,7 +9,9 @@ import { FAR, type NodeId } from './map.ts';
 import { legWeight } from './sea.ts';
 import type { Sea } from './ships.ts';
 import { inSight } from './scout.ts';
-import { type WorldState, advance, knowledge } from './world.ts';
+import { type WorldState, advance, knowledge, observe } from './world.ts';
+import { raise } from './journey.ts';
+import { noWay } from './weather.ts';
 
 /** Tomorrow's step toward `dest`, or null if you're there or can't get there. */
 export function nextStep(sea: Sea, s: WorldState, dest: NodeId): NodeId | null {
@@ -40,11 +42,24 @@ export function plotCourse(sea: Sea, s: WorldState, dest: NodeId): NodeId[] {
 /** Why a day's sailing stopped short of the destination. `news`: something in the log worth heaving to for. */
 export type Halt = 'arrived' | 'encounter' | 'hail' | 'sunk' | 'won' | 'sighted' | 'stuck' | 'news' | 'sail' | 'choice';
 
+const halted = (w: WorldState) => w.won || w.sunk || !!w.encounter || !!w.hail || !!w.dilemma || !!w.spoil;
+
+/** A step more, made in the same day: the chart drawn as she goes, a landmark raised if she reaches one. */
+function glide(sea: Sea, s: WorldState, dest: NodeId): WorldState {
+  const step = nextStep(sea, s, dest);
+  if (step === null) return s;
+  return raise(sea, { ...s, player: step, chart: observe(sea, s.chart, step, s.sight, s.turn) });
+}
+
 /** One day toward `dest`; says why to stop, if you should. */
 export function sailToward(sea: Sea, s: WorldState, dest: NodeId): { world: WorldState; halt: Halt | null } {
   const step = nextStep(sea, s, dest);
   if (step === null) return { world: s, halt: s.player === dest ? 'arrived' : 'stuck' };
-  const world = advance(sea, s, step);
+  // Easy sailing: one day in three, she lies to under short sail and makes no way.
+  // Becalmed, or anchored against the williwaws, she makes no way at all.
+  let world = advance(sea, s, noWay(s) || (s.pace === 'easy' && s.turn % 3 === 2) ? s.player : step);
+  // Cracking on: one day in three, she makes two days' way.
+  if (s.pace === 'hard' && s.turn % 3 === 2 && !noWay(s) && !halted(world)) world = glide(sea, world, dest);
   if (world.won) return { world, halt: 'won' };
   if (world.encounter) return { world, halt: 'encounter' };
   if (world.hail) return { world, halt: 'hail' };

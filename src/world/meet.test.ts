@@ -7,6 +7,7 @@ import { PARTED_DAYS, PIRACY_FLOOR, REFIT_DAYS, REPAIR_COST, attack, fight, letP
 import { PARDON_COST, buyPardon, bribe, serves } from './port.ts';
 import { GOAL, STANDING_DECAY } from './world.ts';
 import { advance, createSea, createWorld, type WorldState } from './world.ts';
+import { victualled } from './testing.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -42,7 +43,7 @@ test('let her pass, and she goes her way', () => {
   assert.equal(passed.hail, null);
   assert.equal(passed.parted[fleet.id], passed.turn + PARTED_DAYS);
   assert.equal(passed.standing.spain, undefined, 'nobody minds');
-  assert.equal(advance(sea, passed, passed.player).hail, null);
+  assert.notEqual(advance(sea, passed, passed.player).hail?.shipId, fleet.id, 'she won’t come alongside again');
 });
 
 test('attack her, and her nation remembers whatever comes of it', () => {
@@ -121,29 +122,61 @@ test('fire on an English ship and you are a pirate', () => {
   const pirate = fightOut(attack(met));
   assert.ok(pirate.pirate);
   assert.ok((pirate.standing.england ?? 0) <= PIRACY_FLOOR);
-  assert.match(pirate.log.at(-1)!.text, /pirate/);
+  assert.ok(pirate.log.some((l) => /pirate/.test(l.text)));
 
 });
 
-test('a pirate: English ports shut, no grudge fades, no bribe works, and London is the gallows — until a pardon', () => {
+test('a pirate: English ports shut, no grudge fades, no bribe works, and Plymouth is the gallows — until a pardon', () => {
   const plymouth = createWorld(sea, 1).player;
-  // Letters all done, so London would be a win but for the noose.
-  let w: WorldState = { ...createWorld(sea, 1), ships: [], trail: [], pirate: true, standing: { england: -3 }, gold: GOAL + PARDON_COST + 50, letter: null, acts: 3, commission: 'done' };
+  let w: WorldState = { ...victualled(createWorld(sea, 1)), ships: [], trail: [], pirate: true, standing: { england: -3 }, gold: GOAL + PARDON_COST + 50 };
   assert.equal(serves(sea, w), false);
   assert.throws(() => bribe(sea, w), /pardon/);
   // Two months in port: the crew will ask for their shares, and be refused, for this.
   for (let i = 0; i < STANDING_DECAY; i++) w = advance(sea, { ...w, dilemma: null }, w.player);
   w = { ...w, dilemma: null };
   assert.equal(w.standing.england, -3, 'it does not fade');
-  // Sail into London rich, but a pirate: no win.
-  const london = map.nodes.find((n) => n.port?.name === 'London')!.id;
-  const off = map.adj[london][0];
-  assert.equal(advance(sea, { ...w, player: off }, london).won, false);
+  // Sail into Plymouth bound home, rich, but a pirate: they'd hang you, so no.
+  const off = map.adj[plymouth].find((n) => !map.nodes[n].port)!;
+  const homeBound = { at: 'cape', bound: 'plymouth-home', visited: ['plymouth', 'cape'] };
+  w = { ...w, voyage: homeBound };
+  assert.equal(advance(sea, { ...w, player: off }, plymouth).won, false);
   // A pardon, bought in Plymouth.
   w = buyPardon(sea, { ...w, player: plymouth });
   assert.equal(w.pirate, false);
   assert.equal(w.standing.england, 0);
   assert.equal(w.gold, GOAL + 50);
   assert.ok(serves(sea, w));
-  assert.equal(advance(sea, { ...w, player: off }, london).won, true);
+  assert.equal(advance(sea, { ...w, player: off, voyage: homeBound }, plymouth).won, true);
+});
+
+test('a fight costs powder and hands, and a prize taken fills the hold', () => {
+  let costs = 0;
+  let filled = 0;
+  for (let seed = 1; seed < 16; seed++) {
+    const { w, step } = setUp(seed);
+    const alongside = advance(sea, { ...w, stores: { food: 100, water: 100, spares: 0, powder: 9 }, crew: 30 }, step);
+    if (!alongside.hail) continue;
+    const after = fightOut(attack(alongside));
+    if (after.sunk) continue;
+    if (after.stores.powder < 9 || after.crew < 30) costs++;
+    assert.ok(after.crew <= 30);
+    if (after.reckoning!.outcome === 'destroyed') {
+      assert.ok(after.stores.food > 100 || after.stores.water > 100, 'her hold');
+      assert.ok(after.log.some((l) => l.text.startsWith('her hold')));
+      filled++;
+    }
+  }
+  assert.ok(costs > 0, 'some fight cost something');
+  void filled; // the galeones are too much for a pinnace: see stores.test.ts for the hold
+});
+
+test('no powder, no guns: the shot cards stay in the locker', () => {
+  const { w, step } = setUp(2);
+  const alongside = advance(sea, { ...w, stores: { ...w.stores, powder: 0 } }, step);
+  if (!alongside.hail) return;
+  const f = attack(alongside);
+  const all = [...f.encounter!.fight.deck, ...f.encounter!.fight.hand, ...f.encounter!.fight.discard].filter((c) => c.side === 'ship');
+  assert.ok(all.length > 0);
+  assert.ok(all.every((c) => !c.effects.some((e) => e.kind === 'hit')));
+  assert.ok(f.log.some((l) => /no powder/.test(l.text)));
 });

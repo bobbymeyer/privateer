@@ -10,8 +10,8 @@ import { YOUR_NATION } from './meet.ts';
 import { type Sea, wantedBy } from './ships.ts';
 import { GOAL, type WorldState } from './world.ts';
 import { MORALE_MAX } from './events.ts';
-import { ACTS, describeLetter, intelligence, issue } from './letters.ts';
-import type { Roller } from './random.ts';
+
+import { type Stores, capacity, topUp } from './stores.ts';
 
 /** Gold per point of standing raised, times how far below zero you are. */
 export const BRIBE_COST = 10;
@@ -23,13 +23,13 @@ const portHere = (sea: Sea, s: WorldState) => {
 };
 
 /**
- * A pirate's havens: Port Royal, which asks no questions, and the Barbary
+ * A pirate's havens: Baltimore, where the Munster pirates sell their prizes, and the Barbary
  * coast. They deal with a pirate whoever wants him, and he can retire there.
  */
-export const PIRATE_HAVENS = ['Port Royal', 'Algiers', 'Tunis', 'Tripoli', 'Salé'];
+export const PIRATE_HAVENS = ['Baltimore', 'Algiers', 'Tunis', 'Tripoli', 'Salé'];
 export const isHaven = (sea: Sea, s: WorldState) => s.pirate && PIRATE_HAVENS.includes(sea.map.nodes[s.player].port?.name ?? '');
 
-/** Whether this port will deal with you. Independent harbours deal with anyone; English ones not with a pirate, but for Port Royal; a pirate's havens with a pirate. */
+/** Whether this port will deal with you. Independent harbours deal with anyone; English ones not with a pirate, but for Baltimore; a pirate's havens with a pirate. */
 export const serves = (sea: Sea, s: WorldState): boolean => {
   const port = sea.map.nodes[s.player].port;
   if (!port) return false;
@@ -62,8 +62,12 @@ export function provision(sea: Sea, s: WorldState): WorldState {
   if (wantedBy(s.standing, 'native')) throw new Error(`the ${port.name} islanders won't trade with you`);
   if (s.rounds > 0) throw new Error("you've traded here today");
   const paid = pay(s, PROVISION_COST);
+  const cap = capacity(s);
   return {
     ...paid,
+    // Casks filled, and fresh food: three weeks of it, against the scurvy.
+    stores: { ...s.stores, water: Math.max(s.stores.water, cap.water), food: topUp(s.stores.food, s.crew * 21, cap.food) },
+    fresh: 0,
     rounds: s.rounds + 1,
     morale: Math.min(MORALE_MAX, s.morale + PROVISION_CHEER),
     hull: Math.min(s.maxHull, s.hull + PROVISION_HULL),
@@ -80,19 +84,12 @@ export function buyPardon(sea: Sea, s: WorldState): WorldState {
   if (!s.pirate) throw new Error('you have nothing to be pardoned for');
   if (port.nation !== YOUR_NATION) throw new Error('a pardon is bought in an English port');
   const paid = pay(s, PARDON_COST);
-  const pardoned: WorldState = {
+  return {
     ...paid,
     pirate: false,
     standing: { ...s.standing, [YOUR_NATION]: 0 },
     log: [...s.log, { turn: s.turn, text: 'a royal pardon, bought dear: you are no pirate' }],
   };
-  // A letter revoked comes back with the pardon: the next act's, as if the last were done.
-  if (s.commission !== 'revoked') return pardoned;
-  if (s.acts >= ACTS) return { ...pardoned, commission: 'done' };
-  const r: Roller = { rng: pardoned.rng };
-  const letter = issue(sea, pardoned, s.acts + 1, r);
-  const w: WorldState = { ...pardoned, rng: r.rng, letter, commission: 'active', log: [...pardoned.log, { turn: s.turn, text: `and with it a new letter: ${describeLetter(sea, pardoned, letter).task}`, stop: true }] };
-  return intelligence(sea, w, letter);
 }
 
 const mustServe = (sea: Sea, s: WorldState) => {
@@ -135,7 +132,11 @@ export function buyShip(sea: Sea, s: WorldState, cls: string): WorldState {
   if (!c) throw new Error(`no such ship: ${cls}`);
   if (cls === s.outfit.ship) throw new Error(`you already sail a ${c.name}`);
   if (s.outfit.crew.length > c.berths) throw new Error(`a ${c.name} has berths for ${c.berths}`);
-  return refit(pay(s, c.cost), { ...s.outfit, ship: cls, upgrades: [] }, true);
+  const w = refit(pay(s, c.cost), { ...s.outfit, ship: cls, upgrades: [] }, true);
+  // A smaller ship carries fewer: the rest are paid off and sold here.
+  const cap = capacity(w);
+  const fit = (k: keyof Stores) => Math.min(w.stores[k], cap[k]);
+  return { ...w, crew: Math.min(w.crew, c.complement), stores: { food: fit('food'), water: fit('water'), spares: fit('spares'), powder: fit('powder') } };
 }
 
 /** Fit an upgrade to the ship you have. */
@@ -165,12 +166,12 @@ export function bribe(sea: Sea, s: WorldState): WorldState {
 
 /**
  * Retire, a pirate in one of his havens, with the score: a win, the
- * pirate's way. London would hang him; Port Royal and the Barbary coast
+ * pirate's way. Plymouth would hang him; Baltimore and the Barbary coast
  * will let him grow old.
  */
 export function retire(sea: Sea, s: WorldState): WorldState {
   const port = portHere(sea, s);
-  if (!isHaven(sea, s)) throw new Error('a pirate retires in a haven: Port Royal, or the Barbary coast');
+  if (!isHaven(sea, s)) throw new Error('a pirate retires in a haven: Baltimore, or the Barbary coast');
   if (s.gold < GOAL) throw new Error(`not yet: ${GOAL} to retire on`);
   return { ...s, won: true, ending: 'retired', log: [...s.log, { turn: s.turn, text: `you retired to ${port.name} with ${s.gold}, a pirate rich enough to grow old` }] };
 }

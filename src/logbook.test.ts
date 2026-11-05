@@ -1,7 +1,7 @@
 /** The logbook, today's voyage, and a run's tally and last fight. Run with `npm test`. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { type Entry, LOG_KEPT, best, dailySeed, entryFor, today, withEntry } from './logbook.ts';
+import { type Entry, LOG_KEPT, best, dailySeed, entryFor, today, raised, withEntry } from './logbook.ts';
 import { legalActions } from './rules.ts';
 import { portNamed } from './world/map.ts';
 import { fight, raid } from './world/meet.ts';
@@ -10,7 +10,7 @@ import { createSea, createWorld, type WorldState } from './world/world.ts';
 
 const sea = createSea();
 
-const entry = (over: Partial<Entry>): Entry => ({ when: '2026-11-03', seed: 1, daily: null, day: 100, gold: 50, acts: 0, ending: 'sunk', ship: 'pinnace', sunkBy: null, taken: 0, sacks: 0, ...over });
+const entry = (over: Partial<Entry>): Entry => ({ when: '2026-11-03', seed: 1, daily: null, day: 100, gold: 50, raised: 0, ending: 'sunk', ship: 'pinnace', sunkBy: null, taken: 0, sacks: 0, ...over });
 
 test("today's voyage: one seed a day, the same for everyone, different the next day", () => {
   assert.equal(dailySeed('2026-11-03'), dailySeed('2026-11-03'));
@@ -19,11 +19,15 @@ test("today's voyage: one seed a day, the same for everyone, different the next 
   assert.equal(today(new Date('2026-11-03T15:00:00Z')), '2026-11-03');
 });
 
-test('the best run is the richest win; with no win, the furthest the letters went', () => {
+test('the best run is the richest win; with no win, the furthest the voyage went', () => {
   assert.equal(best([]), null);
-  const log = [entry({ gold: 300, acts: 2 }), entry({ gold: 90, ending: 'home', acts: 3 }), entry({ gold: 140, ending: 'retired' })];
+  const log = [entry({ gold: 300, raised: 2 }), entry({ gold: 90, ending: 'home', raised: 3 }), entry({ gold: 140, ending: 'retired' })];
   assert.equal(best(log)!.gold, 140);
-  assert.equal(best([entry({ acts: 1, gold: 500 }), entry({ acts: 2, gold: 10 })])!.acts, 2);
+  assert.equal(best([entry({ raised: 1, gold: 500 }), entry({ raised: 2, gold: 10 })])!.raised, 2);
+  // An entry from before the voyage has no landmarks: it counts as none.
+  const { raised: _r, ...old } = entry({ gold: 999 });
+  assert.equal(raised(old as Entry), 0);
+  assert.equal(best([old as Entry, entry({ raised: 1, gold: 1 })])!.raised, 1);
 });
 
 test('the log keeps the newest runs first, and only so many', () => {

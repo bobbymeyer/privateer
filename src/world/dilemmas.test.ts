@@ -13,7 +13,7 @@ const sea = createSea();
 const { map } = sea;
 const midAtlantic = () => map.nodes.filter((n) => n.kind === 'ocean' && Math.abs(n.lon + 35) < 3 && Math.abs(n.lat - 25) < 3)[0].id;
 const atSea = (over: Partial<WorldState> = {}): WorldState => ({ ...createWorld(sea, 1), ships: [], trail: [], player: midAtlantic(), ...over });
-const storm = (over: Partial<WorldState> = {}): WorldState => atSea({ dilemma: { kind: 'storm' }, ...over });
+const storm = (over: Partial<WorldState> = {}): WorldState => atSea({ dilemma: { kind: 'storm' }, ...over, stores: { food: 1e6, water: 1e6, spares: 0, powder: 0, ...over.stores } });
 
 test('nothing to choose, or a choice that is not on offer, is refused', () => {
   assert.throws(() => choose(sea, atSea(), 'ride'), /nothing to choose/);

@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { portNamed } from './map.ts';
 import { HUNTER_STATIONS, advance, createSea, createWorld, type WorldState } from './world.ts';
 import { hunterGoal, mayEnter } from './ships.ts';
+import { victualled } from './testing.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -15,7 +16,6 @@ test('every ship flies its home port’s flag', () => {
   assert.equal(route('flota'), 'spain');
   assert.equal(route('manila galleon'), 'spain');
   assert.equal(route('carreira'), 'portugal');
-  assert.equal(route('retourvloot'), 'netherlands');
   assert.equal(w.ships.find((s) => s.kind === 'merchant' && s.home === at('Amsterdam'))!.nation, 'netherlands');
 });
 
@@ -26,14 +26,14 @@ test('the guard stations are out where control is weak, not in Europe', () => {
 test('forts make protected waters', () => {
   assert.equal(map.nodes[at('Plymouth')].waters, 'england');
   assert.equal(map.nodes[at('Havana')].waters, 'spain');
-  assert.equal(map.nodes[at('Willemstad')].waters, 'netherlands');
+  assert.equal(map.nodes[at('Goa')].waters, 'portugal');
   const midAtlantic = map.nodes.reduce((best, n) => (Math.hypot(n.lon + 40, n.lat - 30) < Math.hypot(best.lon + 40, best.lat - 30) ? n : best));
   assert.equal(midAtlantic.waters, null);
 });
 
 /** You, lying in Santo Domingo (Spanish waters, so Spanish guard ships may come), for 40 days. */
 function lieAt(standing: WorldState['standing']) {
-  let w: WorldState = { ...createWorld(sea, 3), player: at('Santo Domingo'), standing };
+  let w: WorldState = { ...victualled(createWorld(sea, 3)), player: at('Santo Domingo'), standing };
   const guards = w.ships.filter((s) => s.kind === 'hunter' && s.nation === 'spain' && map.distTo(s.home)[w.player] <= 25);
   const before = guards.reduce((t, g) => t + map.distTo(w.player)[g.node], 0);
   for (let i = 0; i < 40; i++) {
@@ -55,8 +55,8 @@ test('guard ships leave you be until you’ve attacked their nation', () => {
 test('a guard ship never enters another nation’s waters — so they are a refuge', () => {
   const w = createWorld(sea, 1);
   const havana = w.ships.find((s) => s.kind === 'hunter' && s.home === at('Havana'))!;
-  // Wanted by Spain, but lying under Port Royal's guns.
-  assert.equal(hunterGoal(map, havana, at('Port Royal'), { spain: -3 }), havana.home);
+  // Wanted by Spain, but lying in French waters off Brest.
+  assert.equal(hunterGoal(map, havana, at('Brest'), { spain: -3 }), havana.home);
   assert.equal(hunterGoal(map, havana, at('Santiago de Cuba'), { spain: -3 }), at('Santiago de Cuba'));
 });
 

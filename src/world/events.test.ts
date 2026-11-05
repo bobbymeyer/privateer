@@ -9,11 +9,12 @@ import { MONSTER_RANGE, moveShip } from './ships.ts';
 import { SEA_NAMES } from './seas.ts';
 import { advance, createSea, createWorld, type WorldState } from './world.ts';
 import { legalActions } from '../rules.ts';
+import { victualled } from './testing.ts';
 
 const sea = createSea();
 const { map } = sea;
 const at = (name: string) => portNamed(map, name);
-const quiet = (w: WorldState): WorldState => ({ ...w, ships: [], trail: [] });
+const quiet = (w: WorldState): WorldState => victualled({ ...w, ships: [], trail: [] });
 /** Open water in the middle of the Atlantic, nobody's and nowhere near a port. */
 const midAtlantic = () => map.nodes.filter((n) => n.kind === 'ocean' && Math.abs(n.lon + 35) < 3 && Math.abs(n.lat - 25) < 3)[0].id;
 
@@ -136,10 +137,10 @@ test('a monster keeps each sea, attacks whoever it meets, and wanders with the c
 test('under sail, a storm or a mutiny brings you to; a fair day does not', async () => {
   const { sailToward } = await import('./course.ts');
   const { choices, choose } = await import('./dilemmas.ts');
-  const far = at('Cape Town');
+  const far = at('Table Bay');
   let halts = 0;
   for (let seed = 0; seed < 6 && halts < 2; seed++) {
-    let w = quiet({ ...createWorld(sea, seed), player: at('Plymouth') });
+    let w = quiet({ ...createWorld(sea, seed), player: at('Plymouth'), crew: 1000 });
     for (let day = 0; day < 200 && w.player !== far; day++) {
       const before = w;
       const out = sailToward(sea, w, far);

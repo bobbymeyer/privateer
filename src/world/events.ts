@@ -14,20 +14,22 @@
  * cargo you throw over to stay afloat.
  */
 
-import { CREW, WAGE_DAYS, wagesOf } from '../outfit.ts';
+import { CREW } from '../outfit.ts';
 import { type Roller, pick, roll } from './random.ts';
 import { seasonOf } from './sea.ts';
 import type { Sea } from './ships.ts';
 import { refit } from './port.ts';
 import { SHARES_AT, sharesCost } from './dilemmas.ts';
 import { type WorldState, atIsland } from './world.ts';
+import { provisionDay } from './stores.ts';
+import { weatherDay } from './weather.ts';
 
 export const MORALE_MAX = 10;
 export const MORALE_START = 7;
 /** Days without a prize before the crew start to sour. */
-export const IDLE_DAYS = 30;
+export const IDLE_DAYS = 60;
 /** After that, a point of morale lost every this many days. */
-export const SOUR_EVERY = 10;
+export const SOUR_EVERY = 15;
 /** Where morale is set again after a mutiny, once it's over. */
 export const AFTER_MUTINY = 4;
 /** What a mutiny takes from the strongroom, when there's nobody of note to blame. */
@@ -37,8 +39,6 @@ export const OMEN_CHANCE = 1 / 45;
 export const OMEN_CHEER = 2;
 /** A storm, on any day at sea, outside its seasons and its latitudes. */
 export const STORM_CHANCE = 1 / 120;
-/** Wages unpaid cost this much morale. */
-export const UNPAID = 2;
 /** What a prize does for the crew: more for a sacked town. */
 export const PRIZE_CHEER = 3;
 export const SACK_CHEER = 4;
@@ -63,6 +63,8 @@ export function stormChance(sea: Sea, node: number, turn: number): number {
   if (season === HURRICANE_SEASON && inBox(lon, lat, ANTILLES)) k = 3;
   if (season === MONSOON_SEASON && inBox(lon, lat, INDIAN_SEAS)) k = 3;
   if (Math.abs(lat) >= 40) k = Math.max(k, 2);
+  // The bottom of the world, where the two oceans meet: the Horn.
+  if (lat <= -55) k = Math.max(k, 10);
   return STORM_CHANCE * k;
 }
 
@@ -95,16 +97,6 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
     }
   }
 
-  // Payday for the hands of note. Unpaid, they sour fast.
-  const wages = wagesOf(w.outfit);
-  if (wages > 0 && w.turn > 0 && w.turn % WAGE_DAYS === 0) {
-    if (w.gold >= wages) w = { ...w, gold: w.gold - wages };
-    else {
-      w = { ...w, morale: w.morale - UNPAID };
-      log(`no money for the wages: the hands of note are owed ${wages}, and the crew know it`, true);
-    }
-  }
-
   // Too long without a prize, and the crew sour.
   const idle = w.turn - w.lastSpoils;
   if (idle >= IDLE_DAYS && (idle - IDLE_DAYS) % SOUR_EVERY === 0) {
@@ -113,6 +105,11 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
     // Low enough, and they send a man aft to ask for their shares.
     if (w.morale === SHARES_AT && !w.dilemma) w = { ...w, dilemma: { kind: 'shares', cost: sharesCost(w.gold) } };
   }
+  // The weather and the ills of the way.
+  if (atSea && !atIsland(w)) w = weatherDay(sea, w, r);
+  // Eating, drinking, and the dying that comes of too little of either.
+  w = provisionDay(sea, w, r);
+  if (w.sunk) return { ...w, rng: r.rng };
   if (w.morale <= 0) w = mutiny({ ...w, rng: r.rng }, r);
   return { ...w, rng: r.rng };
 }

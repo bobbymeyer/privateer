@@ -33,27 +33,15 @@ import { type Roller, roll } from './random.ts';
 import { serves } from './port.ts';
 import { PRIZE_CHEER, SACK_CHEER, spoils } from './events.ts';
 import { PROMISED_SHARE } from './dilemmas.ts';
-import { advanceLetter, counts, reprisal, revoke } from './letters.ts';
 import { recordFight, tallied, whatOf } from './record.ts';
 import { makeRumor } from './rumors.ts';
 import { adjective, article, type Nation, nationName } from './ports.ts';
 import { type Sea, type ShipKind, wantedBy } from './ships.ts';
 import { CASUS_BELLI, YOUR_NATION, declare, isEnemy } from './wars.ts';
-import { extraFor } from './scout.ts';
-import { renown, type WorldState } from './world.ts';
-
-/** What a laden corsair carries over the usual: captives, and what was taken with them. */
-export const CAPTIVES_CARGO = 12;
-
-/** A prize's payout to your name. Passing a step of renown is news. */
-function fameFor(s: WorldState, payout: number): WorldState {
-  const fame = s.fame + payout;
-  const before = renown(s);
-  const after = renown({ fame });
-  if (after === before) return { ...s, fame };
-  const text = ['', 'your name is getting about: hunters and privateers will come farther for you, and better found', 'your name is known in every port: they come farther still, and better found', 'your name is a legend: no captain on the seas is hunted harder'][after];
-  return { ...s, fame, log: [...s.log, { turn: s.turn, text, stop: true }] };
-}
+import type { WorldState } from './world.ts';
+import { cardType } from '../cards.ts';
+import { fightCost, prizeStores } from './stores.ts';
+import { plateExtra } from './treasure.ts';
 
 export { YOUR_NATION } from './wars.ts';
 
@@ -61,6 +49,8 @@ export { YOUR_NATION } from './wars.ts';
 export const PRIZE_OFFERS = 3;
 /** After parting, a ship won't engage you again for this many days. */
 export const PARTED_DAYS = 5;
+/** A privateer that has fought you once leaves you be this long. */
+export const PRIVATEER_PARTED = 60;
 /** A ship sunk or taken is laid up at home this long. */
 export const REFIT_DAYS = 60;
 /** Gold per point of hull, in port. */
@@ -91,6 +81,8 @@ export interface Hail {
   shipId: number;
   kind: ShipKind;
   nation: Nation;
+  /** The treasure ship off Cape San Francisco: asleep, or warned by your raids. See treasure.ts. */
+  plate?: 'asleep' | 'warned';
 }
 
 export interface Reckoning {
@@ -144,11 +136,12 @@ export function landfall(sea: Sea, s: WorldState): WorldState {
 function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean, extra?: Extra): WorldState {
   const r: Roller = { rng: s.rng };
   const seed = Math.floor(roll(r) * 2 ** 31);
-  // What you saw of her is what you fight: a warship better found against a captain with a name, a corsair laden.
-  const ship = who.shipId >= 0 ? s.ships.find((x) => x.id === who.shipId) : undefined;
   // She came at you: she's bearing down from far. You fired first: within hail.
-  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deckOf(s.outfit), extra ?? (ship ? extraFor(s, ship) : {}), forced && who.port === null ? FAR : CLOSE);
-  return { ...s, rng: r.rng, hail: null, encounter: { ...who, fight, forced } };
+  // No powder, no guns: the shot cards stay in the locker.
+  const deck = s.stores.powder > 0 ? deckOf(s.outfit) : deckOf(s.outfit).filter((c) => cardType(c) !== 'shot');
+  const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deck, extra ?? {}, forced && who.port === null ? FAR : CLOSE);
+  const log = s.stores.powder > 0 ? s.log : [...s.log, { turn: s.turn, text: 'no powder aboard: the guns are silent, and it is sails and boarders' }];
+  return { ...s, rng: r.rng, hail: null, log, encounter: { ...who, fight, forced } };
 }
 
 /**
@@ -162,10 +155,10 @@ function reckon(s: WorldState, nation: Nation, theirs: number, crown: { enemy: n
   let pirate = s.pirate;
   if (nation === YOUR_NATION) {
     standing[nation] = Math.min(standing[nation]!, PIRACY_FLOOR);
-    if (!pirate) log.push({ turn: s.turn, text: `${what('English')}: you're a pirate now, and England will hang you if it can${s.letter ? ', and your letter is void' : ''}` });
+    if (!pirate) log.push({ turn: s.turn, text: `${what('English')}: you're a pirate now, and England will hang you if it can` });
     pirate = true;
-    return revoke({ ...s, standing, pirate, log });
-  } else if (isEnemy(s.wars, nation) || reprisal(s, nation)) {
+    return { ...s, standing, pirate, log };
+  } else if (isEnemy(s.wars, nation)) {
     if (crown.enemy && !s.pirate) standing[YOUR_NATION] = (standing[YOUR_NATION] ?? 0) + crown.enemy;
   } else if (nation !== 'local' && nation !== 'native') {
     if (crown.neutral) {
@@ -188,7 +181,7 @@ export function attack(s: WorldState): WorldState {
   const h = s.hail;
   if (!h) throw new Error('there is no ship alongside');
   const next = reckon(s, h.nation, 1, { enemy: 0, neutral: 1 }, (flag) => `you fired on ${article(flag)} ${flag} ${h.kind.replace('-', ' ')}`, 1);
-  return startFight(next, { shipId: h.shipId, port: null, kind: h.kind, nation: h.nation }, false);
+  return startFight(next, { shipId: h.shipId, port: null, kind: h.kind, nation: h.nation }, false, h.plate ? plateExtra(h.plate === 'warned') : undefined);
 }
 
 /** Let the ship alongside go her way. She won't come alongside again for a few days. */
@@ -279,6 +272,11 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
 
   let w: WorldState = { ...s, rng: r.rng, rumors, nextRumor: next };
 
+  // What it cost: powder for every shot fired, hands for every point of hull lost.
+  const shots = f.events.filter((e) => e.type === 'played' && e.card.side === 'ship' && cardType(e.card) === 'shot').length;
+  w = fightCost(w, shots, s.hull - f.ship.hull, r);
+  w = { ...w, rng: r.rng };
+
   // A nation remembers. If you attacked, that was counted when you fired;
   // taking her, or sacking the town, counts again. If she attacked you,
   // what you did in your own defence still counts.
@@ -311,27 +309,25 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
       w = { ...w, log: [...w.log, { turn: s.turn, text: `${sea.map.nodes[m.port].port!.name} is sacked` }] };
     }
   } else {
-    // A corsair taken with captives aboard: they go free, and their nation and the Crown hear of it.
-    const freed = taken ? s.ships.find((x) => x.id === m.shipId)?.captives : null;
-    if (freed) {
-      const standing = { ...w.standing, [freed]: (w.standing[freed] ?? 0) + 1 };
-      if (!w.pirate && freed !== YOUR_NATION) standing[YOUR_NATION] = (standing[YOUR_NATION] ?? 0) + 1;
-      w = { ...w, standing, log: [...w.log, { turn: s.turn, text: `you freed ${adjective(freed)} captives from the corsairs' hold` }] };
-    }
     w = {
       ...w,
       ships: w.ships.map((x) => {
         if (x.id !== m.shipId || !taken) return x;
-        if (x.kind === 'corsair') return { ...x, node: x.home, laidUp: s.turn + REFIT_DAYS, dest: null, raid: null, captives: null };
+        if (x.kind === 'corsair') return { ...x, node: x.home, laidUp: s.turn + REFIT_DAYS, dest: null };
         // Gone to the bottom, or taken: laid up at home, then out again.
         return { ...x, node: x.home, laidUp: s.turn + REFIT_DAYS, dest: x.route ? x.route[1] : null, leg: x.route ? 1 : 0 };
       }),
-      parted: taken || outcome === 'sunk' ? w.parted : { ...w.parted, [m.shipId]: s.turn + PARTED_DAYS },
+      // A privateer beaten off, or left astern, has had her cruise: she goes looking for easier prey.
+      parted: taken || outcome === 'sunk' ? w.parted : { ...w.parted, [m.shipId]: s.turn + (m.kind === 'privateer' ? PRIVATEER_PARTED : PARTED_DAYS) },
     };
   }
 
-  if (f.payout > 0 && outcome !== 'sunk') w = fameFor(w, f.payout);
   if (f.payout > 0 && outcome !== 'sunk') w = spoils(w, m.port !== null && taken && m.kind !== 'canoes' ? SACK_CHEER : PRIZE_CHEER);
+  // Her hold, or the town's storehouses: food, water, spares, powder.
+  if (taken && m.kind !== 'monster' && m.kind !== 'canoes') {
+    const r3: Roller = { rng: w.rng };
+    w = { ...prizeStores(w, m.kind, m.port !== null, r3), rng: r3.rng };
+  }
   // Her stores: three cards to choose from, if she was taken and had anything worth having.
   const pool = PRIZE_CARDS[m.kind];
   if (taken && pool?.length) {
@@ -343,8 +339,6 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     }
     w = { ...w, rng: r2.rng, spoil: { kind: m.kind, offers: offers.slice(0, PRIZE_OFFERS) } };
   }
-  // A prize or a sack under your letter.
-  if (w.letter && counts(sea, w.letter, { shipId: m.shipId, port: m.port, nation: m.nation, at: s.player, taken })) w = advanceLetter(sea, w);
 
   // The tally, and the fight told, for the end of the run.
   const place = m.port !== null ? sea.map.nodes[m.port].port!.name : null;
@@ -356,7 +350,6 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   if (owed) w = { ...w, promised: false, log: [...w.log, { turn: s.turn, text: `the crew's promised shares paid out of the prize: ${owed}` }] };
   return {
     ...w,
-    // From w, not s: a letter finished by this prize has paid its reward into it.
     gold: w.gold + f.payout - owed,
     hull: f.ship.hull,
     sunk: outcome === 'sunk',

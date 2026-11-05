@@ -39,14 +39,17 @@ test('nothing saved, garbage, or a save from another version: no run', () => {
   assert.equal(decode(JSON.stringify({ ...old, version: SAVE_VERSION + 1 })), null);
 });
 
-test('a save from before renown and the home stretch is brought up to date, and plays on', () => {
+test('a save from before the voyage is brought up to date: stores aboard, the sandbox gone, and it plays on', () => {
   const w = createWorld(sea, 2);
-  const { fame: _f, homewardNoised: _h, ...old } = w;
-  const v1 = encode(2, old as typeof w).replace(`"version":${SAVE_VERSION}`, '"version":1');
-  const back = decode(v1)!;
+  const { crew: _c, stores: _s, fresh: _f, rations: _r, pace: _p, calm: _m, ...rest } = w;
+  const old = { ...rest, letter: null, acts: 1, commission: 'active', fame: 40, homewardNoised: false, ships: w.ships.map((x) => ({ ...x, raid: null, captives: null })) };
+  const v10 = encode(2, old as unknown as typeof w).replace(`"version":${SAVE_VERSION}`, '"version":10');
+  const back = decode(v10)!;
   assert.equal(back.version, SAVE_VERSION);
-  assert.equal(back.world.fame, 0);
-  assert.equal(back.world.homewardNoised, false);
+  for (const gone of ['letter', 'acts', 'commission', 'fame', 'homewardNoised']) assert.ok(!(gone in back.world), gone);
+  assert.ok(back.world.ships.every((x) => !('captives' in x) && !('raid' in x)));
+  assert.equal(back.world.crew, 30);
+  assert.equal(back.world.rations, 'full');
   advance(sea, back.world, sea.map.adj[back.world.player][0]);
 });
 

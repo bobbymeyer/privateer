@@ -120,13 +120,12 @@ export const SEASON_NAMES = ['winter', 'spring', 'summer', 'autumn'];
  *
  * - The flota and the galeones leave Cádiz by the Canaries, come in through
  *   the islands, load silver (the flota at Veracruz, the galeones at
- *   Cartagena and Portobelo), meet at Havana, and run home up the Gulf Stream.
+ *   Cartagena and Nombre de Dios), meet at Havana, and run home up the Gulf Stream.
  * - The Manila galleon crosses the Pacific each way: west on the trades,
  *   back east on the westerlies.
  * - The South Sea fleet brings Potosí silver up from Arica and Callao to
  *   Panama.
- * - The Portuguese carreira and the Dutch return fleet run to the Indies by
- *   the Cape.
+ * - The Portuguese carreira runs to the Indies by the Cape.
  * - The armadas patrol.
  */
 /**
@@ -136,17 +135,14 @@ export const SEASON_NAMES = ['winter', 'spring', 'summer', 'autumn'];
  * port and its nearest neighbours, and along the great courses below.
  */
 export const OCEAN_LANES: [string, string][] = [
-  ['Plymouth', 'Bridgetown'],
-  ['Plymouth', 'Jamestown'],
-  ['Plymouth', 'Bermuda'],
-  ['Bristol', 'Boston'],
-  ['Brest', 'Quebec'],
-  ['Saint-Malo', 'Saint-Pierre'],
-  ['Amsterdam', 'New Amsterdam'],
-  ['Amsterdam', 'Elmina'],
+  ['Plymouth', 'Las Palmas'],
+  ['Plymouth', 'Ribeira Grande'],
+  ['Bristol', "St. John's, Newfoundland"],
+  ['Saint-Malo', "St. John's, Newfoundland"],
+  ['Ribeira Grande', 'Recife'],
   ['Lisbon', 'Salvador'],
-  ['Lisbon', 'Recife'],
   ['Luanda', 'Salvador'],
+  ['Ribeira Grande', 'Cartagena'],
   ['Rio de Janeiro', 'Buenos Aires'],
   ['Buenos Aires', 'Valdivia'],
   ['Valparaíso', 'Rapa Nui'],
@@ -156,21 +152,21 @@ export const OCEAN_LANES: [string, string][] = [
   ['Matavai', 'Nuku Hiva'],
   ['Matavai', 'Nuku’alofa'],
   ['Kealakekua', 'Umatac'],
-  ['Cape Town', 'Goa'],
+  ['Table Bay', 'Goa'],
+  ['Table Bay', 'Elmina'],
   ['Goa', 'Mocha'],
-  ['Batavia', 'Malacca'],
+  ['Bantam', 'Malacca'],
   ['Malacca', 'Macau'],
   ['Macau', 'Nagasaki'],
-  ['Cape Town', 'Elmina'],
+  ['Ternate', 'Bantam'],
 ];
 
 export const ROUTES: Record<string, string[]> = {
   flota: ['Cádiz', 'Las Palmas', 'San Juan', 'Veracruz', 'Havana'],
-  galeones: ['Cádiz', 'Las Palmas', 'Cartagena', 'Portobelo', 'Cartagena', 'Havana'],
+  galeones: ['Cádiz', 'Las Palmas', 'Cartagena', 'Nombre de Dios', 'Cartagena', 'Havana'],
   'manila galleon': ['Acapulco', 'Umatac', 'Manila'],
   'south sea fleet': ['Arica', 'Callao', 'Panama', 'Callao'],
   carreira: ['Lisbon', 'Mozambique', 'Goa'],
-  retourvloot: ['Amsterdam', 'Cape Town', 'Batavia', 'Cape Town'],
-  barlovento: ['Veracruz', 'Havana', 'Santo Domingo', 'San Juan', 'Cartagena', 'Portobelo', 'Campeche'],
+  barlovento: ['Veracruz', 'Havana', 'Santo Domingo', 'San Juan', 'Cartagena', 'Nombre de Dios', 'Campeche'],
   'mar océano': ['Cádiz', 'Angra', 'Lisbon'],
 };

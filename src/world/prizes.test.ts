@@ -1,12 +1,10 @@
 /** Building the deck from prizes, striking cards out, wages; and seeing a ship before you meet her. Run with `npm test`. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MIN_DECK, PRIZE_CARDS, START_OUTFIT, STRIKE_COST, WAGE_DAYS, cardsOf, deckSize, wagesOf } from '../outfit.ts';
+import { MIN_DECK, PRIZE_CARDS, START_OUTFIT, STRIKE_COST, cardsOf, deckSize } from '../outfit.ts';
 import { act, legalActions } from '../rules.ts';
 import { TARGETS } from '../setup.ts';
 import { nextStep, sailToward } from './course.ts';
-import { UNPAID, aDay } from './events.ts';
-import { portNamed } from './map.ts';
 import { PRIZE_OFFERS, attack, fight, meeting } from './meet.ts';
 import { leavePrize, strikable, strikeCard, takePrize } from './port.ts';
 import { inSight, lookout, read } from './scout.ts';
@@ -15,7 +13,6 @@ import { advance, createSea, createWorld, type WorldState } from './world.ts';
 
 const sea = createSea();
 const { map } = sea;
-const at = (name: string) => portNamed(map, name);
 /** The lane node nearest a point in the open Pacific: the sea off the lanes can't be sailed. */
 const farOut = () => map.nodes.filter((n) => n.kind === 'ocean' && map.adj[n.id].length).reduce((a, b) => (Math.hypot(b.lon + 150, b.lat + 20) < Math.hypot(a.lon + 150, a.lat + 20) ? b : a)).id;
 
@@ -92,21 +89,6 @@ test('a yard strikes a card for a price, but not below the least a deck can be',
   assert.equal(deckSize(thin.outfit), MIN_DECK);
   assert.throws(() => strikeCard(sea, thin, Object.keys(cardsOf(thin.outfit))[0]), /nothing to spare/);
   assert.throws(() => strikeCard(sea, { ...w, player: farOut() }, 'sweep'), /in port/);
-});
-
-test('the hands of note are paid every so often; unpaid, the crew sour', () => {
-  const crew = { ...START_OUTFIT, crew: ['gunner', 'pilot'] };
-  const wages = wagesOf(crew);
-  assert.equal(wages, 3);
-  const w: WorldState = { ...createWorld(sea, 1), player: at('Plymouth'), outfit: crew, turn: WAGE_DAYS, lastSpoils: WAGE_DAYS, morale: 7 };
-  const paid = aDay(sea, { ...w, gold: 50 });
-  assert.equal(paid.gold, 50 - wages);
-  assert.equal(paid.morale, 7);
-  const broke = aDay(sea, { ...w, gold: 1 });
-  assert.equal(broke.gold, 1);
-  assert.equal(broke.morale, 7 - UNPAID);
-  assert.ok(broke.log.some((l) => l.stop && l.text.startsWith('no money for the wages')));
-  assert.equal(aDay(sea, { ...w, turn: WAGE_DAYS + 1, gold: 50 }).gold, 50, 'not every day');
 });
 
 test('a ship read before you meet her: her hull, her hold, how she fights', () => {

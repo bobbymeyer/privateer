@@ -8,7 +8,7 @@ import { portNamed } from './map.ts';
 import { ALARM_DAYS, GUARD_DAYS, GUARD_HULL, GUARD_RELIEF, GUARD_SHUT, SACK_DAYS, TREASURY_REFILL, treasury, attack, fight, meeting, raid, raidable } from './meet.ts';
 import { isHaven, leavePrize, retire, serves } from './port.ts';
 import { HUNT_RANGE, hunterGoal } from './ships.ts';
-import { CASUS_BELLI, ENGLAND_OPENS_AGAINST, STANDING_WARS, atWar, declare, drift, enemiesOf, isEnemy, makePeace, openingWars } from './wars.ts';
+import { CASUS_BELLI, STANDING_WARS, atWar, declare, isEnemy, makePeace, openingWars } from './wars.ts';
 import { GOAL, advance, createSea, createWorld, type WorldState } from './world.ts';
 
 const sea = createSea();
@@ -31,28 +31,13 @@ const fightOut = (w: WorldState) => {
   return w;
 };
 
-test('a run opens with England against the corsairs and one great power, chosen by the run', () => {
-  const against = new Set<string>();
-  for (let seed = 0; seed < 30; seed++) {
-    const wars = openingWars({ rng: seed * 7 + 1 });
-    for (const [a, b] of STANDING_WARS) assert.ok(atWar(wars, a, b) && atWar(wars, b, a), 'symmetric');
-    assert.ok(isEnemy(wars, 'barbary') && isEnemy(wars, 'morocco'));
-    const great = ENGLAND_OPENS_AGAINST.filter((n) => isEnemy(wars, n));
-    assert.equal(great.length, 1);
-    against.add(great[0]);
-  }
-  assert.equal(against.size, 3, 'Spain, France and the Dutch all come up');
-});
-
-test('the wars drift, season by season', () => {
-  let wars = openingWars({ rng: 1 });
-  const r = { rng: 99 };
-  const seen = new Set<string>();
-  for (let season = 0; season < 40; season++) {
-    wars = drift(wars, r).wars;
-    seen.add(enemiesOf(wars, 'england').sort().join(','));
-  }
-  assert.ok(seen.size > 3, `England's enemies change over ten years: ${[...seen].join(' | ')}`);
+test('1580: England opens against the one crown of Spain and Portugal, and the corsairs; the Dutch and French are not enemies', () => {
+  const wars = openingWars();
+  for (const [a, b] of STANDING_WARS) assert.ok(atWar(wars, a, b) && atWar(wars, b, a), 'symmetric');
+  for (const n of ['spain', 'portugal', 'barbary', 'morocco'] as const) assert.ok(isEnemy(wars, n), n);
+  for (const n of ['netherlands', 'france'] as const) assert.ok(!isEnemy(wars, n), n);
+  assert.ok(atWar(wars, 'spain', 'netherlands'), 'the Dutch Revolt');
+  assert.deepEqual(createWorld(sea, 1).wars, createWorld(sea, 2).wars, 'history, not a roll');
 });
 
 /** On turn 1, with a ship of the given kind and flag lying one step off Plymouth (she won't move: it's her destination). */
@@ -62,7 +47,12 @@ function alongside(pick: (s: WorldState['ships'][number]) => boolean, extra: Par
   const ship = w.ships.find(pick)!;
   // Everyone else laid up, so nobody else happens along on the same day.
   w = { ...w, ...extra, ships: w.ships.map((s) => (s.id === ship.id ? { ...s, node: step, dest: step } : { ...s, laidUp: 1e9 })) };
-  return { w: advance(sea, w, step), ship };
+  // A day with no storm in it: a storm that day and there's no meeting.
+  for (let k = 0; k < 20; k++) {
+    const out = advance(sea, { ...w, rng: w.rng + k }, step);
+    if (!out.dilemma) return { w: out, ship };
+  }
+  throw new Error('a storm every day');
 }
 
 test('an enemy warship attacks on sight, before you have done anything', () => {
@@ -177,8 +167,8 @@ test('an enemy privateer attacks on sight; at peace, she only comes alongside', 
 
 test('a pirate’s havens deal with him whoever wants him, and he can retire there rich', () => {
   const pirate: WorldState = { ...quiet(createWorld(sea, 1)), pirate: true, standing: { england: -5, barbary: -4 }, gold: 40 };
-  // Port Royal is English, and England would hang him — but it asks no questions.
-  const royal = { ...pirate, player: at('Port Royal') };
+  // Baltimore is English, and England would hang him — but the Munster pirates sell their prizes there.
+  const royal = { ...pirate, player: at('Baltimore') };
   assert.ok(isHaven(sea, royal) && serves(sea, royal));
   assert.equal(serves(sea, { ...pirate, player: at('Bristol') }), false, 'any other English port shuts him out');
   // The Barbary coast, even when the corsairs want him.
@@ -197,12 +187,15 @@ test('a pirate’s havens deal with him whoever wants him, and he can retire the
 /** Raid, take what's quick to take, and fall back to the boats: plunder first, then run. */
 function raidAndRun(w: WorldState): WorldState {
   let s = raid(sea, w);
-  s = { ...s, encounter: { ...s.encounter!, fight: { ...s.encounter!.fight, ship: { ...s.encounter!.fight.ship, hull: 999, maxHull: 999 } } } };
+  // Neither side can go down: this is about falling back, not winning.
+  const f0 = s.encounter!.fight;
+  s = { ...s, encounter: { ...s.encounter!, fight: { ...f0, ship: { ...f0.ship, hull: 999, maxHull: 999 }, target: { ...f0.target, hull: f0.target.hull + 500 } } } };
   while (s.encounter) {
     const f = s.encounter.fight;
     const score = (a: ReturnType<typeof legalActions>[number]) => {
       const n = act(f, a);
-      return (n.outcome === 'fled' ? 1e6 : 0) + n.plunder * 10 + n.range - (n.outcome === 'destroyed' ? 1e7 : 0);
+      // Ashore and plunder first; only then back to the boats.
+      return (n.outcome === 'fled' ? (n.plunder > 0 ? 1e6 : -1e6) : 0) + n.plunder * 10 - n.range * 3 - (n.outcome === 'destroyed' ? 1e7 : 0);
     };
     s = fight(sea, s, legalActions(f).reduce((a, b) => (score(b) > score(a) ? b : a)));
   }
@@ -213,7 +206,8 @@ test('a raid turned out leaves the town on its guard: shut a fortnight, then har
   const town = at('Maracaibo');
   const w = quiet({ ...createWorld(sea, 1), player: town });
   const first = raidAndRun(w);
-  assert.equal(first.reckoning?.outcome, 'fled');
+  // Fell back to the boats, or the raid petered out: either way, not sacked.
+  assert.ok(['fled', 'parted'].includes(first.reckoning!.outcome), first.reckoning!.outcome);
   const g = first.guarded[town];
   assert.ok(g, 'on its guard');
   assert.equal(g.level, 1);

@@ -11,6 +11,7 @@
 import world from './data/world.json' with { type: 'json' };
 import { type LonLat, along, distanceNm } from './geo.ts';
 import { OCEAN_LANES, RIVERS, ROUTES, SHOALS, STRAITS } from './ocean.ts';
+import { LANDMARKS } from './landmarks.ts';
 import { type Nation, PORTS, WATERS_DAYS } from './ports.ts';
 
 export type NodeId = number;
@@ -60,6 +61,8 @@ export interface SeaMap extends Graph {
   lanes: [NodeId, NodeId][];
   /** Every leg of open water, lanes or not: for drawing, never for sailing. */
   open: NodeId[][];
+  /** Where each of the voyage's landmarks lies, by key. */
+  landmarks: Record<string, NodeId>;
 }
 
 const at = (n: SeaNode): LonLat => [n.lon, n.lat];
@@ -135,7 +138,13 @@ export function buildMap(): SeaMap {
   // them is water on the chart and nothing more. Ships kept to a few
   // thousand nodes instead of all of them meet, and a lane is somewhere to
   // lie in wait.
-  const laneEdges = buildLanes(nodes, adj, deepAdj, distances_, distances(deepAdj));
+  // The voyage's landmarks: on a port, or the nearest water to where they lie. Their legs are lanes too.
+  const marks: Record<string, NodeId> = {};
+  // Open-sea landmarks sit off the ports, not on them: the Canaries aren't Las Palmas harbour.
+  const water = nodes.filter((n) => n.kind !== 'underway' && !n.port);
+  for (const l of LANDMARKS) marks[l.key] = typeof l.at === 'string' ? nodes.find((n) => n.port?.name === l.at)!.id : nearest(l.at, water).id;
+  const legs: [NodeId, NodeId][] = LANDMARKS.flatMap((l) => l.next.map((k): [NodeId, NodeId] => [marks[l.key], marks[k]]));
+  const laneEdges = buildLanes(nodes, adj, deepAdj, distances_, distances(deepAdj), legs);
   const laneAdj: NodeId[][] = nodes.map(() => []);
   for (const key of laneEdges) {
     const [a, b] = key.split(',').map(Number);
@@ -145,7 +154,7 @@ export function buildMap(): SeaMap {
   const deepLaneAdj = laneAdj.map((out, i) => (nodes[i].shoal && !nodes[i].port ? [] : out.filter((m) => !nodes[m].shoal || nodes[m].port)));
   const traffic = new Uint16Array(nodes.length);
   for (const key of laneEdges) for (const n of key.split(',').map(Number)) traffic[n]++;
-  return { nodes, adj: laneAdj, distTo: distances(laneAdj), deep: { adj: deepLaneAdj, distTo: distances(deepLaneAdj) }, lanes: [...laneEdges].map((k) => k.split(',').map(Number) as [NodeId, NodeId]), open: adj };
+  return { nodes, adj: laneAdj, distTo: distances(laneAdj), deep: { adj: deepLaneAdj, distTo: distances(deepLaneAdj) }, lanes: [...laneEdges].map((k) => k.split(',').map(Number) as [NodeId, NodeId]), open: adj, landmarks: marks };
 }
 
 /** Each port's nearest neighbours that a lane joins it to. */
@@ -158,7 +167,7 @@ export const LANE_NEIGHBOURS = 3;
  * (OCEAN_LANES); and along the great courses (ROUTES), traced through water
  * deep enough for the ships that sail them.
  */
-function buildLanes(nodes: SeaNode[], adj: NodeId[][], deepAdj: NodeId[][], dist: (n: NodeId) => Int32Array, deepDist: (n: NodeId) => Int32Array): Set<string> {
+function buildLanes(nodes: SeaNode[], adj: NodeId[][], deepAdj: NodeId[][], dist: (n: NodeId) => Int32Array, deepDist: (n: NodeId) => Int32Array, extra: [NodeId, NodeId][] = []): Set<string> {
   const edges = new Set<string>();
   const harbours = nodes.filter((n) => n.port).map((n) => n.id);
   const named = (name: string) => nodes.find((n) => n.port?.name === name)?.id;
@@ -196,6 +205,8 @@ function buildLanes(nodes: SeaNode[], adj: NodeId[][], deepAdj: NodeId[][], dist
     const [x, y] = [named(a), named(b)];
     if (x !== undefined && y !== undefined) join(x, y);
   }
+  // The voyage's legs, landmark to landmark: the Strait and the Horn both.
+  for (const [a, b] of extra) if (a !== b) join(a, b);
   // The great courses, deep enough for the ships that sail them.
   for (const stops of Object.values(ROUTES)) {
     for (let i = 0; i < stops.length; i++) {

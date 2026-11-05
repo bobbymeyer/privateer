@@ -1,6 +1,6 @@
 /**
  * The logbook: every run that ends, kept in the browser across runs — the
- * day, the score, how far the letters went, how it ended, and what sank you.
+ * day, the score, how far the voyage went, how it ended, and what sank you.
  * Your best is the one with the most gold of the runs that were won.
  *
  * And today's voyage: a seed fixed for the date, so everyone who sails it
@@ -8,6 +8,7 @@
  */
 
 import type { WorldState } from './world/world.ts';
+import { type Like, score } from './world/score.ts';
 
 export const LOG_KEY = 'privateer:logbook';
 /** Runs kept, newest first. */
@@ -24,13 +25,17 @@ export interface Entry {
   /** Days sailed. */
   day: number;
   gold: number;
-  acts: number;
+  /** Landmarks raised, past Plymouth. A run from before the voyage reads as none. */
+  raised: number;
   ending: Ending;
   ship: string;
   /** What sank you, if something did. */
   sunkBy: string | null;
   taken: number;
   sacks: number;
+  /** Treasure, hands and ship, all told; and the voyage of the time it was like. A run from before the score reads as its gold. */
+  score?: number;
+  like?: Like;
 }
 
 export function entryFor(w: WorldState, seed: number, daily: string | null, when: Date): Entry {
@@ -41,27 +46,35 @@ export function entryFor(w: WorldState, seed: number, daily: string | null, when
     daily,
     day: w.turn + 1,
     gold: w.gold,
-    acts: w.acts,
+    raised: w.voyage.visited.length - 1,
     ending,
     ship: w.outfit.ship,
     sunkBy: w.sunk ? (w.lastFight?.what ?? null) : null,
     taken: w.tally.taken,
     sacks: w.tally.sacks,
+    score: score(w).total,
+    like: score(w).like,
   };
 }
 
 /** The log with a run added, newest first, no more than LOG_KEPT. */
 export const withEntry = (log: Entry[], e: Entry): Entry[] => [e, ...log].slice(0, LOG_KEPT);
 
-/** A won run: home with the letters, or retired. */
+/** A won run: home to Plymouth, or retired. */
 export const isWin = (e: Entry) => e.ending === 'home' || e.ending === 'retired';
 
-/** The best run: the richest win; failing any win, the furthest the letters went, then the most gold. */
+/** Landmarks raised, reading an entry from before the voyage as none. */
+export const raised = (e: Entry) => e.raised ?? 0;
+
+/** An entry's score, reading one from before the score as its gold if it was won. */
+export const scoreOf = (e: Entry) => e.score ?? (isWin(e) ? e.gold : 0);
+
+/** The best run: the highest-scoring win; failing any win, the furthest the voyage went, then the most gold. */
 export function best(log: Entry[]): Entry | null {
   if (!log.length) return null;
   const wins = log.filter(isWin);
   const pool = wins.length ? wins : log;
-  return pool.reduce((a, b) => (wins.length ? (b.gold > a.gold ? b : a) : b.acts > a.acts || (b.acts === a.acts && b.gold > a.gold) ? b : a));
+  return pool.reduce((a, b) => (wins.length ? (scoreOf(b) > scoreOf(a) ? b : a) : raised(b) > raised(a) || (raised(b) === raised(a) && b.gold > a.gold) ? b : a));
 }
 
 /** Today's date, as the logbook writes it. */
