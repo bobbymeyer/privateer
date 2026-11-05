@@ -13,12 +13,8 @@
  */
 
 import type { Extra } from '../setup.ts';
-import type { NodeId } from './map.ts';
-import type { Sea } from './ships.ts';
-import type { WorldState } from './world.ts';
+import type { Sea, WorldState } from './world.ts';
 
-/** The route she sails. */
-export const PLATE_ROUTE = 'south sea fleet';
 /** Where she's overhauled. */
 export const PLATE_LANDMARK = 'cacafuego';
 /** What she carries over a galleon's usual, asleep or warned; and what that does to her hull. */
@@ -26,36 +22,21 @@ export const PLATE_CARGO = 150;
 export const ASLEEP_HULL = -4;
 export const WARNED_HULL = 4;
 
-/** The coast of Chile and Peru, where a raid wakes the South Sea. */
-const PACIFIC_COAST = { west: -82, east: -68, south: -45, north: 5 };
+/** The towns on the coast of Chile and Peru, before the cape: a raid on either wakes the South Sea. */
+export const PACIFIC_TOWNS = ['valparaiso', 'callao'];
 
 /** Whether you've raided a town on the coast: then the treasure ship is warned. */
-export function coastAwake(sea: Sea, s: WorldState): boolean {
-  const raided = [...Object.keys(s.sacked), ...Object.keys(s.guarded)].map(Number) as NodeId[];
-  return raided.some((n) => {
-    const { lon, lat } = sea.map.nodes[n];
-    return lon >= PACIFIC_COAST.west && lon <= PACIFIC_COAST.east && lat >= PACIFIC_COAST.south && lat <= PACIFIC_COAST.north;
-  });
-}
+export const coastAwake = (s: WorldState): boolean => s.raided.some((k) => PACIFIC_TOWNS.includes(k));
 
 /** Asleep or warned, she strikes when she's beaten, and her silver comes whole: Drake's men spent four days moving it. */
 export const plateExtra = (warned: boolean): Extra => ({ hull: warned ? WARNED_HULL : ASLEEP_HULL, cargo: PLATE_CARGO, takenWhole: true });
 
-/**
- * Raising Cape San Francisco: the treasure ship comes alongside, if she's
- * at sea at all. Called by `raise` in journey.ts, the first time.
- */
+/** Raising Cape San Francisco: the treasure ship comes alongside. Called by `raise` in journey.ts, the first time. */
 export function overhaul(sea: Sea, s: WorldState): WorldState {
-  const ship = s.ships.find((x) => x.routeName === PLATE_ROUTE);
-  const log = (text: string) => [...s.log, { turn: s.turn, text, stop: true }];
-  if (!ship || ship.laidUp > s.turn) {
-    return { ...s, log: log('no sail to the north: the treasure ship has gone by, or never sailed') };
-  }
-  const warned = coastAwake(sea, s);
-  const ships = s.ships.map((x) => (x.id === ship.id ? { ...x, node: s.player, dest: x.route?.[x.leg] ?? x.dest } : x));
+  void sea;
+  const warned = coastAwake(s);
   const text = warned
     ? 'a sail to the north, low in the water: the treasure ship from Callao. word of your raids has gone ahead, and her guns are run out'
     : 'a sail to the north, low in the water: the treasure ship from Callao. she takes you for a Spaniard, and comes down to speak you';
-  return { ...s, ships, hail: { shipId: ship.id, kind: ship.kind, nation: ship.nation, plate: warned ? 'warned' : 'asleep' }, log: log(text) };
+  return { ...s, hail: { kind: 'treasure-ship', nation: 'spain', plate: warned ? 'warned' : 'asleep' }, log: [...s.log, { turn: s.turn, text, stop: true }] };
 }
-

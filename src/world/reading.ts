@@ -1,24 +1,12 @@
 /**
  * What you can see of a ship before you engage her: her hull, what she
  * likely carries, and the character of how she fights, read off her deck.
- * A captain of the century would know a galleon from a guard ship by her
- * rig and her gunports; this is that, in words.
- *
- * And who is in sight at all. The lookout sees ships farther off than you
- * can read the water, so a hostile sail is seen while there's still time to
- * run, or to turn and meet her.
+ * A captain of the century would know a galleon from a merchant by her rig
+ * and her gunports; this is that, in words.
  */
 
 import { type CardDef, REACHES, type Reach, WOUNDS } from '../cards.ts';
 import { type Extra, TARGETS, type TargetKind } from '../setup.ts';
-import { hostile } from './meet.ts';
-import type { NodeId } from './map.ts';
-import { type Sea, type Ship, pursues } from './ships.ts';
-import type { WorldState } from './world.ts';
-
-/** Ships are seen this many steps beyond the water you can read. */
-export const LOOKOUT_BEYOND = 2;
-export const lookout = (s: WorldState) => s.sight + LOOKOUT_BEYOND;
 
 export interface Reading {
   hull: number;
@@ -60,32 +48,4 @@ export function read(kind: TargetKind, extra: Extra = {}): Reading {
   if (Math.max(...cards.map((c) => shotAt(c, 'grappled'))) >= 4) traits.push('deadly alongside');
   traits.push(cargo >= 20 ? 'a rich hold' : cargo >= 10 ? 'a fair hold' : cargo > 0 ? 'a light hold' : 'nothing to take');
   return { hull: t.hull + (extra.hull ?? 0), cargo, bounty: t.bounty, traits };
-}
-
-/** What you can tell of her from her look. */
-export const readShip = (ship: Ship) => read(ship.kind);
-
-export interface Sighting {
-  ship: Ship;
-  /** Days off. */
-  days: number;
-  /** She'll attack on sight. */
-  hostile: boolean;
-  /** She's coming for you. */
-  closing: boolean;
-}
-
-/** Ships the lookout can see from `at`: nearest first. */
-export function inSight(sea: Sea, s: WorldState, at: NodeId = s.player): Sighting[] {
-  const d = sea.map.distTo(at);
-  const range = lookout(s);
-  return s.ships
-    .filter((x) => x.laidUp <= s.turn && d[x.node] <= range)
-    .map((ship) => ({
-      ship,
-      days: d[ship.node],
-      hostile: hostile(s, ship),
-      closing: pursues(ship.kind) && hostile(s, ship) && ship.dest === s.player,
-    }))
-    .sort((a, b) => a.days - b.days || a.ship.id - b.ship.id);
 }

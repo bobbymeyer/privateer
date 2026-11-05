@@ -26,7 +26,7 @@ export function describeEffect(e: Effect, applied: number, note?: EffectNote, mi
     return `you lose ${applied} hull${applied < e.amount ? ` (${e.amount - applied} braced)` : ''}`;
   }
   if (e.kind === 'recall') return applied ? `brings ${applied} spent ${applied === 1 ? 'card' : 'cards'} back under the deck` : 'nothing spent to bring back';
-  if (e.kind === 'interrogate') return `prisoners talk: a rumor, ${Math.round(e.reliability * 100)}% reliable`;
+  if (e.kind === 'interrogate') return 'prisoners taken';
   if (e.kind === 'chase') return applied ? `${mine ? 'you close' : 'she closes'} the range` : 'no closer to be had';
   if (e.kind === 'hold') return applied ? `${mine ? 'you close' : 'she closes'} and makes fast` : 'already as close as can be';
   const amount = e.amount;
@@ -79,7 +79,6 @@ export const GLOSSARY: { word: string; means: string }[] = [
   { word: 'flee', means: 'bear away: the range opens a step; from far, that ship is away' },
   { word: 'chase, hold', means: 'the range closes a step: run her down, or grapple her' },
   { word: 'recall', means: 'that many of the side’s spent cards back under the deck' },
-  { word: 'interrogate', means: 'prisoners will talk: a rumor, if you come through the fight' },
 ];
 
 /** The glossary lines a card's text uses, for its tooltip. */

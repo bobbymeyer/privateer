@@ -21,6 +21,7 @@ second try.
 
 | the trail | the voyage |
 | --- | --- |
+| the banker, carpenter or farmer | the pinnace, sloop or brigantine: a purse, a ship, and a multiplier on the score |
 | the outfitting store at Independence | fitting out at Plymouth: a budget, and every shilling spent is one not brought home |
 | oxen, food, clothing, ammunition, spare parts | the ship, provisions, water, powder and shot, spare canvas and timber, the crew |
 | pace and rations | sail (easy, steady, crack on) and rations (full, short, starvation) |
@@ -74,19 +75,15 @@ Turning back is always possible, Fenton's way. You keep what you have.
 Every day at sea costs:
 
 - **provisions**: a ration a hand a day; short rations stretch them and
-  hurt health and temper;
+  cost hands;
 - **water**: casks, which go faster in the tropics;
 - **health**: scurvy creeps in after about six weeks without fresh food and
   kills slowly, then quickly; the flux and fever come in hot ports;
 - **the hull**: weed, worm and weather; careening at a landmark mends it;
 - **canvas and timber**: storms take them, and without spares a storm takes
   the hull instead;
-- **temper**: the crew's patience, as morale now: hunger, sickness, a long
-  leg and no prize sour it, and at the bottom it's mutiny.
-
-The crew is a number (say 80 at the start) plus the hands of note, named.
-Fewer hands, the ship sails worse and fights worse (fewer cards). Too few
-and she can't be sailed at all.
+The crew is a number, two thirds of the ship's complement at the start.
+Too few and she can't be sailed at all.
 
 ## what you do at a landmark
 
@@ -113,24 +110,49 @@ an enemy of theirs.
 
 ## what goes
 
-The sandbox systems that don't serve the voyage: letters of marque, the
-drifting war table, renown, the standing table by nation (folded into one
-thing, Spain's alarm), wages (folded into rations), Barbary raiding, the
-guard of raided towns (kept only if it fits the alarm).
+Everything that doesn't serve the voyage. In the first pass: letters of
+marque, the drifting war table, renown, wages, Barbary raiding, the
+homeward swarm. In the second, to bring it closer to the trail and down
+to one screen:
 
-What stays: the chart and its lanes, the living sea, the card fight and its
-chain, prize cards, events that ask you, the logbook, today's voyage.
+- **the living sea**: no ship sails but yours. A sail is a roll each day at
+  sea, and who she is depends on the waters you're in;
+- **rumors and the bar**, the lookout, and the chart's currents and winds;
+- **free sailing**: no clicking the sea or plotting courses. You continue
+  on to the next landmark; at a fork you choose the leg;
+- **politics**: standing with each nation, bribes, guard ships, war
+  tension. Spain and Portugal are the enemy; a raid on the coast of Chile
+  and Peru warns the treasure ship, and that is all the alarm there is;
+- **piracy**, pardons, havens and retiring rich;
+- **deck-building**: hands of note, refits, buying ships, prize cards.
+  You choose your ship at the start, as the trail's banker, carpenter or
+  farmer, and your deck is hers;
+- **raiding any port**: only the Spanish towns on the way, once each;
+- islands and castaways, the sea monster, war canoes, the crew's shares;
+- **morale and mutiny**: short rations and starvation cost hands now, a
+  hard pace costs hull.
+
+What stays: the chart and its lanes, the landmarks and forks, the stores
+and the way's events, the card fight and its chain, the treasure ship,
+the score, the logbook, today's voyage.
+
+## the screen
+
+One screen: a fixed chart of the whole voyage, a strip of what you've got,
+rations and pace, and *continue on*. At a landmark, what it offers. The
+ship you choose, the way's events, a sail, a fight and the end are
+dialogs.
 
 ## the score
 
-Treasure home, plus every hand alive, plus the ship's condition, against
-the voyages of the time:
+Treasure home, plus every hand alive, plus the ship's condition, times
+what the ship you chose counts for, against the voyages of the time:
 
 | a voyage like | means |
 | --- | --- |
 | Drake's | round the world, rich, most of the crew home |
-| Cavendish's | round the world, rich, half the crew lost |
-| Fenton's | home again, poorer, having turned back |
+| Cavendish's | home rich, but half the crew lost, or not round the world |
+| Fenton's | home again, poorer, or no richer |
 | Oxenham's | lost |
 
 ## the phases
@@ -144,3 +166,5 @@ the voyages of the time:
 5. **The fight feeds survival**: powder, crew lost, stores taken.
 6. **Cut the sandbox**: letters, wars, renown and the rest.
 7. **The score**, the end screen, the logbook.
+8. **Simplify**: the living sea, free sailing, politics, piracy and
+   deck-building cut; the ship chosen at the start; one screen.

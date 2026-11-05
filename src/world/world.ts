@@ -1,90 +1,38 @@
 /**
- * The world between encounters: you, the other ships, the turn, and what you
- * have heard. Pure, like the encounter rules: state in, state out.
+ * The voyage's state, and a day of it. Pure: the same seed and the same
+ * choices give the same voyage, so a run can be saved, replayed and tested.
  *
- * The sea itself — map, currents, wind — is fixed by the seed, so it is
- * built once by `createSea` and passed alongside rather than copied each turn.
+ * Nothing else sails. The sea is the chart and its lanes; the ship keeps to
+ * them from landmark to landmark. What happens on the way — the weather, the
+ * sickness, a sail sighted — is rolled for each day as it comes.
  */
 
-import { SEA_NAMES } from './seas.ts';
 import type { RngState } from '../rng.ts';
-import { buildMap, type NodeId, portNamed, ports } from './map.ts';
-import { type Nation, PORTS, adjective, navyOf } from './ports.ts';
-import { type Rumor, FADED, makeRumor, markerStrength } from './rumors.ts';
-import { buildPattern, type Chart, CURRENT_SEEN, chartKnowledge, type SeaKnowledge, seasonOf, windSeen } from './sea.ts';
-import { type FleetEntry, type Pursuit, type Sea, type Ship, type Standing, mayEnter, moveShip, spawnShips } from './ships.ts';
-import { type War, isEnemy, openingWars } from './wars.ts';
+import { SHIP_CLASSES } from '../outfit.ts';
+import { buildMap, type NodeId, portNamed, type SeaMap } from './map.ts';
 import { type Roller, roll } from './random.ts';
-import { type Outfit, START_OUTFIT, maxHullOf } from '../outfit.ts';
-import { type Hail, type Meeting, REFIT_DAYS, type Reckoning, YOUR_NATION, landfall, meeting } from './meet.ts';
-import { MORALE_START, aDay } from './events.ts';
-import { type Dilemma, castaway } from './dilemmas.ts';
+import type { Dilemma } from './dilemmas.ts';
+import { aDay } from './events.ts';
+import { type Hail, type Meeting, type Reckoning, sailSighted } from './meet.ts';
 import { type FightRecord, NO_TALLY, type Tally } from './record.ts';
 import { START_VOYAGE, type Voyage, raise } from './journey.ts';
-import { type Pace, type Rations, START_CREW, START_STORES, type Stores } from './stores.ts';
+import { type Pace, type Rations, type Stores, startCrew, startStores } from './stores.ts';
+
+/** The chart: the lanes, and where each landmark lies on them. The same for every run. */
+export interface Sea {
+  map: SeaMap;
+}
 
 export interface WorldState {
   rng: RngState;
+  /** Days since you set out. */
   turn: number;
   player: NodeId;
-  ships: Ship[];
-  rumors: Rumor[];
-  nextRumor: number;
-  /** In the purse. */
-  gold: number;
-  /** How many steps out you can see the water. The crew will extend it. */
-  sight: number;
-  /** What you have seen of the sea, node by node. See `chartKnowledge`. */
-  chart: Chart;
-  /** Where each ship has been, the day before first: what the bar's news is made of. */
-  trail: NodeId[][];
-  /** Rounds bought in this port tonight. Each one finds the drinkers less sober. */
-  rounds: number;
-  /** Your hull, carried from fight to fight; mended in port. */
+  /** The ship you chose at Plymouth: see SHIP_CLASSES. */
+  ship: string;
   hull: number;
   maxHull: number;
-  /** The fight at hand. While there is one, the world waits. */
-  encounter: Meeting | null;
-  /** How the last fight ended. */
-  reckoning: Reckoning | null;
-  /** Ships you've parted from, and the turn until which they leave you be. */
-  parted: Record<number, number>;
-  /** You went down. The run is over. */
-  sunk: boolean;
-  /** How each nation regards you. Attack its ships and it falls; below zero, its guard ships hunt you. It drifts back toward zero. */
-  standing: Standing;
-  /** Your ship, its refits, your crew: what your deck is made of. */
-  outfit: Outfit;
-  /** Uncharted islands, a few to a run, out where nobody sails. */
-  islands: { node: NodeId; found: boolean }[];
-  /** The run is won: home to Plymouth at the end of the voyage, or retired, a rich pirate, to a haven. */
-  won: boolean;
-  ending: 'home' | 'retired' | null;
-  /** A ship alongside, waiting on your choice. While there is one, the world waits. */
-  hail: Hail | null;
-  /** You fired on an English ship. England wants you, and Plymouth will hang you, until you're pardoned. */
-  pirate: boolean;
-  /** Ports sacked, and the turn until which they have nothing for anybody. */
-  sacked: Record<NodeId, number>;
-  /** Nations whose towns you've raided, and the turn until which their guard ships hunt twice as far. */
-  alarm: Partial<Record<Nation, number>>;
-  /** Who is at war with whom: 1580's wars, and any you start. */
-  wars: War[];
-  /** How close your attacks on a nation at peace with England have brought the two to war. At CASUS_BELLI, it's war. */
-  tension: Partial<Record<Nation, number>>;
-  /** The crew's patience, out of ten. At nothing, mutiny. See events.ts. */
-  morale: number;
-  /** The day the last prize was taken: the crew count from it. */
-  lastSpoils: number;
-  /** A prize's stores, waiting on your choice of one card to keep, or none. While there is one, the world waits. */
-  spoil: { kind: string; offers: string[] } | null;
-  /** The run's fights and prizes, counted. */
-  tally: Tally;
-  /** The last fight, told: what the end of a run shows. */
-  lastFight: FightRecord | null;
-  /** The voyage: the landmark you last raised, the one you're bound for, and every one raised. */
-  voyage: Voyage;
-  /** Hands aboard, not counting the hands of note. Too few and she can't be sailed. */
+  /** Hands aboard. Too few and she can't be sailed. */
   crew: number;
   /** Provisions and water in rations, spares in bundles, powder in barrels. See stores.ts. */
   stores: Stores;
@@ -92,280 +40,110 @@ export interface WorldState {
   fresh: number;
   rations: Rations;
   pace: Pace;
-  /** Becalmed, or anchored against the williwaws: no way made until this turn. */
+  /** Becalmed, anchored against the williwaws, or driven before a storm: no way made until this turn. */
   calm: number;
-  /** Towns that turned out a raid short of a sack, on `since`: on their guard till `until`, shut to raiding till `shutUntil`, `level` steps on it, with `cargo` left in the treasury then. */
-  guarded: Record<NodeId, { since: number; until: number; shutUntil: number; level: number; cargo: number }>;
-  /** An event waiting on your choice: a storm, the crew's shares, a castaway. While there is one, the world waits. */
+  gold: number;
+  /** The landmark you last raised, the one you're bound for, and every one raised. */
+  voyage: Voyage;
+  /** An event waiting on your choice: a storm, fever, foul water. While there is one, the voyage waits. */
   dilemma: Dilemma | null;
-  /** The crew have been promised a share of the next prize. */
-  promised: boolean;
-  /** What happened that you'd hear about: navies driving off intruders, and the like. */
+  /** A sail sighted, waiting on your choice: attack, or let her pass. */
+  hail: Hail | null;
+  /** The fight at hand. */
+  encounter: Meeting | null;
+  /** How the last fight ended. */
+  reckoning: Reckoning | null;
+  /** The Spanish towns you've raided, by landmark: each once. A raid on the coast of Chile and Peru warns the treasure ship. */
+  raided: string[];
+  /** Home: the run is won. */
+  won: boolean;
+  /** Lost: sunk, or too few hands to work her. The run is over. */
+  sunk: boolean;
+  ending: 'home' | null;
+  /** The run's fights and prizes, counted. */
+  tally: Tally;
+  /** The last fight, told: what the end of a run shows. */
+  lastFight: FightRecord | null;
   log: LogEntry[];
 }
 
-/** A line of news. `stop`: worth heaving to for, when you're under sail — a storm, a mutiny, a war. */
+/** A line of the log. `stop`: worth stopping for, when you're under sail. */
 export interface LogEntry {
   turn: number;
   text: string;
   stop?: boolean;
 }
 
-/** The Barbary and Sallee rovers' home ports: Algiers, Tunis, Tripoli and Salé. They prey on shipping at sea. */
-export const CORSAIR_PORTS = ['Algiers', 'Salé', 'Tunis', 'Tripoli'];
-
-/** Days of each ship's wake that are remembered. */
-export const TRAIL = 12;
-export const START_GOLD = 80;
-/** What a pirate needs to retire on in a haven. */
-export const GOAL = 150;
-/** Every this many days, each nation's standing drifts a point back toward zero. */
-export const STANDING_DECAY = 60;
-/** Uncharted islands in a run, and what the Crown pays for charting one. */
-export const ISLANDS = 8;
-export const CHARTING_BOUNTY = 15;
-
-/** What you can see from where you are: the water `sight` steps out, its current and this season's wind. */
-export function observe(sea: Sea, chart: Chart, from: NodeId, sight: number, turn: number): Chart {
-  const out = chart.slice();
-  const bits = CURRENT_SEEN | windSeen(seasonOf(sea.pattern, turn));
-  const depth = new Map<NodeId, number>([[from, 0]]);
-  const queue = [from];
-  for (let i = 0; i < queue.length; i++) {
-    const n = queue[i];
-    out[n] |= bits;
-    if (depth.get(n)! >= sight) continue;
-    for (const m of sea.map.adj[n]) if (!depth.has(m)) (depth.set(m, depth.get(n)! + 1), queue.push(m));
-  }
-  return out;
-}
-
-/** The player's knowledge of the sea, for predictions. */
-export const knowledge = (s: WorldState): SeaKnowledge => chartKnowledge(s.chart);
-
-/**
- * Where the powers keep guard ships that will come after you. Out where
- * control is weak — not in Europe, whose home waters their navies keep.
- */
-export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Goa', 'Malacca', 'Manila', 'Mozambique', 'Algiers'];
-
-/**
- * Where enemy privateers fit out: Dunkirkers, Saint-Malo and La Rochelle
- * corsairs, Dutch Sea Beggars, Salé rovers, Algerines, Portuguese and
- * Spanish privateers out of Lisbon, Havana and Cartagena. They come for you whenever their nation is at war
- * with England.
- */
-export const PRIVATEER_PORTS = ['Dunkirk', 'Saint-Malo', 'La Rochelle', 'Amsterdam', 'Salé', 'Algiers', 'Lisbon', 'Havana', 'Cartagena'];
-
-/** A merchant out of every port, a guard ship at every station, and the great courses. */
-export const DEFAULT_FLEET: FleetEntry[] = [
-  ...PORTS.filter((p) => p.nation !== 'native').map((p): FleetEntry => ({ kind: 'merchant', home: p.name })),
-  ...HUNTER_STATIONS.map((home): FleetEntry => ({ kind: 'hunter', home })),
-  ...PRIVATEER_PORTS.map((home): FleetEntry => ({ kind: 'privateer', home })),
-  ...CORSAIR_PORTS.map((home): FleetEntry => ({ kind: 'corsair', home })),
-  { kind: 'treasure-fleet', route: 'flota' },
-  { kind: 'treasure-fleet', route: 'galeones' },
-  // The plate ship of the South Sea: alone, as the Cacafuego was, since nobody had ever come to take her. See treasure.ts.
-  { kind: 'treasure-ship', route: 'south sea fleet' },
-  { kind: 'treasure-ship', route: 'manila galleon' },
-  { kind: 'treasure-ship', route: 'carreira' },
-  { kind: 'armada', route: 'barlovento' },
-  { kind: 'armada', route: 'mar océano' },
-  ...SEA_NAMES.map((sea): FleetEntry => ({ kind: 'monster', at: sea.at, sea: sea.name })),
-];
-
 let built: Sea | null = null;
 
-/** The sea is the same every run — built once, then shared. */
+/** The chart is the same every run: built once, then shared. */
 export function createSea(): Sea {
-  if (!built) {
-    const map = buildMap();
-    built = { map, pattern: buildPattern(map) };
-  }
+  if (!built) built = { map: buildMap() };
   return built;
 }
 
-/** Drake fitted out at Plymouth. */
-export const START = 'Plymouth';
-
-/**
- * Where this run's uncharted islands lie: open ocean, nobody's waters, far
- * from every port and from each other.
- */
-function placeIslands(sea: Sea, r: Roller): NodeId[] {
-  const { map } = sea;
-  const harbours = ports(map);
-  // Off the beaten track, but on a lane: you only find what you sail past.
-  const candidates = map.nodes.filter((n) => n.kind === 'ocean' && n.waters === null && Math.abs(n.lat) < 55 && map.adj[n.id].length);
-  const placed: NodeId[] = [];
-  for (let tries = 0; placed.length < ISLANDS && tries < 500; tries++) {
-    const n = candidates[Math.floor(roll(r) * candidates.length)].id;
-    const farFromPorts = harbours.every((p) => map.distTo(p)[n] >= 8);
-    const farFromOthers = placed.every((q) => map.distTo(q)[n] >= 15);
-    if (farFromPorts && farFromOthers) placed.push(n);
-  }
-  return placed;
+/** The day you set out: 1 December 1580, three months after Drake came home. */
+export const SET_OUT = Date.UTC(1580, 11, 1);
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** The date on a day of the voyage: `14 March 1581`. */
+export function dateOf(turn: number): string {
+  const d = new Date(SET_OUT + turn * 86400000);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): WorldState {
-  const player = portNamed(sea.map, START);
-  const ships = spawnShips(sea, fleet);
+/** A new voyage, in the ship you chose, at Plymouth with her purse. */
+export function createWorld(sea: Sea, seed: number, ship = 'pinnace'): WorldState {
+  const c = SHIP_CLASSES[ship];
+  if (!c) throw new Error(`no such ship: ${ship}`);
   const r: Roller = { rng: (seed ^ 0x0ce4) >>> 0 };
-  const islands = placeIslands(sea, r).map((node) => ({ node, found: false }));
-  const wars = openingWars();
-  const world: WorldState = {
+  roll(r);
+  return {
     rng: r.rng,
     turn: 0,
-    player,
-    ships,
-    rumors: [],
-    nextRumor: 0,
-    gold: START_GOLD,
-    sight: 1,
-    chart: observe(sea, new Uint8Array(sea.map.nodes.length), player, 1, 0),
-    trail: ships.map(() => []),
-    rounds: 0,
-    hull: maxHullOf(START_OUTFIT),
-    maxHull: maxHullOf(START_OUTFIT),
-    encounter: null,
-    reckoning: null,
-    parted: {},
-    sunk: false,
-    standing: {},
-    log: [],
-    outfit: START_OUTFIT,
-    islands,
-    won: false,
-    ending: null,
-    hail: null,
-    pirate: false,
-    sacked: {},
-    alarm: {},
-    wars,
-    tension: {},
-    morale: MORALE_START,
-    lastSpoils: 0,
-    spoil: null,
-    dilemma: null,
-    promised: false,
-    guarded: {},
-    tally: NO_TALLY,
-    lastFight: null,
-    voyage: START_VOYAGE,
-    crew: START_CREW,
-    stores: START_STORES,
+    player: portNamed(sea.map, 'Plymouth'),
+    ship,
+    hull: c.hull,
+    maxHull: c.hull,
+    crew: startCrew(ship),
+    stores: startStores(ship),
     fresh: 0,
     rations: 'full',
     pace: 'steady',
     calm: 0,
-  };
-  return world;
-}
-
-/** You sail to `to` (a neighbour, or where you are), then everyone else moves. */
-export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
-  if (s.sunk) throw new Error('you went down; the run is over');
-  if (s.won) throw new Error('you are home and the run is won');
-  if (s.encounter) throw new Error('there is a fight to finish first');
-  if (s.hail) throw new Error('a ship is alongside: attack, or let her pass');
-  if (s.spoil) throw new Error("the prize's stores are waiting: take a card, or leave them");
-  if (s.dilemma) throw new Error('there is a choice to make first');
-  if (to !== s.player && !sea.map.adj[s.player].includes(to)) {
-    throw new Error(`node ${to} is not next to ${s.player}`);
-  }
-  const r: Roller = { rng: s.rng };
-  const ships = s.ships.map((ship) => ({ ...ship }));
-  for (const ship of ships) moveShip(sea, r, ship, s.turn, to, pursuitOf(s, sea));
-
-  // Countries protect their waters: a foreign guard ship found inside them
-  // is driven off by the navy and laid up at home.
-  const log = [...s.log];
-  for (const ship of ships) {
-    const owner = sea.map.nodes[ship.node].waters;
-    if (ship.laidUp > s.turn || mayEnter(sea.map, ship, ship.node) || !owner) continue;
-    log.push({ turn: s.turn + 1, text: `${navyOf(owner)} drove off a ${adjective(ship.nation)} guard ship` });
-    Object.assign(ship, { node: ship.home, laidUp: s.turn + 1 + REFIT_DAYS, dest: null });
-  }
-  const turn = s.turn + 1;
-
-  // Islands: sighted within sight, paid for once; an anchorage after.
-  let gold = s.gold;
-  let hull = s.hull;
-  const near = sea.map.distTo(to);
-  let found = false;
-  const islands = s.islands.map((isle) => {
-    if (isle.found || near[isle.node] > s.sight) return isle;
-    gold += CHARTING_BOUNTY;
-    log.push({ turn, text: `you sighted land nobody has charted, and the Crown will pay ${CHARTING_BOUNTY} for it` });
-    found = true;
-    return { ...isle, found: true };
-  });
-  if (atIsland({ ...s, islands }, to)) hull = Math.min(s.maxHull, hull + 1);
-
-  // Grudges fade, and so does the strain your attacks have put on a peace.
-  const fading = turn % STANDING_DECAY === 0;
-  const standing = fading
-    ? Object.fromEntries(Object.entries(s.standing).map(([n, v]) => [n, s.pirate && n === YOUR_NATION ? v! : v! - Math.sign(v!)]))
-    : s.standing;
-  const tension = fading ? Object.fromEntries(Object.entries(s.tension).map(([n, v]) => [n, Math.max(0, v! - 1)])) : s.tension;
-
-  let next: WorldState = {
-    ...s,
-    rng: r.rng,
-    turn,
-    player: to,
-    ships,
-    // Faded markers are dropped; what they said is no longer worth acting on.
-    rumors: s.rumors.filter((rumor) => markerStrength(rumor, turn) >= FADED),
-    chart: observe(sea, s.chart, to, s.sight, turn),
-    trail: s.ships.map((ship, i) => [ship.node, ...s.trail[i]].slice(0, TRAIL)),
-    rounds: 0,
-    log,
-    islands,
-    gold,
-    hull,
-    standing,
-    tension,
-  };
-  // Land nobody has charted, and maybe somebody on it.
-  if (found) {
-    const r2: Roller = { rng: next.rng };
-    const d = castaway(next, r2);
-    next = { ...next, rng: r2.rng, ...(d ? { dilemma: d } : {}) };
-  }
-  next = aDay(sea, next);
-  if (next.sunk) return next;
-  // A landmark raised; Plymouth again ends the run.
-  next = raise(sea, next);
-  if (next.won) return next;
-  if (to !== s.player) next = landfall(sea, next);
-  return meeting(sea, next);
-}
-
-/** What pursuers make of you: who wants you, who's alarmed, who's at war with England. */
-export function pursuitOf(s: WorldState, sea: Sea): Pursuit {
-  return {
-    standing: s.standing,
-    alarmed: (n) => (s.alarm[n] ?? -1) > s.turn,
-    enemy: (n) => isEnemy(s.wars, n),
-    leftBe: (id) => (s.parted[id] ?? -1) > s.turn,
+    gold: c.purse,
+    voyage: START_VOYAGE,
+    dilemma: null,
+    hail: null,
+    encounter: null,
+    reckoning: null,
+    raided: [],
+    won: false,
+    sunk: false,
+    ending: null,
+    tally: NO_TALLY,
+    lastFight: null,
+    log: [],
   };
 }
 
-/** A charted island you're lying at: no ship troubles you there, and the hull mends a point a day. */
-export const atIsland = (s: WorldState, node = s.player) => s.islands.some((i) => i.found && i.node === node);
+/** Something waiting on you: the voyage doesn't go on until it's answered. */
+export const waiting = (s: WorldState) => !!(s.dilemma || s.hail || s.encounter);
 
 /**
- * A rumor about a ship, true as of now. From interrogation after a fight, or
- * bought in port; the caller decides which ship and how reliable the source.
+ * A day: you sail to `to` (a neighbour on the lanes, or where you are), and
+ * the day happens — the weather, the stores, a landmark raised, a sail.
  */
-export function hearRumor(sea: Sea, s: WorldState, shipId: number, reliability: number): WorldState {
-  const ship = s.ships.find((x) => x.id === shipId);
-  if (!ship) throw new Error(`no ship ${shipId}`);
-  const r: Roller = { rng: s.rng };
-  const rumor = makeRumor(sea, r, s.nextRumor, ship, s.turn, reliability);
-  return { ...s, rng: r.rng, rumors: [...s.rumors, rumor], nextRumor: s.nextRumor + 1 };
+export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
+  if (s.sunk) throw new Error('the ship is lost; the voyage is over');
+  if (s.won) throw new Error('you are home');
+  if (s.encounter) throw new Error('there is a fight to finish first');
+  if (s.hail) throw new Error('a sail is in sight: attack, or let her pass');
+  if (s.dilemma) throw new Error('there is a choice to make first');
+  if (to !== s.player && !sea.map.adj[s.player].includes(to)) throw new Error(`node ${to} is not next to ${s.player}`);
+  let next: WorldState = { ...s, turn: s.turn + 1, player: to };
+  next = aDay(sea, next);
+  if (next.sunk) return next;
+  next = raise(sea, next);
+  if (next.won || next.hail) return next;
+  return sailSighted(sea, next);
 }
-
-/** Gold in, from a prize. */
-export const earn = (s: WorldState, amount: number): WorldState => ({ ...s, gold: s.gold + amount });

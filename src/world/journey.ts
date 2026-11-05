@@ -1,14 +1,12 @@
 /**
  * The voyage: where you are on the chain of landmarks, where you're bound,
- * and where you've been. You choose the next leg at each landmark — at a
- * fork, which way — and the ship sails it along the lanes. You can turn
- * aside to a port or a prize between, and come back to it; you can turn for
- * home at any point, Fenton's way. Coming into Plymouth again ends the run.
+ * and where you've been. At a fork you choose the next leg, and the ship
+ * sails it along the lanes; you can turn for home at any point, Fenton's
+ * way. Coming into Plymouth again ends the run.
  */
 
-import { HOME_LANDMARK, LANDMARKS, START_LANDMARK, landmark } from './landmarks.ts';
-import type { Sea } from './ships.ts';
-import type { WorldState } from './world.ts';
+import { HOME_LANDMARK, START_LANDMARK, landmark } from './landmarks.ts';
+import type { Sea, WorldState } from './world.ts';
 import { PLATE_LANDMARK, overhaul } from './treasure.ts';
 
 export interface Voyage {
@@ -37,6 +35,12 @@ export function choices(v: Voyage): string[] {
   return [...next, HOME_LANDMARK];
 }
 
+/** The one way on from here, if the way doesn't divide (turning for home aside); null at a fork. */
+export function onward(v: Voyage): string | null {
+  const next = landmark(v.at).next;
+  return next.length === 1 ? next[0] : null;
+}
+
 /** Make for a landmark: one of the next, or home. */
 export function makeFor(s: WorldState, key: string): WorldState {
   if (!choices(s.voyage).includes(key)) throw new Error(`you can’t make for ${landmark(key).name} from ${landmark(s.voyage.at).name}`);
@@ -58,10 +62,6 @@ export function raise(sea: Sea, s: WorldState): WorldState {
   if (!raised || raised === v.at) return s;
   const voyage: Voyage = { at: raised, bound: null, visited: [...v.visited, raised] };
   const l = landmark(raised);
-  if (raised === HOME_LANDMARK && s.pirate) {
-    // Plymouth would hang you. Not home yet: a pardon first, or a haven.
-    return { ...s, log: [...s.log, { turn: s.turn, text: 'Plymouth, but they’d hang you here: buy a pardon first, or make for a pirate’s haven', stop: true }] };
-  }
   if (raised === HOME_LANDMARK) {
     const how = howHome(voyage);
     const said = how === 'round' ? 'round the world and home' : how === 'back' ? 'home the way you went' : 'turned back, and home';
@@ -71,6 +71,3 @@ export function raise(sea: Sea, s: WorldState): WorldState {
   // Off Cape San Francisco, the first time: the treasure ship.
   return raised === PLATE_LANDMARK && !v.visited.includes(PLATE_LANDMARK) ? overhaul(sea, raisedIt) : raisedIt;
 }
-
-/** The landmarks in order of the main line, for drawing: every one, once. */
-export const ALL_LANDMARKS = LANDMARKS;

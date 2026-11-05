@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { HAND_WORTH, RICH, SHIP_WORTH, score } from './score.ts';
-import { createSea, createWorld, START_GOLD, type WorldState } from './world.ts';
+import { SHIP_CLASSES } from '../outfit.ts';
+import { createSea, createWorld, type WorldState } from './world.ts';
 
 const sea = createSea();
 const base = createWorld(sea, 1);
@@ -20,7 +21,7 @@ test('treasure, hands and the ship, all told', () => {
   assert.equal(s.treasure, 300);
   assert.equal(s.hands, 20 * HAND_WORTH);
   assert.equal(s.ship, SHIP_WORTH / 2);
-  assert.equal(s.total, 300 + 20 * HAND_WORTH + SHIP_WORTH / 2);
+  assert.equal(s.total, (300 + 20 * HAND_WORTH + SHIP_WORTH / 2) * SHIP_CLASSES.pinnace.multiplier);
 });
 
 test('round the world, rich, most of the crew home: Drake’s', () => {
@@ -33,17 +34,22 @@ test('rich, but dear in men, or home the way you went: Cavendish’s', () => {
 });
 
 test('home without the money: Fenton’s', () => {
-  const poor = score(home({ gold: START_GOLD - 10, crew: 25 }, ['canaries', 'brazil']));
+  const poor = score(home({ gold: SHIP_CLASSES.pinnace.purse - 10, crew: 25 }, ['canaries', 'brazil']));
   assert.equal(poor.like, 'fenton');
   assert.match(poor.text, /poorer/);
   assert.match(score(home({ gold: RICH - 1, crew: 25 }, ROUND)).text, /little to show/);
 });
 
-test('lost: Oxenham’s, and nothing scored; retired: a pirate’s end, the gold', () => {
+test('lost: Oxenham’s, and nothing scored', () => {
   const lost = score({ ...base, sunk: true, gold: 500 });
   assert.equal(lost.like, 'oxenham');
   assert.equal(lost.total, 0);
-  const retired = score({ ...base, won: true, ending: 'retired', gold: 400 });
-  assert.equal(retired.like, 'pirate');
-  assert.equal(retired.total, 400);
+});
+
+test('a smaller ship counts for more: the score times her multiplier', () => {
+  const at = (ship: string) => score(home({ ship, gold: 100, crew: 10, hull: 10, maxHull: 10 }, ROUND));
+  const raw = 100 + 10 * HAND_WORTH + SHIP_WORTH;
+  assert.equal(at('pinnace').total, raw * 2);
+  assert.equal(at('sloop').total, raw * 1.5);
+  assert.equal(at('brigantine').total, raw);
 });

@@ -1,34 +1,23 @@
 /**
- * Setting a course: pick a destination and the ship sails for it a day at a
- * time, until it arrives or something happens. Each day's step is the one
- * that brings it nearest, and where steps tie, the one that runs best with
- * the current and wind you've charted.
+ * Continuing on: the ship sails the lanes toward the landmark she's bound
+ * for, a day at a time, until something happens. Where the way doesn't
+ * divide she's bound for the next landmark without asking; at a fork, you
+ * choose (journey.ts).
  */
 
 import { FAR, type NodeId } from './map.ts';
-import { legWeight } from './sea.ts';
-import type { Sea } from './ships.ts';
-import { inSight } from './scout.ts';
-import { type WorldState, advance, knowledge, observe } from './world.ts';
-import { raise } from './journey.ts';
+import { makeFor, onward, raise } from './journey.ts';
 import { noWay } from './weather.ts';
+import { type Sea, type WorldState, advance } from './world.ts';
 
-/** Tomorrow's step toward `dest`, or null if you're there or can't get there. */
+/** Tomorrow's step toward `dest`: a neighbour a day nearer, or null if you're there or can't get there. */
 export function nextStep(sea: Sea, s: WorldState, dest: NodeId): NodeId | null {
   const d = sea.map.distTo(dest);
   if (s.player === dest || d[s.player] >= FAR) return null;
-  const know = knowledge(s);
-  let best: NodeId | null = null;
-  let bestW = -1;
-  for (const m of sea.map.adj[s.player]) {
-    if (d[m] !== d[s.player] - 1) continue;
-    const w = legWeight(sea.map, sea.pattern, s.player, m, s.turn, know);
-    if (w > bestW) [best, bestW] = [m, w];
-  }
-  return best;
+  return sea.map.adj[s.player].find((m) => d[m] === d[s.player] - 1) ?? null;
 }
 
-/** The whole course from here, for drawing, as things stand today. */
+/** The whole way from here to `dest`, for drawing. */
 export function plotCourse(sea: Sea, s: WorldState, dest: NodeId): NodeId[] {
   const course = [s.player];
   let at: WorldState = s;
@@ -39,35 +28,46 @@ export function plotCourse(sea: Sea, s: WorldState, dest: NodeId): NodeId[] {
   return course;
 }
 
-/** Why a day's sailing stopped short of the destination. `news`: something in the log worth heaving to for. */
-export type Halt = 'arrived' | 'encounter' | 'hail' | 'sunk' | 'won' | 'sighted' | 'stuck' | 'news' | 'sail' | 'choice';
+/**
+ * Why a day stopped the ship: a landmark raised, an event to answer, a sail
+ * sighted, a fight, the end of the run, or a line in the log worth stopping
+ * for. Null: sail on.
+ */
+export type Halt = 'landmark' | 'choice' | 'sail' | 'fight' | 'won' | 'sunk' | 'news';
 
-const halted = (w: WorldState) => w.won || w.sunk || !!w.encounter || !!w.hail || !!w.dilemma || !!w.spoil;
-
-/** A step more, made in the same day: the chart drawn as she goes, a landmark raised if she reaches one. */
-function glide(sea: Sea, s: WorldState, dest: NodeId): WorldState {
-  const step = nextStep(sea, s, dest);
-  if (step === null) return s;
-  return raise(sea, { ...s, player: step, chart: observe(sea, s.chart, step, s.sight, s.turn) });
+/** Bound somewhere: the landmark you chose, or the next where the way doesn't divide. Throws at a fork. */
+export function bound(s: WorldState): WorldState {
+  if (s.voyage.bound) return s;
+  const next = onward(s.voyage);
+  if (!next) throw new Error('the way divides here: choose which way');
+  return makeFor(s, next);
 }
 
-/** One day toward `dest`; says why to stop, if you should. */
-export function sailToward(sea: Sea, s: WorldState, dest: NodeId): { world: WorldState; halt: Halt | null } {
+const stopped = (w: WorldState) => w.won || w.sunk || !!w.encounter || !!w.hail || !!w.dilemma;
+
+/** A step more, made in the same day: a landmark raised if she reaches one. */
+function glide(sea: Sea, s: WorldState, dest: NodeId): WorldState {
   const step = nextStep(sea, s, dest);
-  if (step === null) return { world: s, halt: s.player === dest ? 'arrived' : 'stuck' };
-  // Easy sailing: one day in three, she lies to under short sail and makes no way.
-  // Becalmed, or anchored against the williwaws, she makes no way at all.
-  let world = advance(sea, s, noWay(s) || (s.pace === 'easy' && s.turn % 3 === 2) ? s.player : step);
+  return step === null ? s : raise(sea, { ...s, player: step });
+}
+
+/** A day on toward the landmark you're bound for; says why to stop, if you should. */
+export function continueOn(sea: Sea, s: WorldState): { world: WorldState; halt: Halt | null } {
+  const from = bound(s);
+  const dest = sea.map.landmarks[from.voyage.bound!];
+  const step = nextStep(sea, from, dest);
+  if (step === null) throw new Error('no way there');
+  // Becalmed, or anchored against the williwaws, she makes no way at all;
+  // at an easy pace, one day in three she lies to under short sail.
+  let world = advance(sea, from, noWay(from) || (from.pace === 'easy' && from.turn % 3 === 2) ? from.player : step);
   // Cracking on: one day in three, she makes two days' way.
-  if (s.pace === 'hard' && s.turn % 3 === 2 && !noWay(s) && !halted(world)) world = glide(sea, world, dest);
+  if (from.pace === 'hard' && from.turn % 3 === 2 && !noWay(from) && !stopped(world) && world.voyage.at === from.voyage.at) world = glide(sea, world, dest);
   if (world.won) return { world, halt: 'won' };
-  if (world.encounter) return { world, halt: 'encounter' };
-  if (world.hail) return { world, halt: 'hail' };
+  if (world.sunk) return { world, halt: 'sunk' };
+  if (world.encounter) return { world, halt: 'fight' };
+  if (world.hail) return { world, halt: 'sail' };
   if (world.dilemma) return { world, halt: 'choice' };
-  if (world.islands.filter((i) => i.found).length > s.islands.filter((i) => i.found).length) return { world, halt: 'sighted' };
-  if (world.player !== dest && world.log.slice(s.log.length).some((l) => l.stop)) return { world, halt: 'news' };
-  // A hostile sail newly in sight: heave to while there's time to choose.
-  const before = new Set(inSight(sea, s).filter((x) => x.hostile).map((x) => x.ship.id));
-  if (inSight(sea, world).some((x) => x.hostile && !before.has(x.ship.id))) return { world, halt: 'sail' };
-  return { world, halt: world.player === dest ? 'arrived' : null };
+  if (world.voyage.at !== from.voyage.at) return { world, halt: 'landmark' };
+  if (world.log.slice(s.log.length).some((l) => l.stop)) return { world, halt: 'news' };
+  return { world, halt: null };
 }

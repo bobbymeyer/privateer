@@ -1,7 +1,7 @@
 /** The days at sea: rain, fish, calms, williwaws, fever, foul water, weevils. Run with `npm test`. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { sailToward } from './course.ts';
+import { continueOn } from './course.ts';
 import { choices, choose } from './dilemmas.ts';
 import { aDay } from './events.ts';
 import { doldrums, inStrait, noWay } from './weather.ts';
@@ -12,12 +12,12 @@ const sea = createSea();
 const { map } = sea;
 const node = (lon: number, lat: number) =>
   map.nodes.filter((n) => !n.port && map.adj[n.id].length).sort((a, b) => Math.hypot(a.lon - lon, a.lat - lat) - Math.hypot(b.lon - lon, b.lat - lat))[0].id;
-const fresh = (over: Partial<WorldState> = {}): WorldState => ({ ...victualled({ ...createWorld(sea, 1), ships: [], trail: [] }), ...over });
+const fresh = (over: Partial<WorldState> = {}): WorldState => ({ ...victualled(createWorld(sea, 1)), ...over });
 
 /** Days at a place, with every choice answered by its first. */
 function lie(w: WorldState, days: number): WorldState {
   for (let d = 0; d < days; d++) {
-    w = aDay(sea, { ...w, turn: w.turn + 1, lastSpoils: w.turn + 1 });
+    w = aDay(sea, { ...w, turn: w.turn + 1 });
     if (w.dilemma) w = choose(sea, w, choices(w, w.dilemma)[0].key);
     if (w.sunk) break;
   }
@@ -31,9 +31,9 @@ test('in the doldrums, calms come on and the ship makes no way', () => {
   assert.ok(after.log.some((l) => /becalmed/.test(l.text)));
   assert.ok(!doldrums(sea, fresh({ player: node(-25, 30) })));
   // Becalmed, a day's sailing goes nowhere.
-  const calm = { ...w, calm: w.turn + 3 };
+  const calm: WorldState = { ...w, calm: w.turn + 3, voyage: { at: 'cape-verde', bound: 'brazil', visited: ['plymouth', 'canaries', 'cape-verde'] } };
   assert.ok(noWay(calm));
-  const out = sailToward(sea, calm, map.landmarks.brazil);
+  const out = continueOn(sea, calm);
   assert.equal(out.world.player, w.player);
 });
 
@@ -62,14 +62,14 @@ test('fever, foul water and weevils ask, and say what they cost', () => {
   assert.ok(noWay(nursed));
   const pressed = choose(sea, fever, 'press');
   assert.ok(pressed.crew <= 28 && pressed.crew >= 25);
-  const surgeon = choose(sea, { ...fever, outfit: { ...fever.outfit, crew: ['surgeon'] } }, 'press');
-  assert.ok(surgeon.crew >= 27, 'a surgeon saves half');
   const foul = { ...w, dilemma: { kind: 'foul' as const } };
   assert.equal(choose(sea, foul, 'heave').stores.water, 500);
   assert.ok(choose(sea, foul, 'drink').crew < 30);
   const weevils = { ...w, dilemma: { kind: 'weevils' as const } };
   assert.equal(choose(sea, weevils, 'heave').stores.food, 750);
-  assert.equal(choose(sea, weevils, 'eat').morale, w.morale - 1);
+  let sick = 0;
+  for (let rng = 0; rng < 200; rng++) sick += 30 - choose(sea, { ...weevils, rng }, 'eat').crew;
+  assert.ok(sick > 30 && sick < 100, `${sick} hands of 200 sickened of the weevils`);
 });
 
 test('over a long voyage the way asks things of you, and costs hands', () => {

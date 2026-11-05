@@ -8,19 +8,18 @@
  *   ration you set, water half as fast again in the tropics.
  * - Scurvy: six weeks without fresh food and it starts to kill, slowly and
  *   then not slowly. Fresh food — foraged, bought, traded, taken — resets it.
+ *   Short rations and starvation make it worse, and starvation kills besides.
  * - Spares (canvas, cordage, timber) take a storm's damage before the hull
  *   does, and careen her at a landmark.
  * - Powder, for the guns.
- * - Pace: easy loses a day in three and spares the ship and crew; hard gains
- *   one and wears them.
+ * - Pace: easy loses a day in three and spares the hull; hard gains one and
+ *   wears it.
  */
 
 import { SHIP_CLASSES } from '../outfit.ts';
-import { HOME_LANDMARK, LANDMARKS } from './landmarks.ts';
+import { type Landmark, type ShoreWork, landmark } from './landmarks.ts';
 import { type Roller, roll } from './random.ts';
-import type { Sea } from './ships.ts';
-import { wantedBy } from './ships.ts';
-import type { WorldState } from './world.ts';
+import type { Sea, WorldState } from './world.ts';
 
 export interface Stores {
   /** Provisions, in rations: one hand for one day at full ration. */
@@ -36,27 +35,37 @@ export interface Stores {
 export type Rations = 'full' | 'short' | 'starving';
 export type Pace = 'easy' | 'steady' | 'hard';
 
-/** What a ration setting eats, against full. */
+/** What a ration setting eats and drinks, against full. */
 export const EAT: Record<Rations, number> = { full: 1, short: 0.67, starving: 0.34 };
 /** Water goes this much faster inside the tropics. */
 export const TROPIC_THIRST = 1.5;
 /** Days without fresh food before scurvy kills. */
 export const SCURVY_DAYS = 42;
 /** Hands dead of scurvy a day, per hand, per day past SCURVY_DAYS. */
-export const SCURVY_RATE = 0.00025;
+export const SCURVY_RATE = 0.0001;
 /** And of thirst, and of hunger, a day, per hand, when it's run out. */
 export const THIRST_RATE = 0.08;
 export const HUNGER_RATE = 0.03;
+/** On starvation rations, hunger kills this share of HUNGER_RATE even with food aboard. */
+export const STARVING_HUNGER = 0.05;
 /** Fewer hands than this and she can't be sailed: the run is over. */
 export const MIN_HANDS = 8;
 /** Days at sea between a point of hull lost to weed and worm, by pace. */
-export const WEAR_DAYS: Record<Pace, number> = { easy: 40, steady: 25, hard: 15 };
+export const WEAR_DAYS: Record<Pace, number> = { easy: 60, steady: 40, hard: 25 };
 
-export const complement = (s: WorldState) => SHIP_CLASSES[s.outfit.ship].complement;
+export const complement = (s: { ship: string }) => SHIP_CLASSES[s.ship].complement;
 /** What she can carry, by her complement: food for 180 days, water for 90, a share of spares and powder. */
-export const capacity = (s: WorldState): Stores => {
+export const capacity = (s: { ship: string }): Stores => {
   const c = complement(s);
   return { food: c * 180, water: c * 90, spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) };
+};
+
+/** A new voyage's hands: two thirds of her complement. The rest are to hire. */
+export const startCrew = (ship: string) => Math.round((SHIP_CLASSES[ship].complement * 2) / 3);
+/** And her stores: two months' food, a month's water, a little spare and powder. The rest is to buy. */
+export const startStores = (ship: string): Stores => {
+  const crew = startCrew(ship);
+  return { food: crew * 60, water: crew * 30, spares: 2, powder: 3 };
 };
 
 /** Add to what's aboard, as far as there's room; never less than there was. */
@@ -71,7 +80,7 @@ export const daysOf = (s: WorldState) => ({
 /** How it stands with the scurvy: none, coming on, or killing. */
 export const scurvy = (s: WorldState): 'none' | 'coming' | 'killing' => (s.fresh > SCURVY_DAYS ? 'killing' : s.fresh > SCURVY_DAYS - 14 ? 'coming' : 'none');
 
-const deaths = (r: Roller, expected: number) => Math.floor(expected) + (roll(r) < expected - Math.floor(expected) ? 1 : 0);
+export const deaths = (r: Roller, expected: number) => Math.floor(expected) + (roll(r) < expected - Math.floor(expected) ? 1 : 0);
 
 /** A day's eating, drinking and dying. Called by `aDay`. */
 export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
@@ -92,10 +101,11 @@ export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
 
   // The dying.
   const mult = (s.rations === 'starving' ? 1.5 : s.rations === 'short' ? 1.2 : 1) * (s.pace === 'easy' ? 0.8 : 1);
+  const hungry = food <= 0 ? HUNGER_RATE : s.rations === 'starving' ? HUNGER_RATE * STARVING_HUNGER : 0;
   const lost = {
     scurvy: w.fresh > SCURVY_DAYS ? deaths(r, w.crew * (w.fresh - SCURVY_DAYS) * SCURVY_RATE * mult) : 0,
     thirst: water <= 0 ? deaths(r, w.crew * THIRST_RATE) : 0,
-    hunger: food <= 0 ? deaths(r, w.crew * HUNGER_RATE) : 0,
+    hunger: hungry ? deaths(r, w.crew * hungry) : 0,
   };
   const dead = Math.min(w.crew, lost.scurvy + lost.thirst + lost.hunger);
   if (dead) {
@@ -107,13 +117,9 @@ export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
     if (w.fresh === SCURVY_DAYS + 1 && lost.scurvy) log('the scurvy has begun to kill', true);
   }
   if (w.crew < MIN_HANDS) {
-    log(`too few hands left to work her: the ship is lost`, true);
+    log('too few hands left to work her: the ship is lost', true);
     return { ...w, sunk: true };
   }
-
-  // Hunger sours the crew; short rations slowly, starvation fast.
-  if ((s.rations === 'short' && w.turn % 10 === 0) || (s.rations === 'starving' && w.turn % 4 === 0) || food <= 0 || water <= 0) w = { ...w, morale: w.morale - 1 };
-  if (s.pace === 'hard' && w.turn % 12 === 0) w = { ...w, morale: w.morale - 1 };
 
   // Weed and worm.
   if (!sea.map.nodes[s.player].port && w.turn % WEAR_DAYS[s.pace] === 0 && w.hull > 1) {
@@ -125,81 +131,56 @@ export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
 
 // --- At a landmark -----------------------------------------------------------
 
-/** What you can do where you are: water, forage, careen. */
-export interface Shore {
-  water: boolean;
-  forage: boolean;
-  careen: boolean;
-  /** Where this is, in words. */
-  place: string;
-}
+/** The landmark you're lying at, if you're at one. */
+export const landmarkHere = (sea: Sea, s: WorldState): Landmark | null => (sea.map.landmarks[s.voyage.at] === s.player ? landmark(s.voyage.at) : null);
+
+/** The shore work to be done here. */
+export const shoreHere = (sea: Sea, s: WorldState): ShoreWork[] => landmarkHere(sea, s)?.offers.shore ?? [];
+
+/** Days each takes. */
+export const SHORE_DAYS: Record<ShoreWork, number> = { water: 2, forage: 3, careen: 5 };
 
 /**
- * The shore here. Water and forage at an anchorage, a cape, an island, or
- * islanders who'll have you; water in a strait; careen anywhere quiet
- * enough — an anchorage, an island, a friendly port's yard.
+ * Work ashore for its days: the casks, the foraging, the careening. The
+ * days pass meanwhile, and stop early if something asks you.
  */
-export function shore(sea: Sea, s: WorldState): Shore {
-  const none = { water: false, forage: false, careen: false, place: '' };
-  const node = sea.map.nodes[s.player];
-  const mark = LANDMARKS.find((l) => sea.map.landmarks[l.key] === s.player && l.key !== HOME_LANDMARK);
-  const island = s.islands.some((i) => i.found && i.node === s.player);
-  if (island) return { water: true, forage: true, careen: true, place: 'an island nobody has charted' };
-  if (node.port) {
-    if (node.port.nation === 'native') return wantedBy(s.standing, 'native') ? none : { water: true, forage: true, careen: false, place: node.port.name };
-    // A port that deals with you: water from the town, and its yard.
-    return none;
-  }
-  if (!mark) return none;
-  if (mark.kind === 'anchorage') return { water: true, forage: true, careen: true, place: mark.name };
-  if (mark.kind === 'cape') return { water: true, forage: true, careen: false, place: mark.name };
-  if (mark.kind === 'strait') return { water: true, forage: false, careen: false, place: mark.name };
-  return { ...none, place: mark.name };
-}
-
-/** Days each costs. */
-export const SHORE_DAYS = { water: 2, forage: 3, careen: 5, rest: 4 };
-
-/**
- * Do something ashore for its days: the world goes on meanwhile. Stops early
- * if something comes alongside, a fight starts, or an event asks you.
- */
-export function ashore(sea: Sea, s: WorldState, what: keyof typeof SHORE_DAYS, advance: (sea: Sea, s: WorldState, to: number) => WorldState): WorldState {
-  const here = shore(sea, s);
-  if (what !== 'rest' && !here[what]) throw new Error(`nothing to ${what} here`);
+export function ashore(sea: Sea, s: WorldState, what: ShoreWork, advance: (sea: Sea, s: WorldState, to: number) => WorldState): WorldState {
+  if (!shoreHere(sea, s).includes(what)) throw new Error(`nothing to ${what} here`);
   const r: Roller = { rng: s.rng };
-  let w: WorldState = { ...s, rng: r.rng };
+  let w: WorldState = s;
   const cap = capacity(w);
-  const text = { water: 'casks filled', forage: '', careen: '', rest: 'the crew rested' }[what];
-  if (what === 'water') w = { ...w, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water) } };
+  const log = (text: string) => (w = { ...w, log: [...w.log, { turn: w.turn, text }] });
+  if (what === 'water') {
+    w = { ...w, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water) } };
+    log('casks filled');
+  }
   if (what === 'forage') {
     // Fish, fowl, seals, penguins, fruit, roots: a week's worth some days, a month's others. Fresh, whatever it is.
     const got = Math.round(w.crew * (8 + roll(r) * 22));
-    w = { ...w, rng: r.rng, fresh: 0, stores: { ...w.stores, food: topUp(w.stores.food, got, cap.food) }, morale: Math.min(10, w.morale + 1) };
-    w = { ...w, log: [...w.log, { turn: w.turn, text: `foraging: fresh food, ${Math.round(got / Math.max(1, w.crew))} days of it` }] };
+    w = { ...w, fresh: 0, stores: { ...w.stores, food: topUp(w.stores.food, got, cap.food) } };
+    log(`foraging: fresh food, ${Math.round(got / Math.max(1, w.crew))} days of it`);
   }
   if (what === 'careen') {
-    // Hauled down on a beach, scraped, caulked: two points of hull for each bundle of spares.
+    // Hauled down on a beach, scraped, caulked: two points of hull for each bundle of spares, and one for the scraping.
     const need = Math.ceil((w.maxHull - w.hull) / 2);
     const used = Math.min(need, w.stores.spares);
     w = { ...w, hull: Math.min(w.maxHull, w.hull + used * 2 + 1), stores: { ...w.stores, spares: w.stores.spares - used } };
-    w = { ...w, log: [...w.log, { turn: w.turn, text: `careened: weed scraped, seams caulked${used ? `, ${used} of the spares used` : ''}` }] };
+    log(`careened: weed scraped, seams caulked${used ? `, ${used} of the spares used` : ''}`);
   }
-  if (what === 'rest') w = { ...w, morale: Math.min(10, w.morale + 2) };
-  if (text) w = { ...w, log: [...w.log, { turn: w.turn, text }] };
+  w = { ...w, rng: r.rng };
   for (let d = 0; d < SHORE_DAYS[what]; d++) {
     w = advance(sea, w, w.player);
-    if (w.encounter || w.hail || w.spoil || w.dilemma || w.sunk || w.won) break;
+    if (w.encounter || w.hail || w.dilemma || w.sunk || w.won) break;
   }
   return w;
 }
 
-// --- The chandler ------------------------------------------------------------
+// --- The market --------------------------------------------------------------
 
 /** What a chandler sells, a lot at a time, at Plymouth's prices; dearer abroad. */
 export const CHANDLER = {
   food: { lot: 300, cost: 4, name: 'biscuit and salt meat', unit: 'rations' },
-  water: { lot: 300, cost: 1, name: 'casks of water', unit: 'rations' },
+  water: { lot: 300, cost: 1, name: 'water', unit: 'rations' },
   spares: { lot: 1, cost: 3, name: 'canvas, cordage and timber', unit: 'bundle' },
   powder: { lot: 1, cost: 3, name: 'powder and shot', unit: 'barrel' },
   hands: { lot: 5, cost: 4, name: 'hands', unit: 'men' },
@@ -207,8 +188,14 @@ export const CHANDLER = {
 export type Ware = keyof typeof CHANDLER;
 /** Away from Plymouth, everything costs half as much again. */
 export const ABROAD = 1.5;
+/** What islanders want for casks filled and three weeks of fresh food. */
+export const ISLANDERS_COST = 3;
+export const ISLANDERS_DAYS = 21;
 
-export const price = (sea: Sea, s: WorldState, ware: Ware) => Math.ceil(CHANDLER[ware].cost * (sea.map.nodes[s.player].port?.name === 'Plymouth' ? 1 : ABROAD));
+/** The market where you're lying, if there is one. */
+export const marketHere = (sea: Sea, s: WorldState) => landmarkHere(sea, s)?.offers.market ?? null;
+
+export const price = (s: WorldState, ware: Ware) => Math.ceil(CHANDLER[ware].cost * (s.voyage.at === 'plymouth' ? 1 : ABROAD));
 
 /** Room for another lot of this. */
 export function room(s: WorldState, ware: Ware): boolean {
@@ -216,21 +203,30 @@ export function room(s: WorldState, ware: Ware): boolean {
   return s.stores[ware] + CHANDLER[ware].lot <= capacity(s)[ware];
 }
 
-/** Buy a lot at a port that deals with you. Fresh food in a port resets the scurvy, too. */
-export function buy(sea: Sea, s: WorldState, ware: Ware, serves: boolean): WorldState {
-  if (!sea.map.nodes[s.player].port) throw new Error('a chandler is found in port');
-  if (!serves) throw new Error("they won't deal with you here");
+/** Buy a lot from a chandler. Food bought in port is fresh, and resets the scurvy. */
+export function buy(sea: Sea, s: WorldState, ware: Ware): WorldState {
+  if (marketHere(sea, s) !== 'chandler') throw new Error('there is no chandler here');
   if (!room(s, ware)) throw new Error(ware === 'hands' ? 'no room for more hands' : 'the hold is full');
-  const cost = price(sea, s, ware);
+  const cost = price(s, ware);
   if (s.gold < cost) throw new Error('not enough in the purse');
   const paid = { ...s, gold: s.gold - cost };
   if (ware === 'hands') return { ...paid, crew: s.crew + CHANDLER.hands.lot };
   return { ...paid, stores: { ...s.stores, [ware]: s.stores[ware] + CHANDLER[ware].lot }, ...(ware === 'food' ? { fresh: 0 } : {}) };
 }
 
-/** A new run's ship: a pinnace two thirds manned, with two months' food and a month's water. The rest is for you to buy. */
-export const START_CREW = 20;
-export const START_STORES: Stores = { food: START_CREW * 60, water: START_CREW * 30, spares: 2, powder: 3 };
+/** Trade with islanders: the casks filled, and three weeks of fresh food, for a little. */
+export function trade(sea: Sea, s: WorldState): WorldState {
+  if (marketHere(sea, s) !== 'islanders') throw new Error('there is nobody here to trade with');
+  if (s.gold < ISLANDERS_COST) throw new Error('not enough in the purse');
+  const cap = capacity(s);
+  return {
+    ...s,
+    gold: s.gold - ISLANDERS_COST,
+    fresh: 0,
+    stores: { ...s.stores, water: Math.max(s.stores.water, cap.water), food: topUp(s.stores.food, s.crew * ISLANDERS_DAYS, cap.food) },
+    log: [...s.log, { turn: s.turn, text: 'water, fruit and fresh meat from the islanders' }],
+  };
+}
 
 // --- The fight -----------------------------------------------------------------
 
@@ -239,7 +235,7 @@ export const SHOTS_PER_BARREL = 3;
 /** Hands killed for each point of hull she lost, a share of those aboard. */
 export const KILLED_PER_HULL = 0.015;
 
-/** What a fight cost in powder and hands: shots fired, hull lost. */
+/** What a fight cost in powder and hands: shots fired, hull lost. Returns the state and what it said. */
 export function fightCost(s: WorldState, shots: number, hullLost: number, r: Roller): WorldState {
   const powder = Math.min(s.stores.powder, Math.ceil(shots / SHOTS_PER_BARREL));
   const dead = Math.min(s.crew, deaths(r, Math.max(0, hullLost) * s.crew * KILLED_PER_HULL));
@@ -252,11 +248,8 @@ export function fightCost(s: WorldState, shots: number, hullLost: number, r: Rol
 const HOLDS: Record<string, { food: number; water: number; spares: number; powder: number }> = {
   merchant: { food: 25, water: 20, spares: 2, powder: 1 },
   'treasure-ship': { food: 30, water: 25, spares: 2, powder: 2 },
-  'treasure-fleet': { food: 40, water: 30, spares: 3, powder: 3 },
-  hunter: { food: 15, water: 15, spares: 2, powder: 4 },
   privateer: { food: 15, water: 15, spares: 2, powder: 3 },
   corsair: { food: 15, water: 15, spares: 1, powder: 2 },
-  armada: { food: 30, water: 20, spares: 3, powder: 6 },
   town: { food: 45, water: 0, spares: 2, powder: 2 },
   fortress: { food: 45, water: 0, spares: 3, powder: 5 },
 };
@@ -267,7 +260,7 @@ const HOLDS: Record<string, { food: number; water: number; spares: number; powde
  * casks filled at its well.
  */
 export function prizeStores(s: WorldState, kind: string, town: boolean, r: Roller): WorldState {
-  const hold = HOLDS[town ? (kind === 'fortress' ? 'fortress' : 'town') : kind];
+  const hold = HOLDS[kind];
   if (!hold) return s;
   const cap = capacity(s);
   const crew = Math.max(s.crew, 1);
