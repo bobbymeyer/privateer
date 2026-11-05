@@ -10,6 +10,7 @@ import { SEASON_LENGTH } from './ocean.ts';
 import { type Roller, roll } from './random.ts';
 import { provisionDay } from './stores.ts';
 import { weatherDay } from './weather.ts';
+import { happeningsDay } from './happenings.ts';
 import type { Sea, WorldState } from './world.ts';
 
 /** A storm, on any day at sea, outside its seasons and its latitudes. */
@@ -47,6 +48,7 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
       w = { ...w, dilemma: { kind: 'storm' }, log: [...w.log, { turn: w.turn, text: 'a storm coming on', stop: true }] };
     }
     w = weatherDay(sea, w, r);
+    w = happeningsDay(sea, w, r);
   }
   w = provisionDay(sea, w, r);
   return { ...w, rng: r.rng };

@@ -47,8 +47,8 @@ test('the williwaws hold you in the Strait, and only there, and only bound throu
 });
 
 test('rain fills the casks and fish freshen the crew, in the tropics', () => {
-  const w = fresh({ player: node(-30, 10), stores: { food: 1e6, water: 2000, spares: 0, powder: 0 }, fresh: 30, crew: 10 });
-  const after = lie(w, 100);
+  const w = fresh({ player: node(-30, 10), stores: { food: 1e6, water: 3000, spares: 0, powder: 0 }, fresh: 30, crew: 40 });
+  const after = lie(w, 60);
   assert.ok(after.log.some((l) => /rain squall/.test(l.text)));
   assert.ok(after.log.some((l) => /bonito|flying fish|turtle|boobies/.test(l.text)));
 });

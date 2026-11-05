@@ -8,6 +8,8 @@
 import { HOME_LANDMARK, START_LANDMARK, landmark } from './landmarks.ts';
 import type { Sea, WorldState } from './world.ts';
 import { PLATE_LANDMARK, overhaul } from './treasure.ts';
+import { arriving } from './happenings.ts';
+import { SPICE_WORTH } from './stores.ts';
 
 export interface Voyage {
   /** The landmark you last raised. */
@@ -65,9 +67,13 @@ export function raise(sea: Sea, s: WorldState): WorldState {
   if (raised === HOME_LANDMARK) {
     const how = howHome(voyage);
     const said = how === 'round' ? 'round the world and home' : how === 'back' ? 'home the way you went' : 'turned back, and home';
-    return { ...s, voyage, won: true, ending: 'home', log: [...s.log, { turn: s.turn, text: `Plymouth: ${said}, with ${s.gold}`, stop: true }] };
+    // The spice sold on the quay.
+    const sold = s.spice * SPICE_WORTH;
+    const log = [...s.log, ...(sold ? [{ turn: s.turn, text: `${s.spice} tons of spice sold on the quay for ${sold}` }] : [])];
+    const gold = s.gold + sold;
+    return { ...s, voyage, gold, spice: 0, won: true, ending: 'home', log: [...log, { turn: s.turn, text: `Plymouth: ${said}, with ${gold}`, stop: true }] };
   }
-  const raisedIt: WorldState = { ...s, voyage, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] };
+  const raisedIt: WorldState = arriving({ ...s, voyage, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] }, raised);
   // Off Cape San Francisco, the first time: the treasure ship.
   return raised === PLATE_LANDMARK && !v.visited.includes(PLATE_LANDMARK) ? overhaul(sea, raisedIt) : raisedIt;
 }

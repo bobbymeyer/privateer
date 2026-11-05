@@ -18,7 +18,7 @@
   import { read } from '../world/reading.ts';
   import { HAND_WORTH, LIKE_TITLES, score } from '../world/score.ts';
   import {
-    CHANDLER, ISLANDERS_COST, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade,
+    CHANDLER, ISLANDERS_COST, SPICE_WORTH, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade,
   } from '../world/stores.ts';
   import { plateExtra } from '../world/treasure.ts';
   import { advance, createSea, createWorld, dateOf, type Sea, type WorldState, waiting } from '../world/world.ts';
@@ -258,6 +258,7 @@
   const shore = $derived(sea && now() ? shoreHere(sea, now()!) : []);
   const market = $derived(sea && now() ? marketHere(sea, now()!) : null);
   const town = $derived(sea && now() ? raidHere(sea, now()!) : null);
+  const spice = $derived(sea && now() ? spiceHere(sea, now()!) : null);
   /** At a fork with nothing chosen: the way divides, and you choose. */
   const atFork = $derived.by(() => {
     const w = now();
@@ -317,6 +318,7 @@
           <div class:low={world.stores.spares === 0}><span class="label">spares</span>{world.stores.spares}</div>
           <div class:low={world.stores.powder === 0}><span class="label">powder</span>{world.stores.powder}</div>
           <div><span class="label">gold</span>{world.gold}</div>
+          {#if world.spice}<div><span class="label">spice</span>{world.spice} {world.spice === 1 ? 'ton' : 'tons'}, {world.spice * SPICE_WORTH} at home</div>{/if}
         </div>
         <div class="settings">
           <div class="row" role="group" aria-label="rations">
@@ -355,6 +357,10 @@
             </div>
           {:else if market === 'islanders'}
             <div class="row"><button disabled={sailing || world.gold < ISLANDERS_COST} onclick={() => attempt(() => trade(sea!, world!))}>trade with the islanders ({ISLANDERS_COST}): the casks filled, {ISLANDERS_DAYS} days of fresh food</button></div>
+          {/if}
+          {#if spice}
+            <p class="faint">{spice.name}, by the ton, sold on the quay at Plymouth for {SPICE_WORTH}. room for {spiceRoom(world)} tons.</p>
+            <div class="row"><button disabled={sailing || world.gold < spice.cost || world.spice >= spiceRoom(world)} onclick={() => attempt(() => buySpice(sea!, world!))}>a ton of {spice.name} ({spice.cost}), {world.spice} aboard</button></div>
           {/if}
           {#if town}
             <div class="row"><button disabled={sailing} onclick={() => attempt(() => raid(sea!, world!))}>raid {here.name}, once</button></div>
