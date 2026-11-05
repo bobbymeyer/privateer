@@ -21,6 +21,7 @@ import type { Sea } from './ships.ts';
 import { refit } from './port.ts';
 import { SHARES_AT, sharesCost } from './dilemmas.ts';
 import { type WorldState, atIsland } from './world.ts';
+import { provisionDay } from './stores.ts';
 
 export const MORALE_MAX = 10;
 export const MORALE_START = 7;
@@ -113,6 +114,9 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
     // Low enough, and they send a man aft to ask for their shares.
     if (w.morale === SHARES_AT && !w.dilemma) w = { ...w, dilemma: { kind: 'shares', cost: sharesCost(w.gold) } };
   }
+  // Eating, drinking, and the dying that comes of too little of either.
+  w = provisionDay(sea, w, r);
+  if (w.sunk) return { ...w, rng: r.rng };
   if (w.morale <= 0) w = mutiny({ ...w, rng: r.rng }, r);
   return { ...w, rng: r.rng };
 }

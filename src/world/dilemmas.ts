@@ -107,9 +107,13 @@ export function choose(sea: Sea, s: WorldState, key: string): WorldState {
 
   switch (`${d.kind}:${key}`) {
     case 'storm:ride': {
-      const lost = Math.min(between(STORM_HULL), w.hull - 1);
-      w = { ...w, hull: w.hull - lost };
-      log(lost > 0 ? `the storm ridden out, at ${lost} hull` : 'the storm ridden out, with nothing left to lose');
+      // Spare canvas and timber take the damage first; then the hull.
+      const blow = between(STORM_HULL);
+      const spent = Math.min(blow, w.stores.spares);
+      const lost = Math.min(blow - spent, w.hull - 1);
+      w = { ...w, hull: w.hull - lost, stores: { ...w.stores, spares: w.stores.spares - spent } };
+      const parts = [spent && `${spent} of the spares`, lost && `${lost} hull`].filter(Boolean).join(' and ');
+      log(parts ? `the storm ridden out, at ${parts}` : 'the storm ridden out, with nothing left to lose');
       break;
     }
     case 'storm:lighten': {

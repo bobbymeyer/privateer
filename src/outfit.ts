@@ -73,15 +73,17 @@ export interface ShipClass {
   hull: number;
   /** Berths for crew of note: the hands you hire for what they bring. */
   berths: number;
+  /** The hands she takes to sail and fight her properly. */
+  complement: number;
   /** Cards on top of the pinnace's. */
   cards: Cards;
 }
 
 export const SHIP_CLASSES: Record<string, ShipClass> = {
-  pinnace: { name: 'pinnace', cost: 0, hull: 12, berths: 2, cards: {} },
-  sloop: { name: 'sloop', cost: 40, hull: 14, berths: 3, cards: { 'raking-fire': 1 } },
-  brigantine: { name: 'brigantine', cost: 90, hull: 17, berths: 4, cards: { broadside: 1, 'raking-fire': 1 } },
-  frigate: { name: 'frigate', cost: 180, hull: 22, berths: 6, cards: { broadside: 2, 'chain-shot': 1 } },
+  pinnace: { name: 'pinnace', cost: 0, hull: 12, berths: 2, complement: 30, cards: {} },
+  sloop: { name: 'sloop', cost: 40, hull: 14, berths: 3, complement: 45, cards: { 'raking-fire': 1 } },
+  brigantine: { name: 'brigantine', cost: 90, hull: 17, berths: 4, complement: 70, cards: { broadside: 1, 'raking-fire': 1 } },
+  frigate: { name: 'frigate', cost: 180, hull: 22, berths: 6, complement: 110, cards: { broadside: 2, 'chain-shot': 1 } },
 };
 
 export interface CrewRole {

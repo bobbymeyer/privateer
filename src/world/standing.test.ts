@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { portNamed } from './map.ts';
 import { HUNTER_STATIONS, advance, createSea, createWorld, type WorldState } from './world.ts';
 import { hunterGoal, mayEnter } from './ships.ts';
+import { victualled } from './testing.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -32,7 +33,7 @@ test('forts make protected waters', () => {
 
 /** You, lying in Santo Domingo (Spanish waters, so Spanish guard ships may come), for 40 days. */
 function lieAt(standing: WorldState['standing']) {
-  let w: WorldState = { ...createWorld(sea, 3), player: at('Santo Domingo'), standing };
+  let w: WorldState = { ...victualled(createWorld(sea, 3)), player: at('Santo Domingo'), standing };
   const guards = w.ships.filter((s) => s.kind === 'hunter' && s.nation === 'spain' && map.distTo(s.home)[w.player] <= 25);
   const before = guards.reduce((t, g) => t + map.distTo(w.player)[g.node], 0);
   for (let i = 0; i < 40; i++) {

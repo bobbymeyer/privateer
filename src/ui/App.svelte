@@ -20,7 +20,7 @@
   import { adjective, article, nationName, sailName } from '../world/ports.ts';
   import { markerStrength, predict } from '../world/rumors.ts';
   import type { Sea } from '../world/ships.ts';
-  import { atIsland, createSea, createWorld, GOAL, HOME, homeward, knowledge, pursuitOf, renown, type WorldState } from '../world/world.ts';
+  import { advance, atIsland, createSea, createWorld, GOAL, START_GOLD, HOME, homeward, knowledge, pursuitOf, renown, type WorldState } from '../world/world.ts';
   import Fight from './Fight.svelte';
   import Flag from './Flag.svelte';
   import { COLORS } from '../world/colors.ts';
@@ -28,6 +28,8 @@
   import Gauge from './Gauge.svelte';
   import SeaChart from './SeaChart.svelte';
   import ShipSheet from './ShipSheet.svelte';
+  import Stores from './Stores.svelte';
+  import { CHANDLER, SHORE_DAYS, type Ware, ashore, buy, price, room, shore } from '../world/stores.ts';
   import { forget, load, store } from '../save.ts';
   import { ambient, bell, coin, gun, knell, setSound, soundOn, storm } from './sound.ts';
   import { type Entry, best, dailySeed, entryFor, loadLog, saveLog, today, withEntry } from '../logbook.ts';
@@ -428,6 +430,17 @@
           {#if tab === 'location'}
             {@const here = LANDMARKS.find((l) => sea!.map.landmarks[l.key] === world!.player && l.key !== 'plymouth-home')}
             {#if here}<p class="landmark"><em>{here.name}.</em> {here.text}</p>{/if}
+            {@const beach = shore(sea, world)}
+            {#if beach.water || beach.forage || beach.careen}
+              <details class="sub" open><summary><h3>ashore</h3></summary>
+              <ul class="plain shop">
+                {#if beach.water}<li><button onclick={() => attempt(() => ashore(sea!, world!, 'water', advance))}>fill the casks ({SHORE_DAYS.water} days)</button><span class="faint">water to the brim</span></li>{/if}
+                {#if beach.forage}<li><button onclick={() => attempt(() => ashore(sea!, world!, 'forage', advance))}>forage and fish ({SHORE_DAYS.forage} days)</button><span class="faint">fresh food, against the scurvy; some days rich, some poor</span></li>{/if}
+                {#if beach.careen}<li><button onclick={() => attempt(() => ashore(sea!, world!, 'careen', advance))} disabled={world.hull >= world.maxHull}>careen ({SHORE_DAYS.careen} days)</button><span class="faint">hauled down and scraped: two hull a bundle of spares, and one for the scraping</span></li>{/if}
+                <li><button onclick={() => attempt(() => ashore(sea!, world!, 'rest', advance))}>rest the crew ({SHORE_DAYS.rest} days)</button><span class="faint">morale +2</span></li>
+              </ul>
+              </details>
+            {/if}
             {#if port}
             <h2><Flag nation={port.nation} />{port.name}, {adjective(port.nation)}</h2>
             {#if isHaven(sea, world)}
@@ -440,7 +453,7 @@
                 <p class="wanted">they remember what you did here, and won't trade.</p>
                 <div class="row"><button onclick={() => attempt(() => bribe(sea!, world!), 'gifts accepted')}>make them gifts ({bribeCost(world, 'native')})</button></div>
               {:else}
-                <div class="row"><button onclick={() => attempt(() => provision(sea!, world!))} disabled={!provisions(sea, world)}>trade for provisions ({PROVISION_COST}): morale +{PROVISION_CHEER}, hull +{PROVISION_HULL}</button></div>
+                <div class="row"><button onclick={() => attempt(() => provision(sea!, world!))} disabled={!provisions(sea, world)}>trade for provisions ({PROVISION_COST}): water, fresh food, morale +{PROVISION_CHEER}, hull +{PROVISION_HULL}</button></div>
               {/if}
             {:else if world.pirate && port.nation === YOUR_NATION && !isHaven(sea, world)}
               <p>they know you for a pirate here.</p>
@@ -449,6 +462,18 @@
               <p>the {adjective(port.nation)} won't deal with you.</p>
               <div class="row"><button onclick={() => attempt(() => bribe(sea!, world!), 'the right palms are greased')}>bribe the officials ({bribeCost(world, port.nation)})</button></div>
             {:else}
+              <details class="sub" open><summary><h3>the chandler</h3></summary>
+              <p class="faint">{port.name === 'Plymouth' ? 'Plymouth prices.' : 'half as dear again as at Plymouth.'} buying food here is fresh food, against the scurvy.</p>
+              <ul class="plain shop">
+                {#each Object.entries(CHANDLER) as [key, c] (key)}
+                  {@const ware = key as Ware}
+                  <li>
+                    <button onclick={() => attempt(() => buy(sea!, world!, ware, true))} disabled={world.gold < price(sea, world, ware) || !room(world, ware)}>{c.lot} {c.unit} of {c.name} ({price(sea, world, ware)})</button>
+                    <span class="faint">{ware === 'hands' ? `${world.crew} aboard` : `${world.stores[ware]} aboard`}{room(world, ware) ? '' : ', no room for more'}</span>
+                  </li>
+                {/each}
+              </ul>
+              </details>
               <details class="sub" open><summary><h3>the bar</h3></summary>
               <p class="faint">berths {world.outfit.crew.length} of {SHIP_CLASSES[world.outfit.ship].berths}{world.outfit.crew.length ? ' · let hands go from the ship & crew tab' : ''}</p>
               <ul class="plain shop">
@@ -557,6 +582,7 @@
           <summary><h2>{nodeName(world.player)}</h2></summary>
           <Gauge label="hull" value={world.hull} max={world.maxHull} />
           <Gauge label="morale" value={world.morale} max={MORALE_MAX} />
+          <Stores {sea} {world} set={(w) => (world = w)} />
           {#if world.morale <= 2}<p class="wanted">the crew are close to mutiny. a prize, a round ashore or fresh water would steady them.</p>{:else if world.turn - world.lastSpoils >= IDLE_DAYS}<p class="faint">{world.turn - world.lastSpoils} days since the last prize: the crew are souring.</p>{/if}
           <p>a {SHIP_CLASSES[world.outfit.ship].name}, {world.outfit.crew.length ? world.outfit.crew.map((c) => CREW[c].name).join(', ') : 'no hands of note'}</p>
           {#if wagesOf(world.outfit)}<p class="faint">wages {wagesOf(world.outfit)} every {WAGE_DAYS} days, next on day {(Math.floor(world.turn / WAGE_DAYS) + 1) * WAGE_DAYS + 1}</p>{/if}
@@ -661,10 +687,12 @@
       <div class="overlay">
         <div class="sheet intro">
           <h2>how to play</h2>
-          <p>Plymouth, 1580. Drake is home with a hold full of Spanish silver, and everyone with a ship thinks the same thing: I could do that too. You have a pinnace, 20 gold, and a letter of marque. <strong>Do the three letters the Crown sends you, come home to {HOME}, and the run is won.</strong> The gold you bring home is your score. Sink, and it is over.</p>
+          <p>Plymouth, 1580. Drake is home with a hold full of Spanish silver, and everyone with a ship thinks the same thing: I could do that too. You have a pinnace, twenty hands and {START_GOLD} gold to fit her out with. <strong>Sail Drake's way, or a way of your own, take what Spain leaves lying about, and come home to Plymouth.</strong> The gold you bring home is your score. Lose the ship, or too many of the crew, and it is over.</p>
           <dl>
-            <dt>sailing</dt>
-            <dd>Click the sea to set a course, then set sail. The ship goes a day at a time, and heaves to when a ship comes alongside, when you sight land, or when there is news worth stopping for: a storm, a mutiny, a war.</dd>
+            <dt>the voyage</dt>
+            <dd>The landmarks of the way are on the chart. Choose the next under "the voyage", and where the way divides, which way; set sail and the ship sails the lanes a day at a time, heaving to when a ship comes alongside, when you raise land, or when there is news worth stopping for. You can turn aside for a port or a prize, and turn for home whenever you like.</dd>
+            <dt>stores</dt>
+            <dd>Every day at sea the hands eat and drink a ration each, water faster in the tropics. Short rations stretch both, at the crew's temper. Six weeks without fresh food and the scurvy starts to kill. Water, forage and careen at the landmarks with a shore; buy at a chandler where they'll deal with you. Spares take a storm's damage before the hull. Pace: easy spares the ship and crew, cracking on gains a day in three.</dd>
             <dt>letters</dt>
             <dd>Each letter names a nation, a region, a task and a deadline: two prizes near home, then a town to sack farther out, then a Spanish plate ship, named, with word of where she is. The region is drawn on the chart. The letter's nation is fair game while it lasts, at war or not. Miss a deadline and the Admiralty grants more time once; miss it again and the letter is revoked, and you are a pirate.</dd>
             <dt>rumors</dt>

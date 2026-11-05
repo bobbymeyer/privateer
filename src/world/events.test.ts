@@ -9,11 +9,12 @@ import { MONSTER_RANGE, moveShip } from './ships.ts';
 import { SEA_NAMES } from './seas.ts';
 import { advance, createSea, createWorld, type WorldState } from './world.ts';
 import { legalActions } from '../rules.ts';
+import { victualled } from './testing.ts';
 
 const sea = createSea();
 const { map } = sea;
 const at = (name: string) => portNamed(map, name);
-const quiet = (w: WorldState): WorldState => ({ ...w, ships: [], trail: [] });
+const quiet = (w: WorldState): WorldState => victualled({ ...w, ships: [], trail: [] });
 /** Open water in the middle of the Atlantic, nobody's and nowhere near a port. */
 const midAtlantic = () => map.nodes.filter((n) => n.kind === 'ocean' && Math.abs(n.lon + 35) < 3 && Math.abs(n.lat - 25) < 3)[0].id;
 

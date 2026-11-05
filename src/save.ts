@@ -9,9 +9,10 @@
  * rather than loaded half-understood.
  */
 
+import { SHIP_CLASSES } from './outfit.ts';
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 /** From each version to the next. A run from before a feature simply goes without it. */
 const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<string, unknown>> = {
@@ -32,6 +33,11 @@ const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<stri
   // 9: the chain of cards in order. A fight in progress starts with none.
   // 10: the voyage. A run from before it starts at Plymouth, whatever it has done.
   9: (w) => ({ ...w, voyage: { at: 'plymouth', bound: null, visited: ['plymouth'] } }),
+  // 10 → 11: stores and survival. An old run is given a full ship and full holds.
+  10: (w) => {
+    const c = SHIP_CLASSES[(w.outfit as { ship?: string })?.ship ?? 'pinnace']?.complement ?? 30;
+    return { ...w, crew: c, stores: { food: c * 180, water: c * 90, spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) }, fresh: 0, rations: 'full', pace: 'steady' };
+  },
   8: (w) => {
     const m = w.encounter as { fight: Record<string, unknown> } | null;
     return m ? { ...w, encounter: { ...m, fight: { chain: { last: null, links: 0 }, ...m.fight } } } : w;

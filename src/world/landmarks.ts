@@ -28,12 +28,12 @@ export const LANDMARKS: Landmark[] = [
     text: 'Drake came in here in September, the Golden Hind low in the water with Spanish silver. Fit out, and follow him.',
   },
   {
-    key: 'canaries', name: 'the Canaries', kind: 'sea', at: [-15.8, 28.6], next: ['cape-verde'],
-    text: 'Spanish islands, and the last of Europe. Fishing boats to take for their fish, or to leave be.',
+    key: 'canaries', name: 'the Canaries', kind: 'anchorage', at: [-15.8, 28.6], next: ['cape-verde'],
+    text: 'Spanish islands, and the last of Europe. Water and fruit in a quiet bay away from the towns; fishing boats to take for their fish, or to leave be.',
   },
   {
-    key: 'cape-verde', name: 'the Cape Verde islands', kind: 'sea', at: [-23.4, 15.4], next: ['brazil'],
-    text: 'Portuguese, and so the King of Spain’s since this year. Drake took a Portuguese ship here, and her pilot, who knew the coast of Brazil.',
+    key: 'cape-verde', name: 'the Cape Verde islands', kind: 'anchorage', at: [-23.4, 15.4], next: ['brazil'],
+    text: 'Portuguese, and so the King of Spain’s since this year. Drake took a Portuguese ship here, and her pilot, who knew the coast of Brazil, and watered at Brava before the long crossing.',
   },
   {
     key: 'brazil', name: 'the coast of Brazil', kind: 'anchorage', at: [-48.5, -27.5], next: ['plate'],

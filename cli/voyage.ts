@@ -23,13 +23,14 @@ import { attack, fight, letPass, onGuard, raid, raidable, repair, REPAIR_COST } 
 import { isEnemy } from '../src/world/wars.ts';
 import { choices, choose as decide } from '../src/world/dilemmas.ts';
 import { inRegion, reprisal } from '../src/world/letters.ts';
-import { choices as choicesOf, howHome, makeFor } from '../src/world/journey.ts';
+import { choices as choicesOf, daysTo, howHome, makeFor } from '../src/world/journey.ts';
 import { landmark as landmarkOf } from '../src/world/landmarks.ts';
 import { buyShip, isHaven, leavePrize, retire, PROVISION_COST, provision, provisions, recruit, serves, takePrize } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
 import { advance, createSea, createWorld, GOAL, homeward, HOME, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
+import { ashore, buy, daysOf, price, room, shore, type Ware } from '../src/world/stores.ts';
 
 const arg = (name: string, fallback: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -53,6 +54,11 @@ function inPort(w: WorldState): WorldState {
   if (provisions(sea, w) && w.gold >= PROVISION_COST && (w.morale <= 7 || w.hull < w.maxHull)) w = provision(sea, w);
   if (!serves(sea, w)) return w;
   if (w.hull < w.maxHull && w.gold >= REPAIR_COST) w = repair(sea, w);
+  // The chandler first: water, food, hands, spares, powder, while there's room and money.
+  for (const ware of ['water', 'food', 'hands', 'spares', 'powder'] as Ware[]) {
+    const keep = ware === 'water' || ware === 'food' ? 0 : 10;
+    for (let i = 0; i < 40 && room(w, ware) && w.gold - price(sea, w, ware) >= keep; i++) w = buy(sea, w, ware, true);
+  }
   for (let i = 0; i < 2 && w.gold >= ROUND_COST + 10; i++) w = buyRound(sea, w).world;
   const reserve = 15;
   for (const cls of ['frigate', 'brigantine', 'sloop']) {
@@ -205,6 +211,9 @@ let mutinies = 0;
 let storms = 0;
 let omens = 0;
 const hullIn: Record<string, string[]> = {};
+const lostTo: Record<string, number> = {};
+const dead: number[] = [];
+const of: Record<string, number> = {};
 for (let seed = FROM; seed < FROM + RUNS; seed++) {
   let w = createWorld(sea, seed);
   let dest: NodeId | null = null;
@@ -222,6 +231,23 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
       } else w = inPort(w);
       if (w.sunk || w.won) break;
     }
+    // On a shore: water when it's low, forage when the scurvy's coming, careen when she's foul.
+    // Rations by the leg ahead: short when the food or water won't see it out with a margin.
+    if (w.voyage.bound) {
+      const need = daysTo(sea, w, w.voyage.bound) + 15;
+      const full = daysOf({ ...w, rations: 'full' });
+      const short = daysOf({ ...w, rations: 'short' });
+      const rations = Math.min(full.food, full.water) >= need ? 'full' : Math.min(short.food, short.water) >= need ? 'short' : 'starving';
+      if (rations !== w.rations) w = { ...w, rations };
+    }
+    const free = (x: WorldState) => !x.encounter && !x.hail && !x.dilemma && !x.spoil && !x.sunk && !x.won;
+    if (free(w) && shore(sea, w).water && daysOf(w).water < 40) w = answer(ashore(sea, w, 'water', advance));
+    if (free(w) && shore(sea, w).forage && w.fresh > 20) w = answer(ashore(sea, w, 'forage', advance));
+    if (free(w) && shore(sea, w).careen && w.hull < w.maxHull - 2) w = answer(ashore(sea, w, 'careen', advance));
+    if (w.sunk || w.won) break;
+    if (w.hail) w = letPass(w);
+    if (w.encounter) w = fightItOut(w);
+    if (w.sunk || w.won) break;
     // At a landmark with no leg chosen: choose one, a fork at random, never turning back.
     if (!w.voyage.bound) {
       const legs = choicesOf(w.voyage).filter((k) => k !== 'plymouth-home' || landmarkOf(w.voyage.at).next.includes('plymouth-home'));
@@ -247,6 +273,12 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
       dest = null;
     }
   }
+  if (w.sunk) {
+    const why = w.log.at(-1)?.text.includes('too few hands') ? 'too few hands' : 'in a fight';
+    lostTo[why] = (lostTo[why] ?? 0) + 1;
+  }
+  for (const l of w.log) for (const k of ['scurvy', 'thirst', 'hunger']) if (/ dead of /.test(l.text) && l.text.includes(k)) of[k] = (of[k] ?? 0) + (Number(l.text.split(' ')[0]) || 1);
+  dead.push(w.log.filter((l) => / dead of /.test(l.text)).reduce((t, l) => t + (Number(l.text.split(' ')[0]) || 1), 0));
   mutinies += w.log.filter((l) => l.text.startsWith('mutiny')).length;
   storms += w.log.filter((l) => l.text.startsWith('a storm')).length;
   omens += w.log.filter((l) => l.text.startsWith('a good omen')).length;
@@ -270,4 +302,5 @@ console.log(`raids ${(raids / RUNS).toFixed(1)} a run`);
 console.log(`mutinies ${(mutinies / RUNS).toFixed(1)}, storms ${(storms / RUNS).toFixed(1)}, omens ${(omens / RUNS).toFixed(1)} a run`);
 console.log('letters done', results.reduce((t, r) => ((t[r.acts] = (t[r.acts] ?? 0) + 1), t), {} as Record<number, number>), '· endings', results.reduce((t, r) => ((t[r.ending || 'none'] = (t[r.ending || 'none'] ?? 0) + 1), t), {} as Record<string, number>));
 console.log(`gold at a win ${Math.round(mean(won.map((r) => r.gold)))}`);
+console.log('lost', lostTo, `· hands dead of want ${mean(dead).toFixed(1)} a run`, of);
 console.log('voyages', hows, '· last landmark raised', reached);

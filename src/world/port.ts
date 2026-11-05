@@ -13,6 +13,8 @@ import { MORALE_MAX } from './events.ts';
 import { ACTS, describeLetter, intelligence, issue } from './letters.ts';
 import type { Roller } from './random.ts';
 
+import { type Stores, capacity } from './stores.ts';
+
 /** Gold per point of standing raised, times how far below zero you are. */
 export const BRIBE_COST = 10;
 
@@ -62,8 +64,12 @@ export function provision(sea: Sea, s: WorldState): WorldState {
   if (wantedBy(s.standing, 'native')) throw new Error(`the ${port.name} islanders won't trade with you`);
   if (s.rounds > 0) throw new Error("you've traded here today");
   const paid = pay(s, PROVISION_COST);
+  const cap = capacity(s);
   return {
     ...paid,
+    // Casks filled, and fresh food: three weeks of it, against the scurvy.
+    stores: { ...s.stores, water: cap.water, food: Math.min(cap.food, s.stores.food + s.crew * 21) },
+    fresh: 0,
     rounds: s.rounds + 1,
     morale: Math.min(MORALE_MAX, s.morale + PROVISION_CHEER),
     hull: Math.min(s.maxHull, s.hull + PROVISION_HULL),
@@ -135,7 +141,11 @@ export function buyShip(sea: Sea, s: WorldState, cls: string): WorldState {
   if (!c) throw new Error(`no such ship: ${cls}`);
   if (cls === s.outfit.ship) throw new Error(`you already sail a ${c.name}`);
   if (s.outfit.crew.length > c.berths) throw new Error(`a ${c.name} has berths for ${c.berths}`);
-  return refit(pay(s, c.cost), { ...s.outfit, ship: cls, upgrades: [] }, true);
+  const w = refit(pay(s, c.cost), { ...s.outfit, ship: cls, upgrades: [] }, true);
+  // A smaller ship carries fewer: the rest are paid off and sold here.
+  const cap = capacity(w);
+  const fit = (k: keyof Stores) => Math.min(w.stores[k], cap[k]);
+  return { ...w, crew: Math.min(w.crew, c.complement), stores: { food: fit('food'), water: fit('water'), spares: fit('spares'), powder: fit('powder') } };
 }
 
 /** Fit an upgrade to the ship you have. */

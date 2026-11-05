@@ -23,6 +23,7 @@ import { type Letter, intelligence, issue, letterDay } from './letters.ts';
 import { type FightRecord, NO_TALLY, type Tally } from './record.ts';
 import { START_VOYAGE, type Voyage, raise } from './journey.ts';
 import { HOME_LANDMARK } from './landmarks.ts';
+import { type Pace, type Rations, START_CREW, START_STORES, type Stores } from './stores.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -95,6 +96,14 @@ export interface WorldState {
   lastFight: FightRecord | null;
   /** The voyage: the landmark you last raised, the one you're bound for, and every one raised. */
   voyage: Voyage;
+  /** Hands aboard, not counting the hands of note. Too few and she can't be sailed. */
+  crew: number;
+  /** Provisions and water in rations, spares in bundles, powder in barrels. See stores.ts. */
+  stores: Stores;
+  /** Days since fresh food: past six weeks, the scurvy kills. */
+  fresh: number;
+  rations: Rations;
+  pace: Pace;
   /** Towns that turned out a raid short of a sack, on `since`: on their guard till `until`, shut to raiding till `shutUntil`, `level` steps on it, with `cargo` left in the treasury then. */
   guarded: Record<NodeId, { since: number; until: number; shutUntil: number; level: number; cargo: number }>;
   /** An event waiting on your choice: a storm, the crew's shares, a castaway. While there is one, the world waits. */
@@ -144,7 +153,7 @@ export const homeward = (s: WorldState) => !s.pirate && s.voyage.bound === HOME_
 
 /** Days of each ship's wake that are remembered. */
 export const TRAIL = 12;
-export const START_GOLD = 20;
+export const START_GOLD = 80;
 /** The score you need home in London to win. */
 export const GOAL = 150;
 export const HOME = 'London';
@@ -285,6 +294,11 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     tally: NO_TALLY,
     lastFight: null,
     voyage: START_VOYAGE,
+    crew: START_CREW,
+    stores: START_STORES,
+    fresh: 0,
+    rations: 'full',
+    pace: 'steady',
   };
   const r1: Roller = { rng: world.rng };
   const letter = issue(sea, world, 1, r1);
@@ -388,6 +402,7 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
     next = { ...next, rng: r2.rng, ...(d ? { dilemma: d } : {}) };
   }
   next = aDay(sea, next);
+  if (next.sunk) return next;
   // Homeward bound with the score, and word gets out.
   if (homeward(next) && !next.homewardNoised) {
     next = { ...next, homewardNoised: true, log: [...next.log, { turn, text: `word is out that you're homeward bound with ${next.gold}: every enemy privateer is putting to sea for you`, stop: true }] };

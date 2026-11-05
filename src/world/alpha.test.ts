@@ -8,12 +8,13 @@ import { bribe, bribeCost, buyShip, buyUpgrade, dismiss, recruit, serves } from 
 import { ISLANDS, CHARTING_BOUNTY, GOAL, STANDING_DECAY, type WorldState, advance, atIsland, createSea, createWorld } from './world.ts';
 import { buyRound } from './bar.ts';
 import { repair } from './meet.ts';
+import { victualled } from './testing.ts';
 
 const sea = createSea();
 const { map } = sea;
 const at = (name: string) => portNamed(map, name);
 /** An empty sea, so nothing comes alongside. */
-const quiet = (w: WorldState): WorldState => ({ ...w, ships: [], trail: [] });
+const quiet = (w: WorldState): WorldState => victualled({ ...w, ships: [], trail: [] });
 const rich = (w: WorldState, gold = 500): WorldState => ({ ...w, gold });
 
 test('your deck is your ship, its refits and your crew', () => {

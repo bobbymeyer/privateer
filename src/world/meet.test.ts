@@ -7,6 +7,7 @@ import { PARTED_DAYS, PIRACY_FLOOR, REFIT_DAYS, REPAIR_COST, attack, fight, letP
 import { PARDON_COST, buyPardon, bribe, serves } from './port.ts';
 import { GOAL, STANDING_DECAY } from './world.ts';
 import { advance, createSea, createWorld, type WorldState } from './world.ts';
+import { victualled } from './testing.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -128,7 +129,7 @@ test('fire on an English ship and you are a pirate', () => {
 test('a pirate: English ports shut, no grudge fades, no bribe works, and London is the gallows — until a pardon', () => {
   const plymouth = createWorld(sea, 1).player;
   // Letters all done, so London would be a win but for the noose.
-  let w: WorldState = { ...createWorld(sea, 1), ships: [], trail: [], pirate: true, standing: { england: -3 }, gold: GOAL + PARDON_COST + 50, letter: null, acts: 3, commission: 'done' };
+  let w: WorldState = { ...victualled(createWorld(sea, 1)), ships: [], trail: [], pirate: true, standing: { england: -3 }, gold: GOAL + PARDON_COST + 50, letter: null, acts: 3, commission: 'done' };
   assert.equal(serves(sea, w), false);
   assert.throws(() => bribe(sea, w), /pardon/);
   // Two months in port: the crew will ask for their shares, and be refused, for this.
