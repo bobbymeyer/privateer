@@ -49,3 +49,14 @@ test('a save from before renown and the home stretch is brought up to date, and 
   assert.equal(back.world.homewardNoised, false);
   advance(sea, back.world, sea.map.adj[back.world.player][0]);
 });
+
+test('a fight saved before the chain picks up with none', () => {
+  const w = createWorld(sea, 4);
+  const fighting = raid(sea, { ...w, player: portNamed(sea.map, 'Havana') });
+  const { chain: _c, ...oldFight } = fighting.encounter!.fight;
+  const v8 = encode(4, { ...fighting, encounter: { ...fighting.encounter!, fight: oldFight as NonNullable<typeof fighting.encounter>["fight"] } }).replace(`"version":${SAVE_VERSION}`, '"version":8');
+  const back = decode(v8)!;
+  assert.deepEqual(back.world.encounter!.fight.chain, { last: null, links: 0 });
+  const a = legalActions(back.world.encounter!.fight)[0];
+  fight(sea, back.world, a);
+});

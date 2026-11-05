@@ -261,7 +261,7 @@
     if (!sea || !world?.encounter || !shown) return;
     const before = shown.events.length;
     const next = act(shown, a);
-    lastRound = next.events.slice(before).filter((e) => e.type === 'played' || e.type === 'effect' || e.type === 'rejected' || e.type === 'range');
+    lastRound = next.events.slice(before).filter((e) => e.type === 'played' || e.type === 'effect' || e.type === 'rejected' || e.type === 'range' || e.type === 'chain');
     world = fight(sea, world, a);
     shown = next;
     if (next.outcome) reckoning = world.reckoning;

@@ -22,7 +22,7 @@
  *   the range till they're dealt with.
  */
 
-import { type Card, type Effect, type Reach, REACHES, type Side, type Wound, woundCard } from './cards.ts';
+import { type Card, type CardType, CHAIN_ORDER, type Effect, type Reach, REACHES, type Side, type Wound, cardType, woundCard } from './cards.ts';
 import { type RngState, shuffle } from './rng.ts';
 
 export const HAND_SIZE = 3;
@@ -88,10 +88,42 @@ export type GameEvent =
   | { type: 'effect'; round: number; card: Card; effect: Effect; applied: number; note?: EffectNote }
   | { type: 'rejected'; round: number; card: Card }
   | { type: 'range'; round: number; range: Range }
+  | { type: 'chain'; round: number; card: Card; links: number }
   | { type: 'ended'; round: number; outcome: Outcome; payout: number };
+
+/**
+ * The chain: your last card's type, and how many links in order it made.
+ * A card of the next type in CHAIN_ORDER gets a link more, and every one of
+ * its hits, plunder, repairs and brace that much more. Hands' work doesn't
+ * break it or add to it; anything else out of order starts it again; a
+ * board card at the end of a full chain closes it.
+ */
+export interface Chain {
+  last: CardType | null;
+  links: number;
+}
+export const NO_CHAIN: Chain = { last: null, links: 0 };
+/** The effects a link adds to: never bearing away or closing, which would jump the range. */
+const SCALES: Effect['kind'][] = ['hit', 'plunder', 'repair', 'brace'];
+
+/** The links a card of `type` would make, played now. */
+export function linksFor(chain: Chain, type: CardType): number {
+  if (type === 'hands') return 0;
+  const i = CHAIN_ORDER.indexOf(type);
+  return chain.last && CHAIN_ORDER.indexOf(chain.last) === i - 1 ? chain.links + 1 : 0;
+}
+
+/** The chain after a card of `type` is played. */
+export function chained(chain: Chain, type: CardType): Chain {
+  if (type === 'hands') return chain;
+  const links = linksFor(chain, type);
+  return type === CHAIN_ORDER.at(-1) && links ? NO_CHAIN : { last: type, links };
+}
 
 export interface EncounterState {
   rng: RngState;
+  /** Your chain of cards in order: see `Chain`. */
+  chain: Chain;
   /** Your deck. Index 0 is the top. */
   deck: Card[];
   hand: Card[];
@@ -150,6 +182,7 @@ export function createEncounter(setup: EncounterSetup): EncounterState {
   const [herDeck, rng] = shuffle(setup.targetCards, rng1);
   const state: EncounterState = {
     rng,
+    chain: NO_CHAIN,
     deck,
     hand: [],
     discard: [],
@@ -207,9 +240,19 @@ export function act(state: EncounterState, action: Action): EncounterState {
   s.intent = null;
   for (const card of plays) {
     s.events.push({ type: 'played', round: s.round, card });
+    // Your cards in the order of a boarding action scale; hers don't chain.
+    // A card that does nothing at this range is no link: it breaks the chain.
+    const mine = card.side === 'ship' && !card.damage;
+    const type = cardType(card);
+    const works = card.effects.some((e) => reaches(s, e));
+    const links = mine && works ? linksFor(s.chain, type) : 0;
+    if (mine) {
+      if (links) s.events.push({ type: 'chain', round: s.round, card, links });
+      s.chain = works ? chained(s.chain, type) : type === 'hands' ? s.chain : NO_CHAIN;
+    }
     for (const effect of card.effects) {
       let away: Outcome | null;
-      [s, away] = applyEffect(s, card, effect);
+      [s, away] = applyEffect(s, card, links && SCALES.includes(effect.kind) && 'amount' in effect ? ({ ...effect, amount: effect.amount + links } as Effect) : effect);
       const outcome = away ?? settled(s);
       if (outcome) {
         spend(s, card);

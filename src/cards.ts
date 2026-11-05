@@ -69,6 +69,26 @@ type Bare =
  */
 export type Effect = Bare & { at?: Reach[] };
 
+/**
+ * What kind of work a card is, for the chain: sail (chase, bear away), shot
+ * (the guns), board (grapnels, boarders, the hold), hands (repairs, brace,
+ * recall, a wound dealt with). A boarding action goes sail → shot → board:
+ * close her, fire into her, go across. A card that follows the one before
+ * it in that order scales — see `CHAIN` in rules.ts.
+ */
+export type CardType = 'sail' | 'shot' | 'board' | 'hands';
+export const CHAIN_ORDER: CardType[] = ['sail', 'shot', 'board'];
+
+/** A card's type, from what it does: guns make it shot, grapnels or plunder board, chase or flight sail; anything else is the hands' work. */
+export function cardType(card: { effects: readonly Effect[]; damage?: true }): CardType {
+  if (card.damage) return 'hands';
+  const has = (...k: Effect['kind'][]) => card.effects.some((e) => k.includes(e.kind));
+  if (has('hit')) return 'shot';
+  if (has('plunder', 'hold')) return 'board';
+  if (has('flee', 'chase')) return 'sail';
+  return 'hands';
+}
+
 export interface Card {
   /** Unique within an encounter: `broadside#2`. */
   id: string;

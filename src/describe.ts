@@ -60,6 +60,7 @@ export function describeEvent(e: GameEvent): string | null {
     case 'ended': return `${OUTCOME_TEXT[e.outcome]}. you walk away with ${e.payout}`;
     case 'dealt': return null;
     case 'range': return `the range: ${REACHES[e.range]}`;
+    case 'chain': return `  in order: +${e.links}`;
   }
 }
 
@@ -74,6 +75,7 @@ export const GLOSSARY: { word: string; means: string }[] = [
   { word: 'repair, mend', means: 'hull back: repair is yours, mend is hers' },
   { word: 'jettison', means: 'she throws cargo over the side to lighten ship' },
   { word: 'far, close, grappled', means: 'the range between the ships; most cards work only at some of them. opened past far, a ship is away' },
+  { word: 'sail, shot, board, hands', means: 'a card’s type. play them in the order of a boarding action — sail, then shot, then board — and each that follows the one before scales: +1, then +2, to its hits, plunder, repairs and brace. the chain carries across rounds; hands neither add nor break it' },
   { word: 'flee', means: 'bear away: the range opens a step; from far, that ship is away' },
   { word: 'chase, hold', means: 'the range closes a step: run her down, or grapple her' },
   { word: 'recall', means: 'that many of the side’s spent cards back under the deck' },

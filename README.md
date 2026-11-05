@@ -207,6 +207,24 @@ A fight is two ships, two decks, and the range between them (`src/rules.ts`).
   town mends its barricades and calls its relief. The read of a ship before
   you engage says which.
 
+- **The chain: sail → shot → board.** Every card has a type: *sail*
+  (chase, bear away), *shot* (the guns), *board* (grapnels, boarders, the
+  hold) or *hands* (repairs, brace, recall, a wound dealt with). Played in
+  the order of a boarding action — close her, fire into her, go across —
+  each card that follows the one before scales: shot after sail is +1 to
+  its hits, board after sail-then-shot +2 to its plunder. The chain carries
+  across rounds, her card between doesn't break it, so this round sets up
+  the next. Hands neither add to it nor break it; anything out of order, or
+  a card that does nothing at the range, starts it again; a board card at
+  the end of a full chain closes it. Bearing away and closing never scale,
+  so the chain can't jump the range. Each card shows its type, and as you
+  pick, the ones that would follow in order show what they'd gain.
+
+  It changes the numbers more than anything else in the fight: in order, a
+  pinnace takes a guard ship that came at it half the time (51%, against
+  21% before the chain), and over 30 runs the captain bot wins 8 and is
+  sunk 12 times, against 4 and 19.
+
 Card text is written from the effects (`cardText` in `src/cards.ts`), so a
 card can't say other than it does: *far: hit 1 · close or grappled: hit 3 ·
 close: leak*.
