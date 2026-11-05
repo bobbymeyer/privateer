@@ -15,7 +15,6 @@ test('every ship flies its home port’s flag', () => {
   assert.equal(route('flota'), 'spain');
   assert.equal(route('manila galleon'), 'spain');
   assert.equal(route('carreira'), 'portugal');
-  assert.equal(route('retourvloot'), 'netherlands');
   assert.equal(w.ships.find((s) => s.kind === 'merchant' && s.home === at('Amsterdam'))!.nation, 'netherlands');
 });
 
@@ -26,7 +25,7 @@ test('the guard stations are out where control is weak, not in Europe', () => {
 test('forts make protected waters', () => {
   assert.equal(map.nodes[at('Plymouth')].waters, 'england');
   assert.equal(map.nodes[at('Havana')].waters, 'spain');
-  assert.equal(map.nodes[at('Willemstad')].waters, 'netherlands');
+  assert.equal(map.nodes[at('Goa')].waters, 'portugal');
   const midAtlantic = map.nodes.reduce((best, n) => (Math.hypot(n.lon + 40, n.lat - 30) < Math.hypot(best.lon + 40, best.lat - 30) ? n : best));
   assert.equal(midAtlantic.waters, null);
 });
@@ -55,8 +54,8 @@ test('guard ships leave you be until you’ve attacked their nation', () => {
 test('a guard ship never enters another nation’s waters — so they are a refuge', () => {
   const w = createWorld(sea, 1);
   const havana = w.ships.find((s) => s.kind === 'hunter' && s.home === at('Havana'))!;
-  // Wanted by Spain, but lying under Port Royal's guns.
-  assert.equal(hunterGoal(map, havana, at('Port Royal'), { spain: -3 }), havana.home);
+  // Wanted by Spain, but lying in French waters off Brest.
+  assert.equal(hunterGoal(map, havana, at('Brest'), { spain: -3 }), havana.home);
   assert.equal(hunterGoal(map, havana, at('Santiago de Cuba'), { spain: -3 }), at('Santiago de Cuba'));
 });
 

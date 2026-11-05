@@ -628,7 +628,7 @@
       <div class="overlay">
         <div class="sheet intro">
           <h2>how to play</h2>
-          <p>It is 16XX. You are a privateer out of Plymouth with a pinnace and 20 gold, and a letter of marque. <strong>Do the three letters the Crown sends you, come home to {HOME}, and the run is won.</strong> The gold you bring home is your score. Sink, and it is over.</p>
+          <p>Plymouth, 1580. Drake is home with a hold full of Spanish silver, and everyone with a ship thinks the same thing: I could do that too. You have a pinnace, 20 gold, and a letter of marque. <strong>Do the three letters the Crown sends you, come home to {HOME}, and the run is won.</strong> The gold you bring home is your score. Sink, and it is over.</p>
           <dl>
             <dt>sailing</dt>
             <dd>Click the sea to set a course, then set sail. The ship goes a day at a time, and heaves to when a ship comes alongside, when you sight land, or when there is news worth stopping for: a storm, a mutiny, a war.</dd>
@@ -637,7 +637,7 @@
             <dt>rumors</dt>
             <dd>Buy rounds in a port's bar and somebody may have seen a ship. Rumors show as rings that fade; pick one to see where her ship could be by now. The more of the current and wind you have seen, the tighter the guess.</dd>
             <dt>fair game</dt>
-            <dd>England's enemies, listed under "at war", are fair game, and the Crown thinks the better of you for taking them. Anyone else's ships, the Crown hears of, and enough of that starts a war. Fire on an English ship and you are a pirate: London will hang you, but Port Royal and the Barbary coast will let you retire there, rich.</dd>
+            <dd>England's enemies, listed under "at war", are fair game, and the Crown thinks the better of you for taking them. Anyone else's ships, the Crown hears of, and enough of that starts a war. Fire on an English ship and you are a pirate: London will hang you, but Baltimore and the Barbary coast will let you retire there, rich.</dd>
             <dt>fighting</dt>
             <dd>A fight is cards, yours and hers in one deck. Each round three are dealt: keep two, which play in the order you pick them; the third goes to the bottom. A hull at nothing is sunk; three way and a ship is away. Hover a card, or open "what the cards say", for what its words mean.</dd>
             <dt>in port</dt>

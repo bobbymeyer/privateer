@@ -136,7 +136,7 @@ test('a monster keeps each sea, attacks whoever it meets, and wanders with the c
 test('under sail, a storm or a mutiny brings you to; a fair day does not', async () => {
   const { sailToward } = await import('./course.ts');
   const { choices, choose } = await import('./dilemmas.ts');
-  const far = at('Cape Town');
+  const far = at('Table Bay');
   let halts = 0;
   for (let seed = 0; seed < 6 && halts < 2; seed++) {
     let w = quiet({ ...createWorld(sea, seed), player: at('Plymouth') });

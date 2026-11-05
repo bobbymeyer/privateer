@@ -86,7 +86,7 @@ function choose(w: WorldState): NodeId {
     if (away.length) return away[0];
   }
   if (homeward(w)) return london;
-  if (w.pirate && w.gold >= GOAL) return portNamed(map, 'Port Royal');
+  if (w.pirate && w.gold >= GOAL) return portNamed(map, 'Baltimore');
   if (w.hull < w.maxHull * 0.6) {
     const near = harbours.filter((p) => p !== w.player && serves(sea, { ...w, player: p })).sort((a, b) => d[a] - d[b]);
     return near[0];

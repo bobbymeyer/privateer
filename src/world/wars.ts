@@ -18,13 +18,12 @@ export type War = [Nation, Nation];
 
 /** The other powers' wars, as a run opens. */
 export const STANDING_WARS: War[] = [
+  // The Dutch Revolt, against the one crown of Spain and Portugal.
   ['spain', 'netherlands'],
-  ['spain', 'france'],
   ['portugal', 'netherlands'],
-  ['ottoman', 'venice'],
   ['ottoman', 'malta'],
   ['barbary', 'spain'],
-  ['barbary', 'france'],
+  ['barbary', 'portugal'],
   ['barbary', 'netherlands'],
   ['barbary', 'venice'],
   ['barbary', 'malta'],
@@ -60,10 +59,16 @@ export function makePeace(wars: War[], a: Nation, b: Nation): War[] {
 }
 
 /** How a run's wars open: the standing ones, the corsairs, and England against one of the great powers. */
+/**
+ * 1580: Spain and Portugal one crown, and England's enemies both, at sea if
+ * not yet by declaration; the corsairs everyone's. `r` is kept for the
+ * signature: the opening is history now, not a roll.
+ */
 export function openingWars(r: Roller): War[] {
+  void r;
   let wars = [...STANDING_WARS];
-  for (const c of CORSAIRS) wars = declare(wars, YOUR_NATION, c);
-  return declare(wars, YOUR_NATION, pick(r, ENGLAND_OPENS_AGAINST));
+  for (const c of [...CORSAIRS, 'spain', 'portugal'] as Nation[]) wars = declare(wars, YOUR_NATION, c);
+  return wars;
 }
 
 /** A season of diplomacy: every pair of powers may make peace, or fall out. Returns the new table and what was heard of it. */

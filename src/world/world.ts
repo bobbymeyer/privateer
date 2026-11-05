@@ -171,15 +171,15 @@ export const knowledge = (s: WorldState): SeaKnowledge => chartKnowledge(s.chart
  * Where the powers keep guard ships that will come after you. Out where
  * control is weak — not in Europe, whose home waters their navies keep.
  */
-export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Goa', 'Batavia', 'Manila', 'Algiers', 'Port Royal', 'Bridgetown'];
+export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Panama', 'Goa', 'Malacca', 'Manila', 'Mozambique', 'Algiers'];
 
 /**
- * Where enemy privateers fit out: Dunkirkers, Saint-Malo and Tortuga
- * corsairs, Dutch capers, Salé rovers, Algerines, Spanish privateers out of
- * Havana and Cartagena. They come for you whenever their nation is at war
+ * Where enemy privateers fit out: Dunkirkers, Saint-Malo and La Rochelle
+ * corsairs, Dutch Sea Beggars, Salé rovers, Algerines, Portuguese and
+ * Spanish privateers out of Lisbon, Havana and Cartagena. They come for you whenever their nation is at war
  * with England.
  */
-export const PRIVATEER_PORTS = ['Dunkirk', 'Saint-Malo', 'Tortuga', 'Amsterdam', 'Willemstad', 'Salé', 'Algiers', 'Havana', 'Cartagena'];
+export const PRIVATEER_PORTS = ['Dunkirk', 'Saint-Malo', 'La Rochelle', 'Amsterdam', 'Salé', 'Algiers', 'Lisbon', 'Havana', 'Cartagena'];
 
 /** A merchant out of every port, a guard ship at every station, and the great courses. */
 export const DEFAULT_FLEET: FleetEntry[] = [
@@ -192,7 +192,6 @@ export const DEFAULT_FLEET: FleetEntry[] = [
   { kind: 'treasure-fleet', route: 'south sea fleet' },
   { kind: 'treasure-ship', route: 'manila galleon' },
   { kind: 'treasure-ship', route: 'carreira' },
-  { kind: 'treasure-ship', route: 'retourvloot' },
   { kind: 'armada', route: 'barlovento' },
   { kind: 'armada', route: 'mar océano' },
   ...SEA_NAMES.map((sea): FleetEntry => ({ kind: 'monster', at: sea.at, sea: sea.name })),

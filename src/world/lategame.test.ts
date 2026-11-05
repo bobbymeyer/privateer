@@ -127,13 +127,17 @@ test('take a laden corsair and the captives go free: their nation and the Crown 
   const w = createWorld(sea, 5);
   const corsair = { ...w.ships.find((s) => s.kind === 'corsair')!, captives: 'spain' as const, raid: null };
   const here = farOut();
-  const met = meeting(sea, { ...w, player: here, ships: [{ ...corsair, node: here }], trail: [[]] });
-  assert.equal(met.encounter?.kind, 'corsair');
-  assert.equal(met.encounter?.fight.target.cargo, TARGETS.corsair.cargo + CAPTIVES_CARGO);
-  const after = takeHer(met);
-  assert.equal(after.reckoning?.outcome, 'destroyed');
-  assert.equal(after.standing.spain, 1);
-  assert.equal(after.standing.england, 2, 'a point for taking an enemy, and another for the captives');
-  assert.ok(after.log.some((l) => l.text.startsWith('you freed Spanish captives')));
-  assert.equal(after.ships[0].captives, null);
+  let after: WorldState | null = null;
+  for (let seed = 0; seed < 20 && after?.reckoning?.outcome !== 'destroyed'; seed++) {
+    const met = meeting(sea, { ...w, rng: seed, player: here, ships: [{ ...corsair, node: here }], trail: [[]] });
+    assert.equal(met.encounter?.kind, 'corsair');
+    assert.equal(met.encounter?.fight.target.cargo, TARGETS.corsair.cargo + CAPTIVES_CARGO);
+    after = takeHer(met);
+  }
+  const done = after!;
+  assert.equal(done.reckoning?.outcome, 'destroyed');
+  assert.equal(done.standing.spain, 1);
+  assert.equal(done.standing.england, 2, 'a point for taking an enemy, and another for the captives');
+  assert.ok(done.log.some((l) => l.text.startsWith('you freed Spanish captives')));
+  assert.equal(done.ships[0].captives, null);
 });

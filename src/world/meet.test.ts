@@ -42,7 +42,7 @@ test('let her pass, and she goes her way', () => {
   assert.equal(passed.hail, null);
   assert.equal(passed.parted[fleet.id], passed.turn + PARTED_DAYS);
   assert.equal(passed.standing.spain, undefined, 'nobody minds');
-  assert.equal(advance(sea, passed, passed.player).hail, null);
+  assert.notEqual(advance(sea, passed, passed.player).hail?.shipId, fleet.id, 'she won’t come alongside again');
 });
 
 test('attack her, and her nation remembers whatever comes of it', () => {
