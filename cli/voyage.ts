@@ -23,6 +23,8 @@ import { attack, fight, letPass, onGuard, raid, raidable, repair, REPAIR_COST } 
 import { isEnemy } from '../src/world/wars.ts';
 import { choices, choose as decide } from '../src/world/dilemmas.ts';
 import { inRegion, reprisal } from '../src/world/letters.ts';
+import { choices as choicesOf, howHome, makeFor } from '../src/world/journey.ts';
+import { landmark as landmarkOf } from '../src/world/landmarks.ts';
 import { buyShip, isHaven, leavePrize, retire, PROVISION_COST, provision, provisions, recruit, serves, takePrize } from '../src/world/port.ts';
 import { markerStrength, predict } from '../src/world/rumors.ts';
 import { type ShipKind, wantedBy } from '../src/world/ships.ts';
@@ -91,7 +93,19 @@ function choose(w: WorldState): NodeId {
     const near = harbours.filter((p) => p !== w.player && serves(sea, { ...w, player: p })).sort((a, b) => d[a] - d[b]);
     return near[0];
   }
-  // The letter first.
+  // The voyage: a prize close by is worth turning aside for; otherwise the next landmark.
+  let prize: { node: NodeId; value: number } | null = null;
+  for (const r of w.rumors) {
+    if (!isEnemy(w.wars, r.nation)) continue;
+    const value = WORTH[r.kind] * markerStrength(r, w.turn);
+    if (value <= 0.5 || (prize && value <= prize.value)) continue;
+    const p = predict(sea, r, w.turn, knowledge(w), w.player, pursuitOf(w, sea));
+    const node = p.indexOf(Math.max(...p));
+    if (d[node] <= 8) prize = { node, value };
+  }
+  if (prize) return prize.node;
+  if (w.voyage.bound) return map.landmarks[w.voyage.bound];
+  // The letter, if the voyage has nowhere to go (it always has: this is the old sandbox's fallback).
   const l = w.letter;
   if (l) {
     if (l.task.kind === 'take') {
@@ -184,6 +198,8 @@ const met: Record<string, number> = {};
 const ends: Record<string, number> = {};
 const killedBy: Record<string, number> = {};
 let passed = 0;
+const hows: Record<string, number> = {};
+const reached: Record<string, number> = {};
 let raids = 0;
 let mutinies = 0;
 let storms = 0;
@@ -205,6 +221,11 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
         raids++;
       } else w = inPort(w);
       if (w.sunk || w.won) break;
+    }
+    // At a landmark with no leg chosen: choose one, a fork at random, never turning back.
+    if (!w.voyage.bound) {
+      const legs = choicesOf(w.voyage).filter((k) => k !== 'plymouth-home' || landmarkOf(w.voyage.at).next.includes('plymouth-home'));
+      if (legs.length) w = makeFor(w, legs[(seed + w.turn) % legs.length]);
     }
     if (dest === null || since > 10 || w.player === dest || danger(w) !== null) ((dest = choose(w)), (since = 0));
     if (dest === w.player) dest = harbours[(seed + w.turn) % harbours.length];
@@ -229,6 +250,8 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
   mutinies += w.log.filter((l) => l.text.startsWith('mutiny')).length;
   storms += w.log.filter((l) => l.text.startsWith('a storm')).length;
   omens += w.log.filter((l) => l.text.startsWith('a good omen')).length;
+  hows[w.won ? howHome(w.voyage) : w.sunk ? 'sunk' : 'adrift'] = (hows[w.won ? howHome(w.voyage) : w.sunk ? 'sunk' : 'adrift'] ?? 0) + 1;
+  reached[w.voyage.at] = (reached[w.voyage.at] ?? 0) + 1;
   results.push({ won: w.won, sunk: w.sunk, day: w.turn, gold: w.gold, fights, ship: w.outfit.ship, acts: w.acts, ending: w.ending ?? (w.commission === 'revoked' ? 'revoked' : '') });
 }
 
@@ -247,3 +270,4 @@ console.log(`raids ${(raids / RUNS).toFixed(1)} a run`);
 console.log(`mutinies ${(mutinies / RUNS).toFixed(1)}, storms ${(storms / RUNS).toFixed(1)}, omens ${(omens / RUNS).toFixed(1)} a run`);
 console.log('letters done', results.reduce((t, r) => ((t[r.acts] = (t[r.acts] ?? 0) + 1), t), {} as Record<number, number>), '· endings', results.reduce((t, r) => ((t[r.ending || 'none'] = (t[r.ending || 'none'] ?? 0) + 1), t), {} as Record<string, number>));
 console.log(`gold at a win ${Math.round(mean(won.map((r) => r.gold)))}`);
+console.log('voyages', hows, '· last landmark raised', reached);

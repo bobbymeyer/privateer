@@ -21,6 +21,8 @@ import { MORALE_START, aDay } from './events.ts';
 import { type Dilemma, castaway } from './dilemmas.ts';
 import { type Letter, intelligence, issue, letterDay } from './letters.ts';
 import { type FightRecord, NO_TALLY, type Tally } from './record.ts';
+import { START_VOYAGE, type Voyage, raise } from './journey.ts';
+import { HOME_LANDMARK } from './landmarks.ts';
 
 export interface WorldState {
   rng: RngState;
@@ -91,6 +93,8 @@ export interface WorldState {
   tally: Tally;
   /** The last fight, told: what the end of a run shows. */
   lastFight: FightRecord | null;
+  /** The voyage: the landmark you last raised, the one you're bound for, and every one raised. */
+  voyage: Voyage;
   /** Towns that turned out a raid short of a sack, on `since`: on their guard till `until`, shut to raiding till `shutUntil`, `level` steps on it, with `cargo` left in the treasury then. */
   guarded: Record<NodeId, { since: number; until: number; shutUntil: number; level: number; cargo: number }>;
   /** An event waiting on your choice: a storm, the crew's shares, a castaway. While there is one, the world waits. */
@@ -135,7 +139,8 @@ export const REACH_PER_RENOWN = 0.25;
 export const HULL_PER_RENOWN = 2;
 export const renown = (s: { fame: number }) => RENOWN.filter((f) => s.fame >= f).length;
 /** Bound for London with the score, and no pirate. */
-export const homeward = (s: WorldState) => !s.pirate && (s.commission === 'done' || (s.commission === 'legacy' && s.gold >= GOAL));
+/** Bound for Plymouth with a fortune, and no noose waiting: word gets out, and the privateers come. */
+export const homeward = (s: WorldState) => !s.pirate && s.voyage.bound === HOME_LANDMARK && s.gold >= GOAL;
 
 /** Days of each ship's wake that are remembered. */
 export const TRAIL = 12;
@@ -279,6 +284,7 @@ export function createWorld(sea: Sea, seed: number, fleet = DEFAULT_FLEET): Worl
     commission: 'active',
     tally: NO_TALLY,
     lastFight: null,
+    voyage: START_VOYAGE,
   };
   const r1: Roller = { rng: world.rng };
   const letter = issue(sea, world, 1, r1);
@@ -388,9 +394,9 @@ export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
   }
   // Home with a score — and no noose waiting.
   next = letterDay(sea, next);
-  if (sea.map.nodes[to].port?.name === HOME && homeward(next)) {
-    return { ...next, won: true, ending: 'home', log: [...log, { turn, text: `home to London with ${gold}: the run is won` }] };
-  }
+  // A landmark raised; Plymouth again ends the run.
+  next = raise(sea, next);
+  if (next.won) return next;
   if (to !== s.player) next = landfall(sea, next);
   return meeting(sea, next);
 }

@@ -59,7 +59,12 @@ function alongside(pick: (s: WorldState['ships'][number]) => boolean, extra: Par
   const ship = w.ships.find(pick)!;
   // Everyone else laid up, so nobody else happens along on the same day.
   w = { ...w, ...extra, ships: w.ships.map((s) => (s.id === ship.id ? { ...s, node: step, dest: step } : { ...s, laidUp: 1e9 })) };
-  return { w: advance(sea, w, step), ship };
+  // A day with no storm in it: a storm that day and there's no meeting.
+  for (let k = 0; k < 20; k++) {
+    const out = advance(sea, { ...w, rng: w.rng + k }, step);
+    if (!out.dilemma) return { w: out, ship };
+  }
+  throw new Error('a storm every day');
 }
 
 test('an enemy warship attacks on sight, before you have done anything', () => {

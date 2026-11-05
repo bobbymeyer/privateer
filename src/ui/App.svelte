@@ -12,6 +12,8 @@
   import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, isHaven, leavePrize, PARDON_COST, takePrize, PROVISION_CHEER, PROVISION_COST, PROVISION_HULL, provision, provisions, recruit, retire, serves } from '../world/port.ts';
   import { IDLE_DAYS, MORALE_MAX } from '../world/events.ts';
   import { inSight, lookout, readShip } from '../world/scout.ts';
+  import { choices as choicesOf, daysTo, makeFor } from '../world/journey.ts';
+  import { LANDMARKS, landmark } from '../world/landmarks.ts';
   import { ACTS, REGIONS, describeLetter, reprisal } from '../world/letters.ts';
   import { choices, choose, describe as describeDilemma } from '../world/dilemmas.ts';
   import CardView from './CardView.svelte';
@@ -213,7 +215,12 @@
       won: 'home',
       sunk: '',
     };
-    if (out.halt === 'arrived') dest = null;
+    if (out.halt === 'arrived') {
+      dest = null;
+      // Raised a landmark: say which, not just that you've arrived.
+      const raised = world.log.at(-1);
+      if (raised && raised.turn === world.turn && raised.text.startsWith('you raise')) return stop(raised.text);
+    }
     if (out.halt === 'news') return stop([...world.log].reverse().find((l) => l.stop)!.text);
     if (out.halt === 'sail') {
       const x = inSight(sea, world).find((y) => y.hostile)!;
@@ -349,6 +356,12 @@
 
   const captivesOf = (id: number) => world?.ships.find((x) => x.id === id)?.captives ?? null;
   const RENOWN_WORDS = ['unknown', 'getting about', 'known in every port', 'a legend'];
+  /** Make for a landmark: bound for it, and the course plotted to it. */
+  function setFor(key: string) {
+    attempt(() => makeFor(world!, key));
+    dest = sea!.map.landmarks[key];
+    halted = '';
+  }
   const ago = (days: number) => (days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days back`);
 
   const nodeName = (id: NodeId) => {
@@ -370,7 +383,7 @@
       <h1>privateer</h1>
       <p class="meta">
         day {world.turn + 1}, {SEASON_NAMES[Math.floor(world.turn / sea.pattern.seasonLength) % 4]} ·
-        {#if world.commission === 'active'}letter {world.letter!.act} of {ACTS}{' · '}{:else if world.commission === 'done'}every letter done: home to {HOME}{' · '}{/if}{world.gold} gold{world.commission === 'legacy' ? ` of ${GOAL} to bring home to ${HOME}` : world.pirate ? `, ${GOAL} to retire on` : ''} · seed {seed}
+        last raised {landmark(world.voyage.at).name}{world.voyage.bound ? `, bound for ${landmark(world.voyage.bound).name}` : ''} · {world.gold} gold{world.pirate ? `, ${GOAL} to retire on` : ''} · seed {seed}
         {#if world.pirate}<span class="wanted"> · a pirate</span>{/if}
         {#if daily}<span> · today's voyage, {daily}</span>{/if}
       </p>
@@ -413,6 +426,8 @@
         </div>
         <div class="tabpanel" role="tabpanel">
           {#if tab === 'location'}
+            {@const here = LANDMARKS.find((l) => sea!.map.landmarks[l.key] === world!.player && l.key !== 'plymouth-home')}
+            {#if here}<p class="landmark"><em>{here.name}.</em> {here.text}</p>{/if}
             {#if port}
             <h2><Flag nation={port.nation} />{port.name}, {adjective(port.nation)}</h2>
             {#if isHaven(sea, world)}
@@ -565,6 +580,24 @@
           {/if}
         </details>
 
+
+        <details class="panel" open>
+          <summary><h2>the voyage</h2></summary>
+          <p>last raised: {landmark(world.voyage.at).name}</p>
+          {#if world.voyage.bound}
+            <p>bound for {landmark(world.voyage.bound).name}, {daysTo(sea, world, world.voyage.bound)} days on the lanes{dest !== sea.map.landmarks[world.voyage.bound] ? ' (you’ve turned aside)' : ''}</p>
+            {#if dest !== sea.map.landmarks[world.voyage.bound]}<div class="row"><button onclick={() => (dest = sea!.map.landmarks[world!.voyage.bound!])}>back on course for {landmark(world.voyage.bound).name}</button></div>{/if}
+          {/if}
+          <p class="faint">{choicesOf(world.voyage).length > 1 && !world.voyage.bound ? 'the way divides. ' : ''}make for:</p>
+          <ul class="plain shop">
+            {#each choicesOf(world.voyage) as k (k)}
+              <li>
+                <button onclick={() => setFor(k)} aria-pressed={world.voyage.bound === k}>{k === 'plymouth-home' ? 'turn for home' : landmark(k).name}, {daysTo(sea, world, k)} days</button>
+                <span class="faint">{landmark(k).text}</span>
+              </li>
+            {/each}
+          </ul>
+        </details>
 
         <details class="panel" open>
           <summary><h2>your letter</h2></summary>
@@ -848,6 +881,7 @@
   .banner button { flex: none; width: 1.6rem; height: 1.6rem; padding: 0; display: grid; place-items: center; }
   @keyframes drop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { .banner { animation: none; } }
+  .landmark { border-left: 3px solid var(--ink); padding-left: 0.75rem; }
   .intro dl { margin: 1rem 0; }
   .intro dt { margin-top: 0.75rem; }
   .intro dd { margin: 0.2rem 0 0; }

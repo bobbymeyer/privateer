@@ -10,7 +10,7 @@ import { ACTS, DAYS, EXTENSION, LATE_STANDING, type Letter, PLATE_CARGO, PLATE_H
 import { buyPardon } from './port.ts';
 import { readShip } from './scout.ts';
 import { makePeace } from './wars.ts';
-import { createSea, createWorld, homeward, type WorldState } from './world.ts';
+import { createSea, createWorld, type WorldState } from './world.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -134,7 +134,7 @@ test('take the plate ship and every letter is done: home to London is the win', 
     assert.equal(after.acts, 3);
     assert.equal(after.commission, 'done');
     assert.equal(after.letter, null);
-    assert.ok(homeward(after));
+    assert.ok(!after.won, 'the letters are done; the voyage home is still to sail');
     return;
   }
   assert.fail('the plate ship got away every time');

@@ -9,6 +9,8 @@
   import type { WorldState } from '../world/world.ts';
   import { onDestroy, untrack } from 'svelte';
   import SeaShader from './SeaShader.svelte';
+  import { LANDMARKS } from '../world/landmarks.ts';
+  import { choices } from '../world/journey.ts';
 
   let {
     sea,
@@ -379,6 +381,18 @@
       {@const w = arrow(id, pattern.wind[season][id], 0.8)}
       {#if c.len > 0.05}<line x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2} stroke="var(--water)" stroke-width={px * 2} /><circle cx={c.x2} cy={c.y2} r={px * 2.2} fill="var(--water)" />{/if}
       {#if w.len > 0.05}<line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke="var(--faint)" stroke-width={px * 1.2} stroke-dasharray="{px * 3} {px * 2}" /><circle cx={w.x2} cy={w.y2} r={px * 1.6} fill="var(--faint)" />{/if}
+    {/each}
+
+    <!-- The voyage's landmarks: where you've been faded, where you can make for next in ink, where you're bound ringed. -->
+    {#each LANDMARKS.filter((l) => l.key !== 'plymouth-home' && l.key !== 'strait-east' && l.key !== 'brazil-home') as l (l.key)}
+      {@const n = map.nodes[map.landmarks[l.key]]}
+      {@const next = choices(world.voyage).includes(l.key)}
+      {@const been = world.voyage.visited.includes(l.key)}
+      <g opacity={next ? 1 : been ? 0.35 : 0.6}>
+        <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * 4} fill={next ? 'var(--ink)' : 'var(--paper)'} stroke="var(--ink)" stroke-width={px * 1.2} />
+        {#if world.voyage.bound === l.key}<circle cx={X(n.lon)} cy={Y(n.lat)} r={px * 9} fill="none" stroke="var(--ink)" stroke-width={px * 1.4} />{/if}
+        <text x={X(n.lon) + px * 7} y={Y(n.lat) - px * 6} font-size={px * 12} font-style="italic" fill="var(--ink)">{l.name}</text>
+      </g>
     {/each}
 
     <!-- The region your letter names. -->

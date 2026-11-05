@@ -11,7 +11,7 @@
 
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 /** From each version to the next. A run from before a feature simply goes without it. */
 const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<string, unknown>> = {
@@ -30,6 +30,8 @@ const MIGRATIONS: Record<number, (world: Record<string, unknown>) => Record<stri
   // 8: the fight reworked, two decks and the range. A fight left half-fought under the old rules is broken off.
   7: (w) => ({ ...w, encounter: null }),
   // 9: the chain of cards in order. A fight in progress starts with none.
+  // 10: the voyage. A run from before it starts at Plymouth, whatever it has done.
+  9: (w) => ({ ...w, voyage: { at: 'plymouth', bound: null, visited: ['plymouth'] } }),
   8: (w) => {
     const m = w.encounter as { fight: Record<string, unknown> } | null;
     return m ? { ...w, encounter: { ...m, fight: { chain: { last: null, links: 0 }, ...m.fight } } } : w;

@@ -135,15 +135,16 @@ test('a pirate: English ports shut, no grudge fades, no bribe works, and London 
   for (let i = 0; i < STANDING_DECAY; i++) w = advance(sea, { ...w, dilemma: null }, w.player);
   w = { ...w, dilemma: null };
   assert.equal(w.standing.england, -3, 'it does not fade');
-  // Sail into London rich, but a pirate: no win.
-  const london = map.nodes.find((n) => n.port?.name === 'London')!.id;
-  const off = map.adj[london][0];
-  assert.equal(advance(sea, { ...w, player: off }, london).won, false);
+  // Sail into Plymouth bound home, rich, but a pirate: they'd hang you, so no.
+  const off = map.adj[plymouth].find((n) => !map.nodes[n].port)!;
+  const homeBound = { at: 'cape', bound: 'plymouth-home', visited: ['plymouth', 'cape'] };
+  w = { ...w, voyage: homeBound };
+  assert.equal(advance(sea, { ...w, player: off }, plymouth).won, false);
   // A pardon, bought in Plymouth.
   w = buyPardon(sea, { ...w, player: plymouth });
   assert.equal(w.pirate, false);
   assert.equal(w.standing.england, 0);
   assert.equal(w.gold, GOAL + 50);
   assert.ok(serves(sea, w));
-  assert.equal(advance(sea, { ...w, player: off }, london).won, true);
+  assert.equal(advance(sea, { ...w, player: off, voyage: homeBound }, plymouth).won, true);
 });

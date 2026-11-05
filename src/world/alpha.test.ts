@@ -94,18 +94,18 @@ test('sighting an island pays, and it is an anchorage after', () => {
   assert.equal(anchored.hull, 3, 'mending a point a day');
 });
 
-test('home to London with every letter done is a win, whatever the purse; a run from before letters wins the old way', () => {
+test('raising Plymouth again, bound home, ends the run; just sailing past it does not', () => {
   const w = quiet(createWorld(sea, 1));
-  const london = at('London');
-  const offLondon = map.adj[london][0];
-  const rich = advance(sea, { ...w, player: offLondon, gold: GOAL * 3 }, london);
-  assert.equal(rich.won, false, 'gold is the score, not the win: the letters are');
-  const home = advance(sea, { ...w, player: offLondon, gold: 12, letter: null, acts: 3, commission: 'done' }, london);
+  const plymouth = at('Plymouth');
+  const off = map.adj[plymouth][0];
+  // Just out of Plymouth and straight back: it's where you started, not home.
+  assert.equal(advance(sea, { ...w, player: off }, plymouth).won, false);
+  // Turned back from the Cape Verde islands: home, the run is over.
+  const turned = { ...w, player: off, voyage: { at: 'cape-verde', bound: 'plymouth-home', visited: ['plymouth', 'canaries', 'cape-verde'] } };
+  const home = advance(sea, turned, plymouth);
   assert.equal(home.won, true);
-  assert.throws(() => advance(sea, home, london), /won/);
-  const legacy = { ...w, player: offLondon, letter: null, commission: 'legacy' as const };
-  assert.equal(advance(sea, { ...legacy, gold: GOAL - 1 }, london).won, false);
-  assert.equal(advance(sea, { ...legacy, gold: GOAL }, london).won, true);
+  assert.equal(home.ending, 'home');
+  assert.throws(() => advance(sea, home, plymouth), /won/);
 });
 
 test('a course sails a day at a time to where you set it', () => {
