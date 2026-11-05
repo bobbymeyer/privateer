@@ -33,6 +33,8 @@ export interface Offers {
   market?: 'chandler' | 'islanders';
   /** A Spanish town on the way, open or walled, to raid once. */
   raid?: 'town' | 'fortress';
+  /** Spice to buy by the ton, and what a ton costs here: it sells at home for SPICE_WORTH. See stores.ts. */
+  spice?: { name: string; cost: number };
 }
 
 export const LANDMARKS: Landmark[] = [
@@ -97,7 +99,7 @@ export const LANDMARKS: Landmark[] = [
     text: 'The Islands of Thieves, Magellan called them. Water and fruit after the longest crossing in the world, or canoes swarming to steal what isn’t tied down.',
   },
   {
-    key: 'ternate', name: 'Ternate, in the Moluccas', kind: 'port', at: 'Ternate', next: ['java'], offers: { market: 'chandler' },
+    key: 'ternate', name: 'Ternate, in the Moluccas', kind: 'port', at: 'Ternate', next: ['java'], offers: { market: 'chandler', spice: { name: 'cloves', cost: 6 } },
     text: 'The Spice Islands. The Sultan has thrown out the Portuguese and is glad of an enemy of theirs: cloves for the hold, and a welcome.',
   },
   {
@@ -105,7 +107,7 @@ export const LANDMARKS: Landmark[] = [
     text: 'Spain’s port in the East, where the galleon comes from Acapulco with silver. Rich, and on its guard.',
   },
   {
-    key: 'java', name: 'Java', kind: 'port', at: 'Bantam', next: ['cape'], offers: { market: 'chandler' },
+    key: 'java', name: 'Java', kind: 'port', at: 'Bantam', next: ['cape'], offers: { market: 'chandler', spice: { name: 'pepper', cost: 8 } },
     text: 'Bantam, where the pepper is, and kings who trade with anyone. The last good water before the Indian Ocean.',
   },
   {

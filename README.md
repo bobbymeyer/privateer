@@ -49,7 +49,15 @@ water at the cost of hands; easy, steady or crack on lose or gain a day in
 three, at the cost of the hull.
 
 **The way's events** ask you how to meet them, and say what each choice
-costs: storms, fever, foul water, weevils.
+costs: storms, fever, foul water, weevils, a leak, a wreck adrift, islanders'
+canoes, a reef in the Indies, a gentleman stirring the crew at San Julián,
+hands who'd stay in the islands. Between them the days differ by where you
+are: seals off Patagonia, ice and fog in the high latitudes, crossing the
+line, rats, a fire in the galley, the worm in her planking.
+
+**Spice.** Cloves at Ternate, pepper at Bantam, by the ton, a ton for every
+five of her complement; each sells for 20 on the quay at Plymouth. On a reef
+it's the spice you throw over first, as Drake did.
 
 **A sail** is a roll each day at sea, about one in 25, and who she is
 depends on the waters (`WATERS` in `src/world/meet.ts`): Spanish and
@@ -151,6 +159,20 @@ at anchor one day in two. The Horn is the fast way, with the storms: past
 | the water gone foul | 1 in 90 | drink it (the flux, 1 to 4 dead) or heave half over |
 | weevils in the bread | 1 in 90 | eat it (3 in 10, a hand dead) or heave a quarter of the food over |
 | a storm | 1 in 120, more in its seasons and latitudes | ride it out (1 to 3, spares first), run before it (2 to 4 days lost), or lighten ship |
+| a leak | 1 in 160 | fother it (a bundle of spares and a day) or pump and press on (2 hull) |
+| a wreck adrift | 1 in 220 | board her (2 days: stores, a strongbox, nothing, or her sickness) or sail on |
+| canoes | 1 in 30 among the Pacific islands | trade (2 gold: water, 14 days of fresh food), let them aboard (fruit, and they steal), or fire a gun over them |
+| aground on a reef | 1 in 30 in the Indies | lighten her (half the spice, or powder and food) or wait for the tide (1 to 2 days, even odds of 2 to 3 hull) |
+| a gentleman adventurer | at San Julián, once | try him (a hand), maroon him (1 to 3), or let it be (even odds 2 to 5 slip away at the next landmark) |
+| hands who'd stay | 35% at the Ladrones, Ternate, Java | let them go (2 to 4) or double the watch (a day, and one time in three 1 to 3 slip away) |
+
+And the ones that just happen (`src/world/happenings.ts`): crossing the
+line and the Southern Cross, once each; seals and penguins off Patagonia (1
+in 6, 10 to 24 days of fresh meat); ice in the rigging below 50°S (1 in 6, a
+day); fog above 42° (1 in 25, a day); calms in the horse latitudes (1 in 30,
+1 to 3 days); a fire in the galley, rats in the bread room, lightning,
+flotsam, the worm in her planking; and, one day in twelve, a line about the
+sea itself, by region.
 
 ## the loop
 
@@ -212,7 +234,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 91 tests
+npm test                     # the rules and the voyage, 100 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
@@ -245,6 +267,7 @@ src/
     course.ts    continuing on, at a pace, and why the ship stops
     events.ts    a day: storms, the weather, the stores
     weather.ts   rain, fish, calms, williwaws, fever, foul water, weevils
+    happenings.ts the rest of what happens on the way, by region, and on arriving
     dilemmas.ts  events that ask you something, and what each choice stakes
     stores.ts    hands, food, water, spares, powder; the shore; the market; a fight's cost and a prize's hold
     meet.ts      a sail sighted by the waters, attacking, raiding a town, settling a fight

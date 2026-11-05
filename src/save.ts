@@ -9,7 +9,13 @@
 
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
+
+/** From each version to the next, since the voyage was simplified (12): a run in progress shouldn't be lost to an update. */
+const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, unknown>> = {
+  // 12 → 13: spice, and the once-a-voyage happenings.
+  12: (w) => ({ ...w, spice: 0, seen: [] }),
+};
 
 export const SAVE_KEY = 'privateer:run';
 
@@ -30,8 +36,14 @@ export function decode(text: string | null): Saved | null {
   if (!text) return null;
   try {
     const saved = JSON.parse(text) as Saved;
-    if (!Number.isInteger(saved.seed) || !saved.world || saved.version !== SAVE_VERSION) return null;
-    return { version: SAVE_VERSION, seed: saved.seed, world: saved.world, daily: saved.daily ?? null };
+    if (!Number.isInteger(saved.seed) || !saved.world || !(saved.version <= SAVE_VERSION)) return null;
+    let world = saved.world as unknown as Record<string, unknown>;
+    for (let v = saved.version; v < SAVE_VERSION; v++) {
+      const step = MIGRATIONS[v];
+      if (!step) return null;
+      world = step(world);
+    }
+    return { version: SAVE_VERSION, seed: saved.seed, world: world as unknown as WorldState, daily: saved.daily ?? null };
   } catch {
     return null;
   }

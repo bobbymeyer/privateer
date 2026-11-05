@@ -55,6 +55,10 @@ export interface WorldState {
   reckoning: Reckoning | null;
   /** The Spanish towns you've raided, by landmark: each once. A raid on the coast of Chile and Peru warns the treasure ship. */
   raided: string[];
+  /** Tons of spice in the hold, cloves or pepper, to sell on the quay at home. */
+  spice: number;
+  /** What has happened that happens once a voyage, and grievances carried to the next landmark. See happenings.ts. */
+  seen: string[];
   /** Home: the run is won. */
   won: boolean;
   /** Lost: sunk, or too few hands to work her. The run is over. */
@@ -117,6 +121,8 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace'): WorldStat
     encounter: null,
     reckoning: null,
     raided: [],
+    spice: 0,
+    seen: [],
     won: false,
     sunk: false,
     ending: null,

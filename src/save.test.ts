@@ -33,5 +33,5 @@ test('nothing saved, garbage, or a save from another version — the old sandbox
   assert.equal(decode('{not json'), null);
   const saved = JSON.parse(encode(1, createWorld(sea, 1)));
   assert.equal(decode(JSON.stringify({ ...saved, version: SAVE_VERSION + 1 })), null);
-  assert.equal(decode(JSON.stringify({ ...saved, version: 11 })), null);
+  assert.equal(decode(JSON.stringify({ ...saved, version: 11 })), null, 'nothing comes forward from before the simplified voyage');
 });

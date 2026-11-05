@@ -24,7 +24,7 @@ import { choices as legsOf, daysTo, howHome, makeFor } from '../src/world/journe
 import { HOME_LANDMARK, landmark } from '../src/world/landmarks.ts';
 import { attack, fight, letPass, raid, raidHere } from '../src/world/meet.ts';
 import { score } from '../src/world/score.ts';
-import { ashore, buy, CHANDLER, daysOf, marketHere, price, room, shoreHere, trade, type Ware } from '../src/world/stores.ts';
+import { ashore, buy, CHANDLER, daysOf, marketHere, price, room, shoreHere, trade, type Ware, buySpice, spiceHere, spiceRoom } from '../src/world/stores.ts';
 import { coastAwake, PACIFIC_TOWNS } from '../src/world/treasure.ts';
 import { advance, createSea, createWorld, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
@@ -68,6 +68,9 @@ function shop(w: WorldState): WorldState {
   for (const ware of ['hands', 'water', 'food', 'spares', 'powder'] as Ware[]) {
     for (let i = 0; i < 60 && room(w, ware) && !enough[ware](w) && w.gold - price(w, ware) >= keep; i++) w = buy(sea, w, ware);
   }
+  // Spice in the Moluccas and Java, from what's left over a margin: it doubles and more at home.
+  const spice = spiceHere(sea, w);
+  while (spice && w.spice < spiceRoom(w) && w.gold - spice.cost >= 30) w = buySpice(sea, w);
   void CHANDLER;
   return w;
 }
@@ -81,7 +84,14 @@ function answer(w: WorldState): WorldState {
         w.dilemma.kind === 'storm' ? (w.hull > 4 || w.stores.spares > 0 ? 'ride' : open.includes('lighten') ? 'lighten' : 'run')
         : w.dilemma.kind === 'fever' ? 'nurse'
         : w.dilemma.kind === 'foul' ? (daysOf(w).water > 30 ? 'heave' : 'drink')
-        : daysOf(w).food > 60 ? 'heave' : 'eat';
+        : w.dilemma.kind === 'weevils' ? (daysOf(w).food > 60 ? 'heave' : 'eat')
+        : w.dilemma.kind === 'leak' ? (open.includes('fother') ? 'fother' : 'pump')
+        : w.dilemma.kind === 'wreck' ? (w.crew > 15 ? 'board' : 'sail')
+        : w.dilemma.kind === 'canoes' ? (open.includes('trade') ? 'trade' : 'alongside')
+        : w.dilemma.kind === 'reef' ? (w.spice > 0 && w.hull > 6 ? 'wait' : 'lighten')
+        : w.dilemma.kind === 'gentleman' ? 'try'
+        : w.dilemma.kind === 'deserters' ? 'watch'
+        : open[0];
       w = choose(sea, w, want);
     } else if (w.hail) {
       const worth = w.hull >= w.maxHull * (w.hail.plate === 'asleep' ? 0.4 : 0.6);

@@ -214,6 +214,22 @@ export function buy(sea: Sea, s: WorldState, ware: Ware): WorldState {
   return { ...paid, stores: { ...s.stores, [ware]: s.stores[ware] + CHANDLER[ware].lot }, ...(ware === 'food' ? { fresh: 0 } : {}) };
 }
 
+/** What a ton of spice fetches on the quay at Plymouth. Drake brought home six tons of cloves; he threw three more over on a reef. */
+export const SPICE_WORTH = 20;
+/** Tons of spice she can stow: a ton for every five of her complement. */
+export const spiceRoom = (s: WorldState) => Math.floor(complement(s) / 5);
+/** Spice for sale where you're lying, if any. */
+export const spiceHere = (sea: Sea, s: WorldState) => landmarkHere(sea, s)?.offers.spice ?? null;
+
+/** Buy a ton of spice, to sell at home. */
+export function buySpice(sea: Sea, s: WorldState): WorldState {
+  const spice = spiceHere(sea, s);
+  if (!spice) throw new Error('there is no spice to be had here');
+  if (s.spice >= spiceRoom(s)) throw new Error('no room for more spice');
+  if (s.gold < spice.cost) throw new Error('not enough in the purse');
+  return { ...s, gold: s.gold - spice.cost, spice: s.spice + 1 };
+}
+
 /** Trade with islanders: the casks filled, and three weeks of fresh food, for a little. */
 export function trade(sea: Sea, s: WorldState): WorldState {
   if (marketHere(sea, s) !== 'islanders') throw new Error('there is nobody here to trade with');
