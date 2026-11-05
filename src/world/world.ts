@@ -147,7 +147,7 @@ export const knowledge = (s: WorldState): SeaKnowledge => chartKnowledge(s.chart
  * Where the powers keep guard ships that will come after you. Out where
  * control is weak — not in Europe, whose home waters their navies keep.
  */
-export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Callao', 'Panama', 'Goa', 'Malacca', 'Manila', 'Mozambique', 'Algiers'];
+export const HUNTER_STATIONS = ['Havana', 'Cartagena', 'San Juan', 'Goa', 'Malacca', 'Manila', 'Mozambique', 'Algiers'];
 
 /**
  * Where enemy privateers fit out: Dunkirkers, Saint-Malo and La Rochelle
@@ -347,6 +347,7 @@ export function pursuitOf(s: WorldState, sea: Sea): Pursuit {
     standing: s.standing,
     alarmed: (n) => (s.alarm[n] ?? -1) > s.turn,
     enemy: (n) => isEnemy(s.wars, n),
+    leftBe: (id) => (s.parted[id] ?? -1) > s.turn,
   };
 }
 

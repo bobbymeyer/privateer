@@ -48,6 +48,8 @@ export { YOUR_NATION } from './wars.ts';
 export const PRIZE_OFFERS = 3;
 /** After parting, a ship won't engage you again for this many days. */
 export const PARTED_DAYS = 5;
+/** A privateer that has fought you once leaves you be this long. */
+export const PRIVATEER_PARTED = 60;
 /** A ship sunk or taken is laid up at home this long. */
 export const REFIT_DAYS = 60;
 /** Gold per point of hull, in port. */
@@ -312,7 +314,8 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
         // Gone to the bottom, or taken: laid up at home, then out again.
         return { ...x, node: x.home, laidUp: s.turn + REFIT_DAYS, dest: x.route ? x.route[1] : null, leg: x.route ? 1 : 0 };
       }),
-      parted: taken || outcome === 'sunk' ? w.parted : { ...w.parted, [m.shipId]: s.turn + PARTED_DAYS },
+      // A privateer beaten off, or left astern, has had her cruise: she goes looking for easier prey.
+      parted: taken || outcome === 'sunk' ? w.parted : { ...w.parted, [m.shipId]: s.turn + (m.kind === 'privateer' ? PRIVATEER_PARTED : PARTED_DAYS) },
     };
   }
 

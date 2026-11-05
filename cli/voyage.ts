@@ -7,11 +7,15 @@
  * - at sea: sails the voyage, a fork at random, turning aside for a prize
  *   close by; waters, forages and careens where there's a shore, and
  *   rations by the leg ahead;
- * - goes to port to mend when the hull is low;
+ * - goes to a friendly yard near by when the hull is low, else careens at
+ *   the next shore;
  * - fights by one-step lookahead, and runs whenever outgunned;
  * - comes home to Plymouth at the end of the way.
  *
- *   npm run voyage -- [--runs 20] [--days 730]
+ *   npm run voyage -- [--runs 20] [--days 730] [--from 0]
+ *     --straight  keep to the voyage: no turning aside for prizes, no raids off it
+ *     --trace     each run's landmarks, deaths and fights, from the log
+ *     --where     where the ship is and what it's steering for, every five days
  */
 
 import { CREW, SHIP_CLASSES, deckSize } from '../src/outfit.ts';
@@ -38,6 +42,8 @@ const arg = (name: string, fallback: string) => {
 const RUNS = arg('runs', '20');
 const DAYS = arg('days', '730');
 const FROM = arg('from', '0');
+/** Keep to the voyage: no turning aside for prizes. */
+const STRAIGHT = process.argv.includes('--straight');
 
 const sea = createSea();
 const { map } = sea;
@@ -93,9 +99,10 @@ function choose(w: WorldState): NodeId {
     if (away.length) return away[0];
   }
   if (w.pirate && w.gold >= GOAL) return portNamed(map, 'Baltimore');
+  // A foul or battered hull: a friendly yard if there's one near; else carry on and careen at the next shore.
   if (w.hull < w.maxHull * 0.6) {
-    const near = harbours.filter((p) => p !== w.player && serves(sea, { ...w, player: p })).sort((a, b) => d[a] - d[b]);
-    return near[0];
+    const near = harbours.filter((p) => p !== w.player && d[p] <= 12 && serves(sea, { ...w, player: p })).sort((a, b) => d[a] - d[b]);
+    if (near.length) return near[0];
   }
   // The voyage: a prize close by is worth turning aside for; otherwise the next landmark.
   let prize: { node: NodeId; value: number } | null = null;
@@ -107,7 +114,7 @@ function choose(w: WorldState): NodeId {
     const node = p.indexOf(Math.max(...p));
     if (d[node] <= 8) prize = { node, value };
   }
-  if (prize) return prize.node;
+  if (prize && !STRAIGHT) return prize.node;
   if (w.voyage.bound) return map.landmarks[w.voyage.bound];
   if (w.hull < w.maxHull * 0.6) {
     const near = harbours.filter((p) => p !== w.player && serves(sea, { ...w, player: p })).sort((a, b) => d[a] - d[b]);
@@ -204,7 +211,7 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
       // An enemy port, on a sound hull: raid it. A fortified one only in a ship that can take it.
       const port = map.nodes[w.player].port!;
       const able = !port.fort || SHIP_CLASSES[w.outfit.ship].hull >= 14;
-      if (isEnemy(w.wars, port.nation) && raidable(sea, w) && able && w.hull >= w.maxHull * 0.9) {
+      if ((!STRAIGHT || Object.values(map.landmarks).includes(w.player)) && isEnemy(w.wars, port.nation) && raidable(sea, w) && able && w.hull >= w.maxHull * 0.9) {
         w = fightItOut(raid(sea, w));
         raids++;
       } else w = inPort(w);
@@ -222,7 +229,7 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
     const free = (x: WorldState) => !x.encounter && !x.hail && !x.dilemma && !x.spoil && !x.sunk && !x.won;
     if (free(w) && shore(sea, w).water && daysOf(w).water < 40) w = answer(ashore(sea, w, 'water', advance));
     if (free(w) && shore(sea, w).forage && w.fresh > 20) w = answer(ashore(sea, w, 'forage', advance));
-    if (free(w) && shore(sea, w).careen && w.hull < w.maxHull - 2) w = answer(ashore(sea, w, 'careen', advance));
+    if (free(w) && shore(sea, w).careen && w.hull < w.maxHull - 1) w = answer(ashore(sea, w, 'careen', advance));
     if (w.sunk || w.won) break;
     if (w.hail) w = letPass(w);
     if (w.encounter) w = fightItOut(w);
@@ -234,6 +241,7 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
     }
     if (dest === null || since > 10 || w.player === dest || danger(w) !== null) ((dest = choose(w)), (since = 0));
     if (dest === w.player) dest = harbours[(seed + w.turn) % harbours.length];
+    if (process.argv.includes('--where') && w.turn % 5 === 0) { const n = map.nodes[w.player], t = map.nodes[dest]; console.log(w.turn, `at ${n.lat.toFixed(0)},${n.lon.toFixed(0)}`, `for ${t.port?.name ?? `${t.lat.toFixed(0)},${t.lon.toFixed(0)}`}`, w.voyage.bound, 'hull', w.hull, 'water', daysOf(w).water, 'food', daysOf(w).food, w.rations); }
     const out = sailToward(sea, w, dest);
     // Going nowhere — there already, or no way there — the day still passes, lying where she is.
     w = answer(out.world.turn === w.turn ? advance(sea, answer(out.world), out.world.player) : out.world);
@@ -251,6 +259,7 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
       dest = null;
     }
   }
+  if (process.argv.includes('--trace')) console.log(seed, w.log.filter((l) => /you raise|dead of|the fight cost|Plymouth|too few/.test(l.text)).map((l) => `${l.turn}:${l.text}`).join('\n  '));
   if (w.sunk) {
     const why = w.log.at(-1)?.text.includes('too few hands') ? 'too few hands' : 'in a fight';
     lostTo[why] = (lostTo[why] ?? 0) + 1;

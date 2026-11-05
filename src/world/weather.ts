@@ -16,7 +16,7 @@ export const RAIN_CHANCE = 1 / 20;
 /** Fish, birds or a turtle, on any day at sea. */
 export const FISH_CHANCE = 1 / 25;
 /** In the doldrums, a calm comes on this often, and holds this many days. */
-export const CALM_CHANCE = 1 / 10;
+export const CALM_CHANCE = 1 / 15;
 export const CALM_DAYS = [2, 6] as const;
 /** In the Strait, the williwaws hold you at anchor this often. */
 export const WILLIWAW_CHANCE = 0.5;

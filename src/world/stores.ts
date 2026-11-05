@@ -43,7 +43,7 @@ export const TROPIC_THIRST = 1.5;
 /** Days without fresh food before scurvy kills. */
 export const SCURVY_DAYS = 42;
 /** Hands dead of scurvy a day, per hand, per day past SCURVY_DAYS. */
-export const SCURVY_RATE = 0.0006;
+export const SCURVY_RATE = 0.00025;
 /** And of thirst, and of hunger, a day, per hand, when it's run out. */
 export const THIRST_RATE = 0.08;
 export const HUNGER_RATE = 0.03;
@@ -237,7 +237,7 @@ export const START_STORES: Stores = { food: START_CREW * 60, water: START_CREW *
 /** Shots a barrel of powder serves. */
 export const SHOTS_PER_BARREL = 3;
 /** Hands killed for each point of hull she lost, a share of those aboard. */
-export const KILLED_PER_HULL = 0.03;
+export const KILLED_PER_HULL = 0.015;
 
 /** What a fight cost in powder and hands: shots fired, hull lost. */
 export function fightCost(s: WorldState, shots: number, hullLost: number, r: Roller): WorldState {

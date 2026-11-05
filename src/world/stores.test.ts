@@ -124,7 +124,7 @@ test('a fight spends powder by the shot and hands by the hull lost', () => {
   const r = { rng: 1 };
   const after = fightCost(w, 7, 10, r);
   assert.equal(after.stores.powder, 2);
-  assert.ok(after.crew >= 30 - 10 && after.crew <= 30 - 8, `crew ${after.crew}`);
+  assert.ok(after.crew >= 30 - 5 && after.crew <= 30 - 4, `crew ${after.crew}`);
   assert.equal(fightCost(w, 30, 0, r).stores.powder, 0, 'never below none');
   assert.deepEqual(fightCost(w, 0, 0, r), w, 'nothing fired, nothing lost');
 });

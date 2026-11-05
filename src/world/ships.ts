@@ -71,7 +71,7 @@ export const TRADE_RANGE = 30;
 /** Hunters chase you while you are within this many days of their station. */
 export const HUNT_RANGE = 25;
 /** Privateers chase you while you are within this many days of their home port. */
-export const PRIVATEER_RANGE = 20;
+export const PRIVATEER_RANGE = 10;
 
 /** What a pursuer needs to know of the world to decide whether to come after you. */
 export interface Pursuit {
@@ -81,6 +81,8 @@ export interface Pursuit {
   alarmed: (n: Nation) => boolean;
   /** A nation at war with England: its privateers come for you. */
   enemy: (n: Nation) => boolean;
+  /** Ships that have fought you and gone off for easier prey, for now. */
+  leftBe?: (id: number) => boolean;
 }
 export const NO_PURSUIT: Pursuit = { standing: {}, alarmed: () => false, enemy: () => false };
 /** A corsair cruises no farther than this many days from home. */
@@ -135,7 +137,8 @@ export function privateerGoal(map: SeaMap, ship: { home: NodeId; nation: Nation 
 export const pursues = (kind: ShipKind) => kind === 'hunter' || kind === 'privateer';
 
 /** Where a pursuer is bound, by kind. */
-export function pursuerGoal(map: SeaMap, ship: { kind: ShipKind; home: NodeId; nation: Nation }, player: NodeId, p: Pursuit): NodeId {
+export function pursuerGoal(map: SeaMap, ship: { kind: ShipKind; home: NodeId; nation: Nation; id?: number }, player: NodeId, p: Pursuit): NodeId {
+  if (ship.kind === 'privateer' && ship.id != null && p.leftBe?.(ship.id)) return ship.home;
   return ship.kind === 'privateer'
     ? privateerGoal(map, ship, player, p.enemy(ship.nation))
     : hunterGoal(map, ship, player, p.standing, p.alarmed(ship.nation));
