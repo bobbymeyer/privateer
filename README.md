@@ -1,179 +1,168 @@
 # privateer
 
-A card-based privateering roguelike, round the world in 16XX. It's an alpha:
-play it at [bobbymeyer.com/privateer](https://bobbymeyer.com/privateer/).
+A card-based roguelike about the voyage of a Drake copycat. Plymouth,
+autumn 1580: the *Golden Hind* is in with a hold full of Spanish silver,
+and every gentleman with a ship thinks *I could do that too*. You are one
+of them. It has Oregon Trail's bones: fit out, sail a chain of landmarks
+with forks in it, keep the crew alive, take what Spain leaves lying about,
+and come home. It's an alpha: play it at
+[bobbymeyer.com/privateer](https://bobbymeyer.com/privateer/).
 
 Underneath it is a rules module that knows nothing about drawing, a browser
 front end in Svelte, a terminal harness, and simulators that play whole runs
 to tune the numbers. Every push to `main` is tested and published to GitHub
 Pages, and the site serves it from there.
 
+The design is in [docs/the-voyage.md](docs/the-voyage.md).
+
 ## playing
 
-Play it on the site, or `npm run dev` and open the page. You're a privateer out of Plymouth in a
-pinnace with 20 gold. **Bring 150 home to London and the run is won.** Sink,
-and it's over.
+Play it on the site, or `npm run dev` and open the page.
 
-- **Sail** by clicking the sea to set a course, then *set sail*. The ship
-  goes a day at a time and stops when it arrives, when a ship comes
-  alongside, when you sight uncharted land, or for news worth heaving to
-  for: a storm, a mutiny, a war declared, the crew close to mutiny (a log
-  line with `stop` set; see `sailToward`). Drag to pan, wheel or the
-  buttons to zoom.
-- **In port**, the bar sells rounds (rumors) and hires crew; the yard
-  mends the hull (1 gold a point), fits upgrades and sells bigger ships. A
-  port of a nation that wants you won't deal with you until you bribe its
-  officials.
-- **Rumors** show as red rings that fade. Pick one in the list to see the
-  cloud of where its ship could be by now. The cloud is tighter where
-  you've seen the current and wind (blue and dashed grey arrows a step out).
-- **Meeting a ship** at sea: a guard ship or armada of a nation that wants
-  you, or that's at war with England, attacks on sight. Anyone else comes
-  alongside and you choose: attack, or let her pass. Spain and the Barbary
-  corsairs are fair game; anyone else's ships, the Crown hears of; an
-  English ship makes you a pirate.
-- **Raiding a port**: in port, you can raid it instead of trading.
-- **Build the deck.** Take a ship and her stores are offered: three cards
-  off her, keep one or none. A yard will strike a card out for 6, down to
-  10. Your deck is listed under your ship. Hands of note draw wages.
-- **Sea lanes** (`buildLanes` in `src/world/map.ts`). The open ocean wasn't
-serving the game: on 24,000 day-steps of water the ships spread thin, and
-sailing was waiting, prizes were hard to find, and nothing said where to
-go. Now everyone sails the lanes, you too: the shortest paths between each
-port and its three nearest, along a tree spanning every port so none is
-cut off, along the great crossings (`OCEAN_LANES` in `src/world/ocean.ts`:
-Plymouth to Barbados and Virginia, Lisbon to Bahia, the Cape to Goa,
-Acapulco to Hawaii and on), and along the great courses, traced through
-water deep enough for the ships that sail them. That's about 2,700 nodes
-of 24,000; the map's adjacency is the lanes and nothing else, so courses,
-ships, distances and rumor clouds all keep to them without knowing it.
-The water off them is drawn and never sailed. The chart marks them as a
-dotted track, and a click on the chart lands on the nearest lane.
+- **Fit out at Plymouth.** You have a pinnace, 20 hands of her complement
+  of 30, two months' food, a month's water, 2 bundles of spares, 3 barrels
+  of powder, and 80 gold. The chandler sells by the lot: 300 rations of
+  biscuit and salt meat for 4, 300 of water for 1, a bundle of canvas,
+  cordage and timber for 3, a barrel of powder and shot for 3, five hands
+  for 4. Abroad, where they'll deal with you at all, it's half as dear
+  again. The bar, the yard and bigger ships are there too.
+- **The voyage panel** says the landmark you last raised and lists where
+  you can make for next, with the days on the lanes and what a captain
+  knows of each. Where the way divides you choose: the Strait or the Horn,
+  on across the Pacific or back the way you came, the Moluccas or Manila.
+  Once you've left Plymouth you can always turn for home.
+- **Sailing**: choose a landmark, or click the chart for anywhere else, and
+  set sail. The ship sails the lanes a day at a time and heaves to when she
+  raises land, when a ship comes alongside, when a hostile sail comes into
+  sight, or for news: a storm, a fever, the water gone foul, the crew close
+  to mutiny. You can turn aside for a port or a prize and come back on
+  course.
+- **Stores**: every day each hand eats and drinks a ration; water goes half
+  as fast again in the tropics. Set the rations (full, short, starvation)
+  and the pace (easy, steady, crack on). Six weeks without fresh food and
+  the scurvy starts to kill.
+- **Ashore**: at a landmark with a shore, fill the casks (2 days), forage
+  and fish (3), careen (5) or rest the crew (4). Islanders trade water and
+  fresh food for 3 gold.
+- **Events that ask**: a storm, fever aboard, foul water, weevils, the crew
+  wanting their shares, a man on a beach. Each choice says what it stakes.
+- **The fight** is cards: see *the loop*. It costs powder and hands, and a
+  prize's hold fills yours.
+- **Pirates**: fire on an English ship and you are one. English ports shut,
+  and Plymouth would hang you. A pardon costs 80 in an English port; or
+  retire rich (150) in a pirate's haven: Baltimore, Algiers, Tunis, Tripoli
+  or Salé.
+- **The run is won** by raising Plymouth again. It's lost if the ship goes
+  down, or if fewer than 8 hands are left to work her.
 
-Over 30 runs the captain bot has half again as many fights (29.5 a run,
-against 19.8 on the open ocean), wins 7 against 2, and is sunk 14 times
-against 19. A cost: on the lanes a ship can be in fewer places, so
-knowing the currents and winds tightens a rumor's cloud less than it did.
-Some legs of the underlying graph cut a headland, Brittany's for one; the
-lanes show it now that they're drawn.
+**The score** (`src/world/score.ts`) is the treasure home, 2 for every hand
+home, and up to 20 for the ship, by the hull she has left. It's set against
+the voyages of the time:
 
-**The sea moves** (`src/ui/SeaShader.svelte`). A WebGL shader draws the
-open sea under the SVG chart, in the chart's own coordinates, so it pans
-and zooms with it: the engraver's wave marks, each a short double curve
-whose curl rolls slowly, with long swells crossing them that thicken the
-ink on their faces and thin it between. Two colours, the sea's and the
-sepia's. The coast's water-lining is drawn over it as before, so the
-coastal water stays engraved and still and the open sea lives beyond it.
-Without WebGL the SVG's still marks are drawn instead.
-
-**The ship sails**: she glides from day to day instead of jumping, faces
-the way she's going, and leaves a short wake astern; the chart eases after
-her. **Stops say themselves on the chart**, as a banner where you're
-looking, not a line in the sidebar. **Keys**: space sets sail or heaves
-to, f finds the ship, + and − zoom, escape closes.
-
-**Sound** (`src/ui/sound.ts`), off until asked for in the header, and
-remembered: all made in the browser with WebAudio, no files. The sea under
-the hull, swelling and falling; the ship's bell when she heaves to (two
-strokes on arriving, three for something seen); the guns in a fight, in
-the order the shot was fired, yours heavier than hers; coin for a prize; a
-storm getting up; one long low stroke when a run ends at the bottom.
-
-None of the motion plays with reduced motion asked for.
-
-**Under the chart, three tabs.** *Location* is whatever is where you
-are: a port's bar, yard, ships for sale and raid, or at sea the water
-you're in — whose waters, a strait, a bank, a river mouth, a fort's guns,
-an island anchorage. Arriving in a port turns to it. *Politics* is who's
-at war, the strain on a peace, your standing with each nation, your name,
-and the flags. *Ship & crew* is the ship sheet. The sidebar keeps what you
-glance at while sailing: the ship's gauges, the course, your letter, what's
-in sight, rumors and news.
-
-**Ship and crew** have a sheet of their own (`src/ui/ShipSheet.svelte`),
-in its tab under the chart: the ship drawn to her size, her hull and morale,
-each hand of note with what they bring and what they cost, the refits,
-and the deck laid out as cards, grouped by where each came from — the
-ship, each refit, each hand, the prizes — with struck cards shown struck,
-and a strike button on each in a port with a yard. In port, every hire,
-refit and ship for sale says what it would add before you buy it. The
-sidebar's sections fold.
-- **Read a ship before you engage.** The lookout sees ships two days past
-  the water you can read, and a hostile sail coming into view stops you.
-  Alongside, or in the *in sight* list, you see her hull against yours and
-  how she fights: heavily gunned, fast, hard to shake off, a rich hold.
-- **Your name gets about.** The more your prizes pay, the farther the
-  hunters and privateers come for you, and the better found. Make the score
-  and word gets out: every enemy privateer puts to sea to stop you getting
-  it home.
-- **Barbary corsairs** raid the open towns of their enemies for captives.
-  Take one laden and the captives go free.
-- **Keep the crew in heart.** Morale runs out of ten. A long stretch with
-  no prize sours them, and at nothing it's mutiny. A prize, a round in the
-  bar, fresh water at an island and a good omen all put it up.
-- **Some events ask you.** A storm, the crew wanting their shares, a man on
-  the beach of new land: each stops the ship and offers a choice, with what
-  each choice stakes told plainly.
-- **Islanders** in Guam, Hawaii, Tahiti, Tonga, the Marquesas and Rapa Nui
-  trade water, fruit and timber, not drink or ships. Sometimes they put out
-  war canoes instead.
+| a voyage like | means |
+| --- | --- |
+| Drake's | round the world, 150 or more home, and at least half her complement alive |
+| Cavendish's | 150 or more home, by any way, short of Drake's |
+| Fenton's | home again, with less than 150 |
+| Oxenham's | lost |
+| a pirate's end | retired rich in a haven, never home |
 
 Each run has a seed in the URL; `?seed=42` plays the same world again.
+*Today's voyage* is a seed fixed for the date, the same for everyone.
 
-**When a run ends**, the screen tells the last fight: who she was, your
-hull going in, hers at the end, how many rounds, the wounds still against
-you, and the last three rounds card by card, down to the one that sank
-you (`src/world/record.ts`). Then the run in numbers — fights, prizes,
-sacks, ships that got away and times you did, letters done, the ship you
-ended in, your best prize — and your best run beside it.
+## the voyage
 
-**The logbook** (`src/logbook.ts`) keeps every run that ends, and every
-one given up, in the browser: the date, the seed, the gold, letters done,
-days, the ship, how it ended and what sank you. Your best is the richest
-win; with no win yet, the furthest the letters went. It downloads as JSON,
-which is the way to send real runs back for balancing.
+The landmarks (`src/world/landmarks.ts`) are the chain a captain of 1580
+would sail, Drake's way westward as the main line, with the forks the
+captains of the time chose between. `src/world/journey.ts` moves you along
+them; `map.ts` places each on the chart and adds its legs to the lanes.
+Days per leg, on the lanes at a steady pace:
 
-**Today's voyage** is a seed fixed for the date, so everyone who sails it
-that day sails the same world; the header marks it, and so does the
-logbook.
+| from | to | days |
+| --- | --- | --- |
+| Plymouth | the Canaries | 28 |
+| the Canaries | the Cape Verde islands | 16 |
+| the Cape Verde islands | the coast of Brazil | 53 |
+| the coast of Brazil | the River Plate | 10 |
+| the River Plate | Port San Julián | 18 |
+| Port San Julián | **the Strait of Magellan** / **round the Horn** | 9 / 10 |
+| the Strait / the Horn | Mocha Island | 21 / 22 |
+| Mocha Island | Valparaíso | 7 |
+| Valparaíso | Callao | 24 |
+| Callao | off Cape San Francisco | 15 |
+| off Cape San Francisco | **Guatulco** / **the Strait, homeward** | 22 / 61 |
+| Guatulco | **Nova Albion** / **the Ladrones** | 37 / 117 |
+| Nova Albion | the Ladrones | 87 |
+| the Ladrones | **Ternate** / **Manila** | 26 / 29 |
+| Ternate or Manila | Java | 28 |
+| Java | the Cape of Good Hope | 95 |
+| the Cape | Sierra Leone | 54 |
+| Sierra Leone | Plymouth | 51 |
+| the Strait, homeward | the coast of Brazil, homeward | 59 |
+| Brazil, homeward | Plymouth | 71 |
 
-**The run saves as you go** (`src/save.ts`), to the browser's storage, after
-every day and every card. A reload picks it up where it was, mid-fight
-included, unless the address asks for a different seed. A finished run is
-forgotten. A save carries a version: when the shape of the state changes,
-`SAVE_VERSION` goes up and older saves are dropped rather than loaded
-half-understood.
+You come home *round the world* (by the Ladrones or the Cape), *back the
+way you went* (by the Strait homeward), or *turned back*.
 
-**How to play** opens on a first visit and from the header after. In a
-fight, hovering a card explains its words, and *what the cards say* under
-the hand lists them all (`GLOSSARY` in `src/describe.ts`).
+**The Strait or the Horn.** On the map they're two days apart. At sea the
+Strait is the slow, sheltered way: bound through it, within 6 steps of it,
+the williwaws hold you at anchor one day in two. The Horn is the fast way
+with the storms: past 55°S a storm is ten times as likely. Sailed from San
+Julián to Mocha, victualled, over 30 seeds: 43 days by the Strait with 0.8
+storms, 32 round the Horn with 1.5.
 
-**Every nation has its colours**, a field and a border, like a flag at a
-distance (`src/world/colors.ts`). England is white edged red, the Dutch
-orange edged blue, France blue edged gold, Spain yellow edged red, Portugal
-green edged red, the Danes red edged gold, Japan red edged white,
-independent harbours black. They mark ports (squares fortified, circles
-open), ships in sight (triangles, warships larger), rumor rings, each
-nation's protected waters (a faint wash), the standing list and the fight
-sheet, with a key under the chart.
+**The treasure ship off Cape San Francisco** (`src/world/treasure.ts`).
+Every year the silver of Potosí went north from Callao to Panama in one
+galleon, alone, because nobody had ever come to take her; Drake overhauled
+the *Cacafuego* there in March 1579. Raise Cape San Francisco and she comes
+alongside, the first time only. If the coast is still asleep she takes you
+for a Spaniard: 4 hull under a galleon's 13, her guns struck below. If you
+have raided a town on the coast of Chile and Peru on the way, word has gone
+ahead and she's warned: 4 hull over. Either way she carries 150 over a
+galleon's 30, and beaten she strikes rather than sinks, so her whole hold is
+yours, though she can still run. Over 400 fights, a pinnace takes her
+asleep 92% of the time for 172 on average; warned, 23% of the time for 51.
+A brigantine takes her warned 79% of the time for 147. So the coast is a
+choice: raid Valparaíso and Callao for their storehouses, or let it sleep
+and take the silver.
 
-**The chart is a woodcut** (`src/ui/woodcut.ts`, `src/ui/SeaChart.svelte`),
-sepia on parchment, after the engraved charts of the century, and all of it
-drawn in code:
-- **Water-lining:** every coast drawn again and again out to sea.
-- **Hatching** across the land, the same density at any zoom.
-- **Wave marks** scattered on the open sea.
-- **Rhumb lines** fanning from a rose in each ocean.
-- **The seas lettered** as the charts of the time named them: Mar del
-  Nort, Mar del Sur, Oceanus Indicus, Mare Germanicum.
-- **Ports as woodcuts**, a tower for a fortified port and two houses for an
-  open town, and **ships** as hull and sails in their flag's colours.
-- **A wind rose and a graduated border**, fixed to the frame.
+**What wears down** (`src/world/stores.ts`, `src/world/weather.ts`):
 
-The coast is drawn nine times over for the water lines, so it's drawn
-only where it can be seen and only as fine as a pixel. Each nation's
-protected waters are built once, as one path. A pan costs the same as it
-did before the engraving.
+- **Hands**: a number against the ship's complement (pinnace 30, sloop 45,
+  brigantine 70, frigate 110). Hire more by fives in port.
+- **Food and water**, in rations: a hand for a day. Full rations eat 1,
+  short 0.67, starvation 0.34, of both. Water goes 1.5 times as fast inside
+  the tropics. A ship carries food for 180 days of her complement and water
+  for 90. With none left, about 3% of the hands die a day of hunger, 8% of
+  thirst. Short rations cost a point of morale every 10 days, starvation
+  every 4.
+- **Scurvy**: past 42 days without fresh food it kills, a little more each
+  day it goes on. Foraging, buying food in port, a town's storehouses and
+  islanders' fruit reset it; fish and birds put it back 10 days.
+- **The hull**: weed and worm take a point every 40 days at sea at an easy
+  pace, 25 steady, 15 cracking on. Careening mends 2 a bundle of spares, and
+  1 for the scraping.
+- **Spares**: a storm ridden out takes them before the hull.
+- **Pace**: easy makes no way one day in three; cracking on makes two days'
+  way one day in three, and costs a point of morale every 12 days.
+- **Powder**: a barrel for every three shots fired. With none, the guns are
+  silent.
+
+**The way's events**, at sea:
+
+| event | how often | what it does |
+| --- | --- | --- |
+| rain squall | 1 in 20 days in the tropics | casks topped up, 8 rations a hand |
+| fish, birds, a turtle | 1 in 25 | 3 days of food, scurvy put back 10 days |
+| a calm | 1 in 15 in the doldrums | 2 to 6 days without way |
+| williwaws | 1 in 2, in the Strait | a day at anchor |
+| a hand overboard | 1 in 150 | a hand lost |
+| fever aboard | 1 in 45 in the tropics | press on (2 to 5 dead) or nurse them (3 days lying to, 0 or 1 dead) |
+| the water gone foul | 1 in 90 | drink it (the flux, 1 to 4 dead) or heave half of it over |
+| weevils in the bread | 1 in 90 | eat it (morale −1) or heave a quarter of the food over |
+| a storm | 1 in 120, more in its seasons and latitudes | ride it out (1 to 3, spares first), run before it (2 to 4 days downwind), or lighten ship |
+
+A surgeon halves the dead of fever and the flux.
 
 ## the loop
 
@@ -182,558 +171,226 @@ A fight is two ships, two decks, and the range between them (`src/rules.ts`).
 - **The range**: grappled, close or far. Most cards care. Long guns reach
   at far, a broadside is heavy close, boarders only go across grappled.
   Chase and grapnels close the range; bearing away opens it. Opened past
-  far, whoever opened it is away. So cards set each other up: give chase,
-  then grapple, then sweep the hold. A card out of range does nothing, and
-  the fight says so; your hand marks those cards *out of range now*.
+  far, whoever opened it is away. A card out of range does nothing, and
+  the fight says so.
 - **Her intent is face up**: the top card of her deck, shown before you
-  choose. You play first, then she plays it, then her next card turns up.
-  She's about to bear away from far? Chase first, and she falls short.
+  choose. You play first, then she plays it.
 - **Your hand**: three dealt from your deck. Keep two; they resolve in the
-  order you name them and are spent. The third goes under your deck. Spent
-  cards come back only by `recall`, so a deck of fifteen runs out in about
-  seven rounds, and fights last five or six.
-- **Where it starts**: close when you fire first, within hail; far when
-  she comes at you, bearing down, which gives you a chance to bear away
-  before she closes. A town can't move: close is the boats offshore,
-  grappled is the party ashore, and it never gets away.
+  order you name them and are spent. The third goes under your deck.
+- **Where it starts**: close when you fire first; far when she comes at
+  you. A town can't move: close is the boats offshore, grappled is the
+  party ashore.
 - **Wounds**: some shot leaves a leak (2 hull), a fire (3) or shot-away
-  sails (no hull, but that ship can't bear away till they're dealt with),
-  as a card on top of the wounded ship's deck. Yours comes into your hand:
-  keep it to deal with it, or send it under. Hers becomes her next card, a
-  round she spends on it — chain shot is how you stop a ship that runs.
-- **Each kind fights its own way**, from its deck: a merchant runs, a
-  guard ship closes and grapples and is deadly alongside, a galleon's
-  great guns ruin you close, an armada's long guns reach you far off, a
-  town mends its barricades and calls its relief. The read of a ship before
-  you engage says which.
-
-- **The chain: sail → shot → board.** Every card has a type: *sail*
-  (chase, bear away), *shot* (the guns), *board* (grapnels, boarders, the
-  hold) or *hands* (repairs, brace, recall, a wound dealt with). Played in
-  the order of a boarding action — close her, fire into her, go across —
+  sails (that ship can't bear away till they're dealt with), as a card on
+  top of the wounded ship's deck.
+- **The chain: sail → shot → board.** Every card has a type: *sail*,
+  *shot*, *board* or *hands*. Played in the order of a boarding action,
   each card that follows the one before scales: shot after sail is +1 to
-  its hits, board after sail-then-shot +2 to its plunder. The chain carries
-  across rounds, her card between doesn't break it, so this round sets up
-  the next. Hands neither add to it nor break it; anything out of order, or
-  a card that does nothing at the range, starts it again; a board card at
-  the end of a full chain closes it. Bearing away and closing never scale,
-  so the chain can't jump the range. Each card shows its type, and as you
-  pick, the ones that would follow in order show what they'd gain.
+  its hits, board after sail-then-shot +2 to its plunder. Hands neither add
+  to it nor break it; anything out of order starts it again.
+- **Each kind fights its own way**: a merchant runs, a guard ship closes
+  and is deadly alongside, a galleon's great guns ruin you close, an
+  armada's long guns reach you far off, a town mends its barricades and
+  calls its relief.
 
-  It changes the numbers more than anything else in the fight: in order, a
-  pinnace takes a guard ship that came at it half the time (51%, against
-  21% before the chain), and over 30 runs the captain bot wins 8 and is
-  sunk 12 times, against 4 and 19.
+A ship is **credibly threatened**, and its flee cards work, at half hull or
+less, or outgunned two to one.
 
 Card text is written from the effects (`cardText` in `src/cards.ts`), so a
-card can't say other than it does: *far: hit 1 · close or grappled: hit 3 ·
-close: leak*.
+card can't say other than it does.
 
-What the simulator says, a pinnace with the balanced bot:
+**What it costs and what it pays** (`settle` in `src/world/meet.ts`):
 
-| against | rounds | taken | she got away | sunk |
+- **Powder**: a barrel for every three shot cards you played. With no
+  powder aboard, the shot cards stay out of your deck: sails and boarders.
+- **Hands**: for every point of hull lost, 1.5% of those aboard are killed.
+- **Her hold**: a prize taken fills yours as far as there's room, in days
+  of food and water for a crew like yours: a merchant about 25 and 20, a
+  galleon 30 and 25, a warship less food and more powder. A town's
+  storehouses are 45 days of fresh food, and its well fills the casks.
+- **Prize cards**: three from that kind's pool; keep one, for good, or none.
+  A yard strikes a card for 6, down to a deck of 10.
+- The payout goes in the purse; prisoners questioned give rumors; a ship
+  destroyed is laid up at home for 60 days.
+
+| target | hull | hold |
+| --- | --- | --- |
+| merchant | 11 | 12 |
+| privateer, corsair | 11 | 8, 6 |
+| guard ship | 14 | 3 |
+| galleon | 13 | 30 |
+| treasure fleet | 22 | 60 |
+| armada | 26 | 4 |
+| open town | 12 | 25 |
+| fortified port | 20 | 45 |
+
+**Your deck is your ship** (`src/outfit.ts`), never stored, worked out from
+the ship, its refits, your hands of note and your prize cards:
+
+| ship | cost | hull | complement | berths |
 | --- | --- | --- | --- | --- |
-| a merchant | 5.7 | 75% | 14% | 0% |
-| a guard ship, coming at you | 6.9 | 21% | — | 1% |
-| …running, the bot that bears away when it can | 3.2 | 9% | — | 0.4% (73% away) |
+| pinnace | (you start in one) | 12 | 30 | 2 |
+| sloop | 40 | 14 | 45 | 3 |
+| brigantine | 90 | 17 | 70 | 4 |
+| frigate | 180 | 22 | 110 | 6 |
 
-Before the rework a fight ran eleven rounds, and how you played hardly
-mattered: four sensible bots came within a hair of each other. Now running
-and fighting are different games. Over a whole run the captain bot does
-worse than before (4 wins and 19 sunk of 30, against 7 and 14), partly
-because it plays a round at a time and never sets up a combination or
-reads her intent the way a person will; your logbook will say more.
-
-| ending | payout |
-| --- | --- |
-| you get away | your plunder |
-| she gets away | your plunder; the rest of her hold goes with her |
-| she is destroyed | plunder plus bounty; her hold sinks |
-| you are sunk | nothing |
-| the ships part (your deck runs out) | your plunder |
+A smaller ship carries fewer: buy down and the hands and stores over her
+capacity are paid off and sold. Hands of note (a master gunner, marksmen, a
+quartermaster, a boatswain, a surgeon, a pilot, a navigator) are hired in
+the bar, one of each, as many as you have berths. Refits belong to the
+ship.
 
 ## the world
 
-The year is 16XX: the seventeenth century as a setting, never a stated
-year. Ports, flags and fleets are drawn from across the century, so
-nothing pins the calendar.
+It is 1580, strictly (`src/world/ports.ts`, `src/world/wars.ts`). Spain and
+Portugal are one crown since this year, so every Iberian port from Lisbon
+to Goa to Manila is hostile. There's no Dutch East India Company, no
+Batavia, no English colony anywhere. France is divided and its Huguenots
+friendly; the Barbary corsairs are hostile to everyone. In the Moluccas the
+Sultan of Ternate has thrown out the Portuguese.
 
-The ultimate win is re-enacting Drake's raid round the world, so the sea
-is the whole world.
+**The wars are fixed.** England is at war with Spain, Portugal, the Barbary
+states and Morocco from the first day, and the others' wars are the ones
+of the time: the Dutch Revolt against Spain and Portugal, the Ottomans
+against Malta, the corsairs against most of Christendom. They don't drift.
+You can still start one: attacking a nation at peace with England strains
+the peace, and at 6 it's war.
 
-**Coastline first, because the coast is where the action is.**
-`src/world/data/world.json` is built by `npm run world` from Natural
-Earth's 1:10m land (public domain):
-
-1. Every coast and island gets a node offshore every 60 nautical miles,
-   about a day's coasting.
-2. The open ocean is filled in, sparser the farther it is from land, up to
-   300 miles apart mid-ocean.
-3. Everything is triangulated on the sphere. Any edge that crosses more
-   than a spit of land, or runs far longer than its neighbours, is dropped.
-4. Water cut off from the ocean (the Caspian, the Great Lakes) is dropped,
-   and so is the ice beyond 62°S and 72°N.
-
-That gives 6,954 nodes (3,213 on the coast).
-
-Straits narrower than the coastal spacing would be missed, since coastal
-nodes sit offshore. Ten are traced by hand in `src/world/passages.ts` and
-threaded through as chains: Magellan above all, plus Gibraltar, Dover, the
-Øresund, the Dardanelles and Bosporus, Messina, Bab-el-Mandeb, Hormuz,
-Malacca and Sunda.
+**The coast is where the action is.** `src/world/data/world.json` is built
+by `npm run world` from Natural Earth's 1:10m land (public domain): a node
+offshore every 60 nautical miles along every coast, the ocean filled in
+sparser farther out, everything triangulated on the sphere, inland water
+and the ice dropped. Ten straits too narrow for the spacing are traced by
+hand in `src/world/passages.ts`, Magellan above all.
 
 **A turn is a day.** Every leg longer than a day's sail is split into days
-(`src/world/map.ts`), so one step is one turn everywhere. A coastal leg is a
-day; a 300-mile ocean leg is five, and a ship on it is somewhere along it.
-Ocean crossings take as long as they did, and most turns are spent near
-land. That makes 24,331 steps in all.
+(`src/world/map.ts`), 24,331 steps in all.
 
-**111 ports** (`src/world/ports.ts`), from across the century and twenty
-flags: Spain and Portugal's empires, the English, French, Dutch, Danes and
-Swedes, the Hanse, Venice and Malta, the Ottomans and the Barbary states,
-Oman, Persia, the Mughals, China, Japan, and independent harbours like
-Aceh, Bantam and Calicut. Forts put the water a step out under their guns.
+**Sea lanes** (`buildLanes` in `src/world/map.ts`). Everyone sails the
+lanes, you too: the shortest paths between each port and its three
+nearest, a tree spanning every port, the great crossings (`OCEAN_LANES` in
+`src/world/ocean.ts`), the great courses, and the voyage's legs. About
+2,700 of the 24,000 nodes; the map's adjacency is the lanes and nothing
+else, so ships meet on them.
 
-**The grain of the sea** (`src/world/ocean.ts`):
+**The grain of the sea** (`src/world/ocean.ts`): currents with a course, a
+strength and a width; a wind model of the trades, the doldrums, the
+westerlies and the Roaring Forties, following the sun through the year,
+with the monsoon over the Indian seas; rivers pushing out to sea; banks
+that keep deep keels off. Seasons are 91 days.
 
-- **Currents** are streams with a course, a strength and a width: the
-  Atlantic and Pacific gyres, the Gulf Stream, Kuroshio and Agulhas, the
-  Humboldt, the equatorial currents and countercurrent, the West Wind Drift
-  round the south.
-- **Wind** is a model of the global circulation. The trades blow toward the
-  west and the equator, hardest about 14°, slack in the doldrums. The
-  westerlies blow toward the east and the pole, hardest about 48°, and 40%
-  harder in the south (the Roaring Forties). The belts follow the sun four
-  degrees north and south through the year. The monsoon overrides them over
-  the Arabian Sea, the Bay of Bengal and the South China Sea: south-west in
-  summer, north-east in winter.
-- **Rivers** push water out to sea: the Amazon, Congo, Ganges, Yangtze and
-  others.
-- **Banks** keep deep keels off: the Bahamas, Campeche, the Grand Banks,
-  the Dogger, the Great Barrier Reef.
-- **Seasons** are 91 days.
-
-**Ships** sail a step a turn and favour running with the sea:
+**The living sea** (`src/world/ships.ts`):
 
 | kind | habit |
 | --- | --- |
-| merchant | one out of every port, trading with ports within 30 days, three times likelier under its own flag; a day in each port |
-| treasure fleet | the flota and galeones (Cádiz, the Canaries, in through the islands, silver at Veracruz or Cartagena and Portobelo, Havana); the South Sea fleet (Arica, Callao, Panama); half speed |
-| treasure ship | the Manila galleon, the Portuguese carreira to Goa, the Dutch return fleet to Batavia |
+| merchant | one out of every port, trading with ports within 30 days, three times likelier under its own flag |
+| treasure fleet | the flota and galeones (Cádiz, the Canaries, Veracruz or Cartagena and Nombre de Dios, Havana); half speed |
+| treasure ship | the Manila galleon (Acapulco, Umatac, Manila), the Portuguese carreira (Lisbon, Mozambique, Goa), the South Sea's plate ship (Arica, Callao, Panama) |
 | armada | the Armada de Barlovento round the Caribbean, the Mar Océano off Iberia; half speed |
-| hunter | guard ships at ten stations out where control is weak (Havana, Cartagena, San Juan, Callao, Goa, Batavia, Manila, Algiers, and England's pirate hunters at Port Royal and Bridgetown); they keep station until their nation wants you, then chase you within 25 days of it |
+| guard ship | at Havana, Cartagena, San Juan, Goa, Malacca, Manila, Mozambique and Algiers; they keep station until their nation wants you, then chase you within 25 days of it |
+| privateer | out of Dunkirk, Saint-Malo, La Rochelle, Amsterdam, Salé, Algiers, Lisbon, Havana and Cartagena; when their nation is at war with England they come for you within 10 days of home, and one that has fought you leaves you be for 60 days |
+| corsair | out of Algiers, Salé, Tunis and Tripoli, cruising off a port within 45 days of home |
+| sea monster | one in each named sea, drifting with the current |
 
-Square-riggers let the sea pick their heading: they go round rather than
-beat. Hunters are weatherly and can work to windward.
+The coast of Chile and Peru keeps no guard ships: in 1579 Drake found it
+asleep, and so will you, until you raid it.
 
-**Rumors are bought by the round** (`src/world/bar.ts`). In port, stand
-the house a drink (2 gold) and somebody may tell you about a ship: where it
-was when they saw it, a few days back.
+**Flags and standing.** Every nation keeps a standing with you. Attack one
+of its ships and it falls: one for landing damage or taking plunder, two
+for a sinking. Below zero, its guard ships hunt you and its ports won't
+deal with you until its officials are bribed (10 gold, times how far below
+zero you are). Standing drifts a point back toward zero every 60 days.
+**Countries protect their waters**: a guard ship never enters another
+nation's waters, and a foreign one found inside them is driven off.
 
-- **What's talked about:** ships whose wake came within 30 days of the
-  port. Treasure fleets are talked about five times as much as a merchant,
-  and nearer ships more than farther.
-- **How stale:** a sighting is up to twelve days old, mostly recent; about
-  five on average.
-- **How true:** news from far off is garbled, and each round finds the room
-  drunker. The first round of the night hears something nearly nine times
-  in ten, at about 0.75 reliable; the fifth, under four in ten, at about
-  0.5. The room turns over overnight.
+**Meeting a ship**, on the same node outside a port: a hostile ship attacks;
+anyone else comes alongside and the choice is yours, attack or let her
+pass.
 
-A rumor says a ship was at a node, on a turn, with some reliability. It is
-exactly right with that probability; otherwise it is off by up to one step
-(good sources), two or three (bad ones). Prisoners talk too
-(`interrogate`, on boarding party and strike colours, lost if you sink).
+**Raiding a port.** In port, raid it instead of trading. A town can't run,
+carries its valuables inland while you fight, and from the fourth round
+calls its relief. Sacking it takes the treasury and its storehouses, and
+it has nothing for anybody for 120 days; its nation's guard ships hunt
+twice as far for 30. A raid turned out short of a sack leaves the town on
+its guard for 90 days: shut for 14, then 4 more hull and its relief 2
+rounds sooner for each raid it has turned out, its treasury refilling 1 a
+day.
 
-**Flags, standing and protected waters.** Every ship flies its home port's
-flag; a route ship flies its first port's. Every nation keeps a **standing**
-with you. Attack one of its ships and the standing falls: one for landing
-damage or taking plunder, two for a sinking. Below zero, its guard ships
-hunt you. Until then they keep station.
+**Rumors are bought by the round** (`src/world/bar.ts`), 2 gold a round in
+a port's bar: a ship somebody saw, a few days back, true with some
+reliability that falls as the room gets drunker. A rumor is a fading ring
+on the chart and a cloud of where her ship could be by now, tighter where
+you've charted the current and wind (`src/world/rumors.ts`).
 
-**Countries protect their waters.** The sea within 4 days of a nation's
-forts is its protected water; where two overlap, the nearer fort decides.
-A guard ship never enters another nation's waters, so a chase breaks off
-at the edge and a friendly fort is a refuge. Any foreign guard ship found
-inside is driven off by that nation's navy (Spanish ships off Plymouth
-bring out the Royal Navy) and laid up at home; it goes in the world's log.
-That's why the guard stations are out in the colonies: Europe's home
-waters are its navies' business. The armadas are exempt, keeping their
-patrols round their own empire's ports.
+**Uncharted islands**: eight a run, out in open ocean. Sight one and the
+Crown pays 15; after that it's an anchorage where no ship troubles you,
+and the hull mends a point a day.
 
-**What you sail with is what you fight with** (`src/outfit.ts`). Your deck
-is never stored. It's worked out from your ship, its upgrades and your crew:
+**Morale** (`src/world/events.ts`) starts at 7 of 10. Sixty days after the
+last prize the crew lose a point every 15 days; hunger, cracking on and
+weevils cost more. At nothing it's mutiny. A prize (+3), a sack (+4), the
+first round in a bar, islanders' fruit, foraging, rest and a good omen put
+it back.
 
-| ship | cost | hull | berths | adds |
-| --- | --- | --- | --- | --- |
-| pinnace | (you start in one) | 10 | 2 | the nine starting cards, 13 in all |
-| sloop | 40 | 12 | 3 | raking fire |
-| brigantine | 90 | 14 | 4 | broadside, raking fire |
-| frigate | 180 | 18 | 6 | two broadsides, chain shot |
+**The chart is a woodcut** (`src/ui/woodcut.ts`, `src/ui/SeaChart.svelte`),
+sepia on parchment, drawn in code: water-lining, hatched land, rhumb lines,
+the seas lettered as the charts of the time named them, ports and ships as
+woodcuts. The landmarks are on it: the next ones in ink, the one you're
+bound for ringed, the ones raised faded. **The sea moves**
+(`src/ui/SeaShader.svelte`): a WebGL shader draws the engraver's wave marks
+under the chart, rolling. **Sound** (`src/ui/sound.ts`), off until asked
+for: the sea, the ship's bell, the guns, coin, a storm, all WebAudio.
 
-- **Crew**, hired in the bar, one of each, as many as you have berths: a
-  master gunner (double-shotted guns), marksmen (hit and hold), a
-  quartermaster (a prize crew that plunders and questions), a boatswain
-  (all hands: brace 3), a surgeon, a pilot (another bear away), a
-  navigator (a step more sight).
-- **Upgrades**, at the yard, belong to the ship: more guns, a sheathed hull
-  (+2), boarding nets, chase guns. A new ship starts bare.
+**Under the chart, three tabs**: *location* (the landmark, the shore, a
+port's chandler, bar, yard and raid), *politics* (who's at war, standing,
+the flags), and *ship & crew* (`src/ui/ShipSheet.svelte`). The sidebar
+keeps the hull, morale and stores (`src/ui/Stores.svelte`), the rations and
+pace, the course, the voyage, what's in sight, rumors and news.
 
-A bigger ship is sturdier but less nimble. More cards in the deck means
-the flee cards come round more slowly: from an armada, a pinnace gets away
-82% of the time, a brigantine 58%. Hire a pilot.
+**When a run ends**, the screen gives the score and the voyage it was like,
+tells the last fight if one sank you (`src/world/record.ts`), and the run in
+numbers. **The logbook** (`src/logbook.ts`) keeps every run in the browser:
+the score, the gold, the landmarks raised, the days, how it ended. It
+downloads as JSON, which is the way to send real runs back for balancing.
 
-**Grudges fade and can be bought off.** Standing drifts a point back
-toward zero every 60 days. In any port of a nation that wants you, its
-officials can be bribed a point at a time: 10 gold, times how far below
-zero you are.
-
-**Uncharted islands.** Every run hides eight out in open ocean, in nobody's
-waters, far from ports and from each other. Sight one and the Crown pays
-15 for charting it. After that it's an anchorage: no ship troubles you
-there, and the hull mends a point a day.
-
-**Setting a course** (`src/world/course.ts`): each day's step is the one
-that brings you nearest, and where steps tie, the one that runs best with
-the current and wind you've charted.
-
-**Who's at war with whom** (`src/world/wars.ts`) is part of the world, and
-it moves:
-
-- **How a run opens:** England is at war with the Barbary corsairs and
-  Morocco, and with one of Spain, France or the Dutch Republic, chosen by
-  the run. The other powers' wars open as the century had them: Spain
-  against the Dutch and the French, the Dutch against Portugal, the
-  Ottomans against Venice and Malta, the corsairs against nearly everyone.
-- **It drifts.** Every season each pair of powers may make peace (12%) or
-  fall out (3%). The corsairs make peace hard and break it easily. The news
-  reports it.
-- **You can start a war.** Attacking a nation at peace with England puts a
-  strain on the peace: 1 for firing on a ship, 1 more for taking her, 3 for
-  a raid, 2 more for a sack. At 6, England and that nation are at war. The
-  strain fades as grudges do.
-
-For you, sailing for England, it decides what's fair game:
-
-| her flag | firing on her | taking her, or sacking the town |
-| --- | --- | --- |
-| at war with England (Spain, Barbary) | her nation −1 | her nation −1 more; England +1 (+2 for a town) |
-| at peace with England | her nation −1, England −1 | her nation −1 more, England −1 more |
-| English | piracy | piracy |
-
-A raid costs three times a ship: −3 to the town's nation when you go in,
-−2 more if you sack it.
-
-**Meeting a ship** (`src/world/meet.ts`), when you share a node with one
-outside a port. The world waits until you've dealt with it. If several are
-there, one that means you harm comes first, then the one that matters most
-by the bar's notability.
-
-- **She attacks you** if she's hostile: a guard ship, an armada or a
-  privateer of a nation that wants you, or of one at war with England. The
-  fight is on. Guard ships only go out of their way to hunt you once their
-  nation wants you.
-- **Enemy privateers** fit out of Dunkirk, Saint-Malo, Tortuga, Amsterdam,
-  Willemstad, Salé, Algiers, Havana and Cartagena. Whenever their nation is
-  at war with England they come for you, within 20 days of home. Unlike
-  guard ships they go where they like, other nations' waters included:
-  raiding foreign coasts is the trade.
-- **Anyone else comes alongside, and attacking is your choice.** Let her
-  pass and she goes her way, and won't come alongside again for 5 days.
-  Fire on her and her nation remembers it, a point off your standing,
-  however the fight goes, since you fired first; sinking her costs a point
-  more.
-
-**Events at sea** (`src/world/events.ts`), once a day while nobody is
-fighting:
-
-- **Morale** starts at 7 of 10. From 30 days after the last prize, the crew
-  lose a point every 10 days. At nothing it's **mutiny**: a hand of note is
-  hanged as a ringleader or deserts at the next landfall, taking his cards
-  out of your deck with him. With nobody of note aboard, the strongroom is
-  broken open and 30% of the gold goes. Afterwards morale is 4 and the
-  clock starts again.
-- **What puts it up**: a prize with a payout, +3 (+4 for a sacked town); the
-  first round bought in a port, +1; trading with islanders, +3; each day at
-  anchor off a charted island, +1; a good omen, +2.
-- **Good omens**, about one day in 45 at sea: birds over the bow, a spring on
-  an island, Saint Elmo's fire, porpoises under the bow.
-- **Storms**, about one day in 120 at sea. Three times as often in the
-  Antilles in autumn and in the Indian seas in the summer monsoon, and
-  twice as often past forty degrees. How to meet it is your choice (see
-  *Events that ask you something*, below). (At first a storm simply took 1
-  to 3 hull or some of the gold, it was one day in 80 and up to two fifths of the
-  purse, and the captain bot's wins fell from 43% to 27%; as now, 33% over
-  30 runs, about 5 storms and 10 omens a run, and no mutinies: the bot
-  takes a prize often enough to keep its crew.)
-- **Islanders**: Umatac on Guam (Spanish, the galleon's watering stop on
-  the way to Manila), and native harbours at Kealakekua, Matavai, Nuku'alofa,
-  Nuku Hiva and Rapa Nui. Native ports have no bar, yard or hands to hire,
-  but trade provisions, 3 gold for +3 morale and +2 hull, once a day. Coming
-  in, 30% of the time the canoes come out to fight instead (70% if you've
-  raided them). Beating them off costs you no standing; raiding their town
-  does.
-- **Sea monsters**: one in each named sea on the chart. A monster drifts
-  where the current takes it, turns for home once it's more than 12 days
-  out, and attacks whoever it meets. It's nobody's, so fighting it costs no
-  standing, and its bounty pays (ambergris, and a story for the bar).
-
-**Letters of marque: a run in three acts** (`src/world/letters.ts`).
-*Work in progress on this branch.* A run is three letters, each a nation,
-a region (dashed on the chart), a task, a deadline and a reward: two
-prizes near home (the Narrow Seas, the Barbary coast), then a town to sack
-farther out (the Spanish Main, Brazil, the Indies), then a named Spanish
-plate ship. A letter makes its nation fair game while it lasts. Finishing
-one pays it and brings the next, with the Admiralty's word of where to
-look; the plate ship gets fresh word every 30 days. A missed deadline gets
-more time once, at −2 with England; a second, and the letter is revoked
-and you're a pirate (a pardon brings a new one). All three and home to
-London wins; gold is the score. Runs from before letters win the old way.
-
-The Admiralty's latest word of the plate ship stays on the chart till
-fresher word replaces it, so her cloud is there all act long, widening as
-the word ages.
-
-Where it stands: the captain bot, which now intercepts (it heads for where
-she's likeliest to be in k days that it can reach in k days), wins 2 of 30
-runs, on day 368 on average; 12 of 30 reach the third letter. It is sunk
-in 19 of 30: the letters take a small ship into enemy waters.
-
-**Events that ask you something** (`src/world/dilemmas.ts`). A storm used
-to take its toll and log it; the crew soured in silence. Now the
-events that matter stop the world and ask, and every choice says what it
-stakes before you pick it:
-
-| event | when | choices |
-| --- | --- | --- |
-| a storm | the storm chance, at sea | **ride it out**: lose 1 to 3 hull, never the last · **run before it**: no damage, but 2 to 4 days downwind, off your course, sailed day by day (anything can happen in them) · **lighten ship**: a tenth to a quarter of the gold over the side, 30 at most |
-| the crew want their shares | morale sours to 3 | **pay them**: a tenth of the purse, 5 at least, morale +3 · **promise them the next prize**: morale +1, and a quarter of the next payout is theirs · **stand firm**: even odds of morale +1 or −1 |
-| a man on the beach | half the time you sight new land | **take him aboard**: a hand of note you haven't got, free, if there's a berth — but one in four is a liar and a Jonah, and it's morale −2 · **leave him** |
-
-A choice that can't be made — nothing aboard to lighten, no berth, not
-enough to pay — is shown barred, with why. The bot rides out a storm on a
-sound hull, pays shares it can spare, and takes any castaway; with that it
-wins 27% over 30 runs, against 20% when storms rolled their own cost.
-
-**Building the deck** (`src/outfit.ts`, `src/world/port.ts`). The deck
-was all bought: a bigger ship, a gunner, and every run converged on the
-same cards. Now most of it is chosen.
-
-- **Prize cards.** Take a ship, sack a town, or kill a monster, and three
-  cards from that kind's pool in `PRIZE_CARDS` are offered: keep one, for
-  good, or leave them. The world waits on the choice. They run along three
-  ways to fight — the guns (hit and wounds: *her long guns*, *a Spanish
-  great gun*), the boarders (plunder and hold: *her grapnels*, *boarding
-  pikes*), the runner (flee and chase: *her pilot*, *galley sweeps*) — and
-  the strong ones cost you: the great gun recoils, the pikes cost blood.
-  Prize cards come with you to a new ship.
-- **Striking cards.** A yard that deals with you strikes a copy of any card
-  for 6, down to a deck of 10. The deck is listed under your ship, with the
-  strike buttons when you're in such a port.
-- **Wages.** Every 60 days each hand of note is paid, 1 or 2 gold, from the
-  purse, which is also your score. Short of it, morale falls 2, and the ship
-  stops to tell you.
-
-**Seeing her first** (`src/world/scout.ts`).
-
-- **A longer lookout.** Ships are seen two steps past the water you can
-  read, and a hostile sail newly in sight stops the ship, with how far off
-  she is and whether she's bearing down — time to run, or turn.
-- **A read of her**, off her deck: her hull with any renown bonus, against
-  yours; how heavily she's gunned (her hurt, and what her wounds would
-  cost, per card); whether she'll run, is hard to shake off, mends quickly,
-  or has help coming; and how rich her hold is, laden corsairs included. It
-  shows on the sheet when she comes alongside, and for every ship in the
-  *in sight* list.
-- What the bot makes of it: 20% won over 30 runs, against 23% before. It
-  takes the first card offered, and it dies later than it did (on day 214
-  on average, against 74). Letting it sheer off at the longer lookout made
-  it worse (13%): it turned away from too much, and ran out of time.
-
-**The late game** (`src/world/world.ts`, `src/world/meet.ts`):
-
-- **Renown**, from everything your prizes have paid. At 60, 120 and 200 it
-  goes up a step, and each step hunters and privateers come a quarter
-  farther for you (`reach` in `Pursuit`), and a hostile warship comes with
-  2 more hull. Passing a step is news, and stops the ship.
-- **The home stretch.** With the score in hand and no noose waiting, word
-  gets out, and every privateer of a nation at war with England comes for
-  you, whatever the range. The Channel ports — Dunkirk, Saint-Malo,
-  Amsterdam — are between you and London.
-- **Barbary corsairs**, one each out of Algiers, Salé, Tunis and Tripoli.
-  Each picks an open town of an enemy of its nation within 45 days of home,
-  the nearer the likelier: Baltimore is in reach, and Reykjavík when the
-  Danes are at war with them. It strips the town for 60 days, logs it (and
-  stops your ship if the town was English), and sails home with the
-  captives, where it lies 20 days before going out again. A corsair is
-  hostile to you while its nation is at war with England. Take one laden
-  and it carries 12 more in its hold, and the captives go free: a point
-  with their nation, and one with the Crown.
-- **What it does to a run**: over 30 runs the captain bot wins 23%, down
-  from 33%. Corsairs sank it twice; the bot has no notion of the home
-  stretch and sails into it blind.
-- **Saves migrate.** Each change to the save's shape adds a step to
-  `MIGRATIONS` in `src/save.ts`, so a run in progress survives an update.
-
-**The fight moves** a little, so a round can be read without reading it.
-A new hand deals in from the deck, a card at a time; a wound card drops
-onto it from above. Hull and morale are rows of pips: a pip lost
-drains, a pip gained fills, and the difference floats up off the count.
-The round's lines come in one by one. None of it plays when the reader has
-asked for reduced motion.
-
-**Raiding a port.** In port, raid it instead of trading. The fight is the
-same game against the town's defences, from `src/setup.ts`:
-
-- **A town can't run**: no flee cards. Its people carry valuables inland
-  while you fight, so the longer the raid, the less there is to take.
-- **An open town** has a battery, musketry, barricades. **A fortified
-  port** has great guns and walls to mend, and is too much for a pinnace.
-- **If the raid goes on, help comes**: from the seventh round, the
-  garrison is reinforced, a card on top of the town's deck every other
-  round, four in all. (At first it came every round without end, which
-  flooded every hand with relief.)
-- **A raiding party can fall back to the boats**: two extra flee cards in
-  your deck for a raid. They work when you're threatened, as always.
-- **Sacking it takes everything left in its treasury**, and the town has
-  nothing for anybody (no trade, no raid) for 120 days.
-- **The alarm**: the town's nation's guard ships hunt twice as far, 50 days
-  out, for the next 30 days.
-- **A raid turned out leaves the town on its guard.** Falling back to the
-  boats with what you'd plundered, and coming straight back to a treasury
-  full as new, was the strongest play in the game. Now a raid that ends
-  short of a sack (you fled, or it petered out) puts the town on its guard
-  for 90 days:
-  - for the first 14 the boats would never get ashore: no raid;
-  - after that its walls have 4 more hull and its relief comes 2 rounds
-    sooner, for each raid it has turned out while on its guard;
-  - its treasury starts from what the last raid left it and fills again 1
-    a day, up to the usual.
-
-  The port panel says all of this. A sack ends the guard. Over 60 seeds
-  the captain bot, which raids enemy towns, wins 22% with the guard
-  against about 28% without.
-
-`npm run sim -- --target town --ship brigantine` measures a raid:
-
-| raiding with | open town | fortified port |
-| --- | --- | --- |
-| pinnace | sacked 65%, sunk 8% | never sacked, sunk 3% |
-| brigantine | sacked 91% | sacked 48%, sunk 15% |
-| frigate | sacked nearly always | sacked 95% |
-
-The relief was first a card that hurt *and* mended the walls, which made a
-town nearly impossible to sack; mending only from the barricades, and
-relief that only fires, is what gives the table its shape.
-
-**You sail for England, and attacking an English ship is piracy.**
-- England wants you, at least -3, and while you're a pirate that grudge
-  doesn't fade.
-- English ports won't deal with you, and no bribe changes that.
-- London won't count as a win: they'd hang you.
-- A royal pardon (80, in any English port) clears it all and sets England
-  back to 0.
-- Port Royal and Bridgetown keep English guard ships, pirate hunters, who
-  come out only for a captain England wants.
-
-Every kind of ship has a deck (`src/setup.ts`):
-
-| target | hull | hold | deck |
-| --- | --- | --- | --- |
-| merchant | 12 | 12 | return fire, jettisons cargo, runs |
-| guard ship | 12 | 3 | hits hard, grapples so you can't run, bounty 10 |
-| galleon | 13 | 30 | heavy guns, runs, strikes for the silver |
-| treasure fleet | 24 | 60 | escorts' broadsides, cuts off your retreat, a straggler to snatch |
-| armada | 30 | 4 | broadsides of 4, holds the weather gauge. Run. |
-
-A ship is **credibly threatened**, and its flee cards work, at half hull or
-less, *or outgunned three to one*. That's what makes a fleet or an armada
-survivable: against them your flee cards work from the first hand, unless
-they hold you. A captain who runs whenever a flee card works gets away from
-a treasure fleet 77% of the time (often with a straggler's plunder) and
-from an armada 66%. One who stays sinks. `npm run sim -- --target armada`.
-
-Afterwards it is settled:
-- the payout goes in the purse;
-- your hull is kept as it came out (mend it in port at 3 gold a point);
-- each prisoner questioned (`interrogate`) gives a rumor about a ship seen
-  in the last few days;
-- a ship destroyed is laid up at home for 60 days;
-- a ship parted from leaves you be for 5;
-- if you're sunk, the run is over.
-
-**You see the next node.** The water a step out from you, its current and
-this season's wind, goes on your chart (`WorldState.chart`). Currents never
-change, so a current once seen is charted for good. Winds change with the
-season, but the seasons come round, so wind seen in summer is charted for
-every summer. Predictions only use what's on your chart: in water you've
-never sailed, every leg looks the same. `sight` is one step for now; the
-crew will extend it.
-
-Each rumor gives two things:
-
-- **a marker**, which loses a fifth of its strength each day and is gone
-  below a tenth. A 90% rumor lasts ten days.
-- **a prediction**, a cloud of where the ship could be now. It starts at
-  the report and sails forward the way that kind sails:
-  - a merchant is bound for one of the ports it trades with, nobody knows
-    which;
-  - a treasure fleet keeps its known course;
-  - a hunter is bound for you if you're in its range, else for its station.
-
-  It weighs each leg by what's on your chart. The **search area** is the
-  fewest nodes holding 70% of the cloud.
-
-`npm run rumors` measures what a chart is worth, from a blank one to the
-whole sea known. For a 90% rumor, about a random ship, over 80 rumors:
-
-| you know | 2 days old: best guess right | 8 days: best guess right | 8 days: search area | ship inside it |
-| --- | --- | --- | --- | --- |
-| nothing | 28% | 9% | 24 steps | 63% |
-| currents | 33% | 10% | 22 | 69% |
-| wind | 35% | 15% | 20 | 75% |
-| both | 34% | 14% | 18 | 76% |
-
-Knowing the sea still helps: a tighter search, and one you can trust. It
-helps less than on the Caribbean-only map, though, where an eight-day
-search shrank from 32 nodes to 18. Most ships are merchants working coasts,
-where the currents are slack and any of a dozen ports is plausible. The sea
-earns its keep on the long runs: treasure courses, ocean crossings,
-monsoon passages.
-
-`npm run chart -- out.svg land.geojson` draws the world. Add `--turns 2000`
-for where ships actually went, `--flow current` or `--flow wind:2` for the
-sea's grain, and `--box w,s,e,n --scale 30` to zoom. Drake's route is traced
-through the graph on every chart.
+**The run saves as you go** (`src/save.ts`), after every day and every card.
+A save carries a version, and a step in `MIGRATIONS` brings an older one up
+to date, so a run in progress survives an update.
 
 ## balance
 
-`npm run voyage` plays whole runs with a captain bot. In port it repairs,
-buys rounds, hires crew and buys a bigger ship when it can spare the gold.
-At sea it chases the best rumor, sheers off from armadas and from guard
-ships that want it, fights by lookahead, runs when outgunned, and goes
-home with the score. It attacks only enemies (Spanish and Barbary
-merchants and galleons) on a sound hull, lets the rest pass, and raids
-enemy towns, and fortified ports only from a brigantine up. Over 100 runs
-it **wins 39%**, home around day 525, after about eleven raids a run. Most
-of the rest sink: 30 raiding towns, 13 to armadas, which attack on sight
-now that Spain is at war with you.
+`npm run voyage` plays whole runs with a captain bot (`cli/voyage.ts`). It
+fits out at the chandler, sails the voyage taking a fork at random, rations
+by the leg ahead, waters, forages and careens where there's a shore, fights
+by one-step lookahead and runs when outgunned, and turns aside for a prize
+within 8 days.
 
-The economy and the danger are one dial. Cutting a town's treasury from
-25 to 20 took wins from 39% to 9%, and *more* captains sank raiding, not
-fewer: short of gold, they couldn't buy a sturdier ship, and kept raiding
-in a pinnace.
+```
+npm run voyage -- [--runs 20] [--days 730] [--from 0]
+  --straight  keep to the voyage: no turning aside for prizes, no raids off it
+  --trace     each run's landmarks, deaths and fights, from the log
+  --where     where the ship is and what it's steering for, every five days
+```
 
-Getting there took three changes:
+Over 40 runs of up to 1,000 days, it **wins 9** (23%), on day 504 on
+average, with 92 in the purse: 7 voyages like Fenton's and 2 like
+Cavendish's. The other 31 are lost on day 396 on average, 28 of them for
+want of hands, 3 in a fight; about 14 hands a run die of want, scurvy far
+ahead of thirst. With `--straight`, keeping to the way, it wins 13 of 40
+(33%) with 79 in the purse: 11 like Fenton's, 2 like Cavendish's. No run has
+yet come home like Drake's: round the world, rich, and half the crew alive.
+Scurvy on the long crossings is what stands between.
 
-- **A bigger starting hull (6 to 10).** At 6, a merchant fight sank you a
-  quarter of the time: a fine gamble once, but over the 15–25 fights of a
-  run nobody lived. At 10 it's 6%, and each fight costs hull you pay to
-  mend instead.
-- **Repairs at 1 gold a point, not 3.** At 3, mending a merchant fight's
-  damage cost more than the merchant paid.
-- **Outgunned at two to one, not three,** so a fleet or an armada is still
-  something to run from once your hull is bigger.
+It's hard, and meant to be, but the bot is a poor captain: it never hires
+hands abroad, has no plan for the Pacific crossing, and takes the
+treasure ship only when it happens to be fit to. A person will do better;
+the logbook will say.
+
+What moved the numbers to here: the treasure ship, and a crew that sours only after 60 days without a prize, then every 15 (it was 30 and 10, which on a voyage meant a mutiny every crossing); privateers hunting within 10 days of home
+rather than 20, and leaving you be 60 days after a fight (from 33 meetings a
+run to about 4); no guard ships on the Pacific coast; fights killing 1.5% of
+the hands a point of hull, not 3%; calms one day in 15 in the doldrums, not
+10; and scurvy killing more slowly.
 
 ## running it
 
@@ -745,120 +402,68 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/, relative paths
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules (no install needed)
+npm test                     # the rules and the world, 162 tests
 npm run play                 # one encounter in the terminal, random seed
 npm run play -- --seed 42    # that encounter again
 npm run sim                  # card bots × 2000 fights (--target armada, --hull 14)
-npm run voyage               # whole runs with a captain bot (--runs 40 --days 730)
+npm run voyage               # whole runs with a captain bot (see balance)
 npm run rumors               # how good a rumor is, by age and knowledge
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
 npm run coast -- ne.geojson  # rebuild the coastline the browser draws (1:50m)
 npm run chart -- out.svg land.geojson [--turns 2000 --flow current --box w,s,e,n --scale 30]
 ```
 
-In the browser, `?seed=42` replays an encounter too. Keys: 1 2 3 pick,
-enter resolve, s break off.
+In the browser, keys: space sets sail or heaves to, f finds the ship, + and
+− zoom; in a fight 1 2 3 pick, enter resolves.
 
 ## layout
 
 ```
 src/
   rng.ts         seeded RNG; its whole state is one integer kept in the game state
-  cards.ts       the effect vocabulary and the placeholder decks
+  cards.ts       the effect vocabulary, card types and card text
   rules.ts       createEncounter, act, legalActions — pure, no I/O
-  setup.ts       the one encounter so far: you and a merchant
+  setup.ts       every kind of ship and town, and its deck
   describe.ts    words for events and the cards' glossary, shared by terminal and browser
-  save.ts        saving a run to the browser, and loading it back
+  save.ts        saving a run to the browser, and migrating it forward
   logbook.ts     the logbook of finished runs, and today's voyage
-  rules.test.ts
-  outfit.ts      ships, crew, upgrades: what your deck is made of
-  ui/            Svelte: App (the game), SeaChart, SeaShader, Fight, CardView, Gauge, ShipSheet; sound.ts
+  outfit.ts      ships, crew, refits, prize cards: what your deck is made of
+  ui/            Svelte: App, SeaChart, SeaShader, Fight, CardView, Gauge, ShipSheet, Stores; sound.ts
   world/
     data/        world.json: the world graph, from Natural Earth
     passages.ts  the narrow straits, traced by hand
-    ports.ts     the ports of 16XX and their flags
-    ocean.ts     currents, rivers, banks, the wind model, the great courses
+    ports.ts     the ports of 1580 and their flags
+    ocean.ts     currents, rivers, banks, the wind model, the great courses and crossings
     drake.ts     Drake's raid round the world, as the places he touched
+    landmarks.ts the voyage's landmarks and forks: data only
+    journey.ts   where you are on the voyage, where you're bound, raising a landmark, coming home
     geo.ts       the sphere: distances, great circles, headings
-    map.ts       the world graph split into days, with ports and features
+    map.ts       the world graph split into days, with ports, lanes and landmarks
     sea.ts       currents and wind per node, and how they weigh a leg
     ships.ts     the kinds of ship and how each moves
     rumors.ts    making a rumor, its fading marker, its prediction
     bar.ts       buying rounds, and what the room tells you
-    meet.ts      meeting a ship at sea, fighting it, settling up, repairs
-    port.ts      hiring, the yard, bribes, and who will deal with you
-    wars.ts      who's at war with whom, and so what's fair game
+    meet.ts      meeting a ship, fighting it, settling up, raids, repairs
+    port.ts      hiring, the yard, bribes, pardons, and who will deal with you
+    wars.ts      who's at war with whom in 1580, and so what's fair game
+    stores.ts    hands, food, water, spares, powder; the shore; the chandler; what a fight costs and a prize pays
+    weather.ts   the days at sea: rain, fish, calms, williwaws, fever, foul water, weevils
     events.ts    a day at sea: morale and mutiny, storms, omens
     dilemmas.ts  events that ask you something, and what each choice stakes
+    score.ts     the score, and the voyage of the time it was like
+    treasure.ts  the treasure ship off Cape San Francisco, asleep or warned
     scout.ts     the lookout, and a read of a ship before you meet her
     seas.ts      the named seas, where the chart letters them and the monsters keep
-    course.ts    setting a course and sailing it a day at a time
+    course.ts    setting a course and sailing it a day at a time, at a pace
     world.ts     createWorld, advance, observe, hearRumor — pure, like rules.ts
+    testing.ts   a test helper: holds that never empty
 cli/
   play.ts        the interactive harness
   sim.ts         bots and their outcome tables
+  voyage.ts      whole runs with a captain bot
   render.ts      text rendering shared by both
 ```
 
 `rules.ts` knows nothing about drawing. A renderer reads `EncounterState`
 and its `events` log and sends `Action`s back. The `events` log is there so a
 renderer can animate what happened, not just show the new state.
-
-## what the simulator says so far
-
-Every bot does the same thing each round: it tries all six ordered keeps one
-step ahead and takes the best result. The bots differ only in how much they
-value hull, and whether getting away counts as winning. They count damage
-waiting in the deck at most of a point each. Ship hull 6, merchant hull 12,
-over 5,000 seeds:
-
-| bot | payout | rounds | you flee | target flees | destroyed | sunk |
-| --- | --- | --- | --- | --- | --- | --- |
-| balanced | 10.3 | 21 | 3% | 12% | 61% | 25% |
-| careful | 10.7 | 21 | 4% | 10% | 66% | 20% |
-| never flees | 10.1 | 21 | 1% | 13% | 61% | 26% |
-| random keeps | 3.6 | 14 | 41% | 12% | 3% | 45% |
-
-That was a single fight, tuned with a 6-hull ship. For whole runs the
-pinnace now has 10 (see *balance* above), which makes a merchant 81%
-destroyed and 6% sunk for the balanced bot: `npm run sim -- --hull 6` gives
-the table above back.
-
-How we got here, because the cliffs are the useful part. (This was the
-first damage model, where all shot became damage cards. It's been replaced
-by direct damage and wounds; see below.)
-
-- **Damage cards spread through the deck at random** made you nearly
-  untouchable: 92% destroyed, 4% sunk. Spread out, two of your damage cards
-  almost never shared a hand, and you could always dodge one. Making the
-  merchant hit harder barely changed that.
-- **Damage cards on top of the deck** fixed it. Fire lands in the next
-  hand, so a hurt of 2 forces at least one hit.
-- **Merchant hull 12 and broadside 4.** Damage against the merchant is a
-  good card for you, but it still takes one of your two keeps. Your deck
-  holds a fixed amount of shot, so when the merchant's hull is close to
-  that total, every keep spent on something else costs you. One point past
-  it and the merchant can't be sunk.
-
-**Then shot went straight to the hull.** Damage cards for every point of
-shot made fights long (21 rounds) and let you dodge most of what came at
-you. Now shot lands at once, and only some of it leaves a wound card. Fights
-are shorter and threat comes sooner, so running matters again: a captain
-who runs when it can gets away from a merchant a third of the time.
-
-Old open questions from the damage-card model, kept for the record:
-
-- **Fleeing hardly matters now.** Damage you're owed lands late, so by the
-  time you're threatened the merchant usually is too, and finishing it pays
-  better. Before damage cards, fleeing cut sinking nearly in half; now it
-  saves about one encounter in a hundred.
-- **Encounters run about 21 rounds,** double what they were. Every hit adds
-  cards to the deck.
-- **A forced flee.** Even "never flees" gets away 1% of the time. When a
-  threatened ship is dealt a flee card beside two worse cards, keeping it
-  can be the least bad option. That reads as the crew running whatever you
-  wanted, which may be fine.
-- **The ships never part.** Somebody always flees, sinks or goes down before
-  the deck runs out. The ending is a safety net for now.
-- **Destroying still pays best.** The bounty is usually worth more than the
-  cargo that sinks with the ship.

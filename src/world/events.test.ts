@@ -140,7 +140,7 @@ test('under sail, a storm or a mutiny brings you to; a fair day does not', async
   const far = at('Table Bay');
   let halts = 0;
   for (let seed = 0; seed < 6 && halts < 2; seed++) {
-    let w = quiet({ ...createWorld(sea, seed), player: at('Plymouth') });
+    let w = quiet({ ...createWorld(sea, seed), player: at('Plymouth'), crew: 1000 });
     for (let day = 0; day < 200 && w.player !== far; day++) {
       const before = w;
       const out = sailToward(sea, w, far);

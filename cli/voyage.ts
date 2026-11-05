@@ -34,6 +34,7 @@ import { type ShipKind, wantedBy } from '../src/world/ships.ts';
 import { advance, createSea, createWorld, GOAL, knowledge, pursuitOf, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
 import { score } from '../src/world/score.ts';
+import { coastAwake } from '../src/world/treasure.ts';
 import { ashore, buy, daysOf, price, room, shore, type Ware } from '../src/world/stores.ts';
 
 const arg = (name: string, fallback: string) => {
@@ -62,11 +63,16 @@ function inPort(w: WorldState): WorldState {
   if (w.hull < w.maxHull && w.gold >= REPAIR_COST) w = repair(sea, w);
   // The chandler first: water, food, hands, spares, powder, while there's room and money.
   for (const ware of ['water', 'food', 'hands', 'spares', 'powder'] as Ware[]) {
-    const keep = ware === 'water' || ware === 'food' ? 0 : 10;
-    for (let i = 0; i < 40 && room(w, ware) && w.gold - price(sea, w, ware) >= keep; i++) w = buy(sea, w, ware, true);
+    // Rich, keep the fortune: food and water still, the rest only from what's over it.
+    const keep = ware === 'water' || ware === 'food' ? 0 : w.voyage.visited.includes('cacafuego') || w.gold >= GOAL ? w.gold : 10;
+    // Food and water to about four months: a fuller hold only rots.
+    const enough = () => (ware === 'food' ? daysOf(w).food >= 120 : ware === 'water' ? daysOf(w).water >= 120 : false);
+    for (let i = 0; i < 40 && room(w, ware) && !enough() && w.gold - price(sea, w, ware) >= keep; i++) w = buy(sea, w, ware, true);
   }
   for (let i = 0; i < 2 && w.gold >= ROUND_COST + 10; i++) w = buyRound(sea, w).world;
-  const reserve = 15;
+  // Rich, the fortune stays in the strongroom: ships and hands only from what's over it.
+  const silver = w.voyage.visited.includes('cacafuego');
+  const reserve = silver || w.gold >= GOAL ? Math.max(15, w.gold) : 15;
   for (const cls of ['frigate', 'brigantine', 'sloop']) {
     const c = SHIP_CLASSES[cls];
     if (c.hull > SHIP_CLASSES[w.outfit.ship].hull && w.gold - c.cost >= reserve && w.outfit.crew.length <= c.berths) {
@@ -213,7 +219,9 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
       // An enemy port, on a sound hull: raid it. A fortified one only in a ship that can take it.
       const port = map.nodes[w.player].port!;
       const able = !port.fort || SHIP_CLASSES[w.outfit.ship].hull >= 14;
-      if ((!STRAIGHT || Object.values(map.landmarks).includes(w.player)) && isEnemy(w.wars, port.nation) && raidable(sea, w) && able && w.hull >= w.maxHull * 0.9) {
+      // The coast of Chile and Peru is left asleep until the treasure ship is taken: a raid would warn her.
+      const sleeping = !w.voyage.visited.includes('cacafuego') && coastAwake(sea, { ...w, sacked: { [w.player]: 0 }, guarded: {} });
+      if ((!STRAIGHT || Object.values(map.landmarks).includes(w.player)) && !sleeping && isEnemy(w.wars, port.nation) && raidable(sea, w) && able && w.hull >= w.maxHull * 0.9) {
         w = fightItOut(raid(sea, w));
         raids++;
       } else w = inPort(w);
@@ -243,7 +251,7 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
     }
     if (dest === null || since > 10 || w.player === dest || danger(w) !== null) ((dest = choose(w)), (since = 0));
     if (dest === w.player) dest = harbours[(seed + w.turn) % harbours.length];
-    if (process.argv.includes('--where') && w.turn % 5 === 0) { const n = map.nodes[w.player], t = map.nodes[dest]; console.log(w.turn, `at ${n.lat.toFixed(0)},${n.lon.toFixed(0)}`, `for ${t.port?.name ?? `${t.lat.toFixed(0)},${t.lon.toFixed(0)}`}`, w.voyage.bound, 'hull', w.hull, 'water', daysOf(w).water, 'food', daysOf(w).food, w.rations); }
+    if (process.argv.includes('--where') && w.turn % 5 === 0) { const n = map.nodes[w.player], t = map.nodes[dest]; console.log(w.turn, `at ${n.lat.toFixed(0)},${n.lon.toFixed(0)}`, `for ${t.port?.name ?? `${t.lat.toFixed(0)},${t.lon.toFixed(0)}`}`, w.voyage.bound, 'hull', w.hull, 'water', daysOf(w).water, 'food', daysOf(w).food, w.rations, 'gold', w.gold, 'crew', w.crew); }
     const out = sailToward(sea, w, dest);
     // Going nowhere — there already, or no way there — the day still passes, lying where she is.
     w = answer(out.world.turn === w.turn ? advance(sea, answer(out.world), out.world.player) : out.world);
@@ -253,7 +261,8 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
     if (w.hail) {
       const h = w.hail;
       const worth = (h.kind === 'merchant' || h.kind === 'treasure-ship') && isEnemy(w.wars, h.nation);
-      w = worth && w.hull >= w.maxHull * 0.6 ? attack(w) : letPass(w);
+      // The treasure ship asleep is always worth it; anything else wants a sound hull.
+      w = worth && (h.plate === 'asleep' || w.hull >= w.maxHull * 0.6) ? attack(w) : letPass(w);
       if (!w.encounter) passed++;
     }
     if (w.encounter) {
@@ -261,7 +270,8 @@ for (let seed = FROM; seed < FROM + RUNS; seed++) {
       dest = null;
     }
   }
-  if (process.argv.includes('--trace')) console.log(seed, w.log.filter((l) => /you raise|dead of|the fight cost|Plymouth|too few/.test(l.text)).map((l) => `${l.turn}:${l.text}`).join('\n  '));
+  if (process.argv.includes('--runs-summary')) { const met = w.log.find((l) => l.text.includes('the treasure ship from Callao')); const took = met && w.log.some((l) => l.turn === met.turn && l.text.startsWith('her hold')); console.log(seed, w.won ? 'WON' : w.sunk ? 'sunk' : 'adrift', 'day', w.turn, 'gold', w.gold, 'crew', w.crew, met ? (took ? 'took her' : 'met her') : 'never met', 'via', w.voyage.visited.slice(-4).join('>')); }
+  if (process.argv.includes('--trace')) console.log(seed, w.log.filter((l) => /you raise|dead of|the fight cost|Plymouth|too few|treasure ship|her hold/.test(l.text)).map((l) => `${l.turn}:${l.text}`).join('\n  '));
   if (w.won) likes[score(w).like] = (likes[score(w).like] ?? 0) + 1;
   if (w.sunk) {
     const why = w.log.at(-1)?.text.includes('too few hands') ? 'too few hands' : 'in a fight';

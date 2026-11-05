@@ -9,6 +9,7 @@
 import { HOME_LANDMARK, LANDMARKS, START_LANDMARK, landmark } from './landmarks.ts';
 import type { Sea } from './ships.ts';
 import type { WorldState } from './world.ts';
+import { PLATE_LANDMARK, overhaul } from './treasure.ts';
 
 export interface Voyage {
   /** The landmark you last raised. */
@@ -66,7 +67,9 @@ export function raise(sea: Sea, s: WorldState): WorldState {
     const said = how === 'round' ? 'round the world and home' : how === 'back' ? 'home the way you went' : 'turned back, and home';
     return { ...s, voyage, won: true, ending: 'home', log: [...s.log, { turn: s.turn, text: `Plymouth: ${said}, with ${s.gold}`, stop: true }] };
   }
-  return { ...s, voyage, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] };
+  const raisedIt: WorldState = { ...s, voyage, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] };
+  // Off Cape San Francisco, the first time: the treasure ship.
+  return raised === PLATE_LANDMARK && !v.visited.includes(PLATE_LANDMARK) ? overhaul(sea, raisedIt) : raisedIt;
 }
 
 /** The landmarks in order of the main line, for drawing: every one, once. */

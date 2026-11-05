@@ -41,6 +41,7 @@ import { CASUS_BELLI, YOUR_NATION, declare, isEnemy } from './wars.ts';
 import type { WorldState } from './world.ts';
 import { cardType } from '../cards.ts';
 import { fightCost, prizeStores } from './stores.ts';
+import { plateExtra } from './treasure.ts';
 
 export { YOUR_NATION } from './wars.ts';
 
@@ -80,6 +81,8 @@ export interface Hail {
   shipId: number;
   kind: ShipKind;
   nation: Nation;
+  /** The treasure ship off Cape San Francisco: asleep, or warned by your raids. See treasure.ts. */
+  plate?: 'asleep' | 'warned';
 }
 
 export interface Reckoning {
@@ -178,7 +181,7 @@ export function attack(s: WorldState): WorldState {
   const h = s.hail;
   if (!h) throw new Error('there is no ship alongside');
   const next = reckon(s, h.nation, 1, { enemy: 0, neutral: 1 }, (flag) => `you fired on ${article(flag)} ${flag} ${h.kind.replace('-', ' ')}`, 1);
-  return startFight(next, { shipId: h.shipId, port: null, kind: h.kind, nation: h.nation }, false);
+  return startFight(next, { shipId: h.shipId, port: null, kind: h.kind, nation: h.nation }, false, h.plate ? plateExtra(h.plate === 'warned') : undefined);
 }
 
 /** Let the ship alongside go her way. She won't come alongside again for a few days. */

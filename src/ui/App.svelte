@@ -11,7 +11,8 @@
   import { SEASON_NAMES } from '../world/ocean.ts';
   import { bribe, bribeCost, buyPardon, buyShip, buyUpgrade, isHaven, leavePrize, PARDON_COST, takePrize, PROVISION_CHEER, PROVISION_COST, PROVISION_HULL, provision, provisions, recruit, retire, serves } from '../world/port.ts';
   import { IDLE_DAYS, MORALE_MAX } from '../world/events.ts';
-  import { inSight, lookout, readShip } from '../world/scout.ts';
+  import { inSight, lookout, read, readShip } from '../world/scout.ts';
+  import { plateExtra } from '../world/treasure.ts';
   import { choices as choicesOf, daysTo, makeFor } from '../world/journey.ts';
   import { LANDMARKS, landmark } from '../world/landmarks.ts';
   import { choices, choose, describe as describeDilemma } from '../world/dilemmas.ts';
@@ -726,7 +727,11 @@
       <div class="overlay">
         <div class="sheet">
           <h2><Flag nation={h.nation} size={18} />{article(flagName)} {flagName} {what} alongside</h2>
-          {#if world.ships.find((x) => x.id === h.shipId)}
+          {#if h.plate}
+            {@const r = read(h.kind, plateExtra(h.plate === 'warned'))}
+            <p>the treasure ship of the South Sea, with the year's silver from Callao for Panama. {h.plate === 'warned' ? 'word of your raids on the coast has gone ahead of you, and she is ready for you.' : 'she has never seen an enemy in these waters, and takes you for one of her own.'}</p>
+            <p class="reading">hull {r.hull} to your {world.hull} · {r.traits.join(' · ')}{r.bounty ? ` · a price of ${r.bounty} on her` : ''}</p>
+          {:else if world.ships.find((x) => x.id === h.shipId)}
             {@const r = readShip(world.ships.find((x) => x.id === h.shipId)!)}
             <p class="reading">hull {r.hull} to your {world.hull} · {r.traits.join(' · ')}{r.bounty ? ` · a price of ${r.bounty} on her` : ''}</p>
           {/if}

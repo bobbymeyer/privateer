@@ -27,9 +27,9 @@ import { weatherDay } from './weather.ts';
 export const MORALE_MAX = 10;
 export const MORALE_START = 7;
 /** Days without a prize before the crew start to sour. */
-export const IDLE_DAYS = 30;
+export const IDLE_DAYS = 60;
 /** After that, a point of morale lost every this many days. */
-export const SOUR_EVERY = 10;
+export const SOUR_EVERY = 15;
 /** Where morale is set again after a mutiny, once it's over. */
 export const AFTER_MUTINY = 4;
 /** What a mutiny takes from the strongroom, when there's nobody of note to blame. */

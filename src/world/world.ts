@@ -165,7 +165,8 @@ export const DEFAULT_FLEET: FleetEntry[] = [
   ...CORSAIR_PORTS.map((home): FleetEntry => ({ kind: 'corsair', home })),
   { kind: 'treasure-fleet', route: 'flota' },
   { kind: 'treasure-fleet', route: 'galeones' },
-  { kind: 'treasure-fleet', route: 'south sea fleet' },
+  // The plate ship of the South Sea: alone, as the Cacafuego was, since nobody had ever come to take her. See treasure.ts.
+  { kind: 'treasure-ship', route: 'south sea fleet' },
   { kind: 'treasure-ship', route: 'manila galleon' },
   { kind: 'treasure-ship', route: 'carreira' },
   { kind: 'armada', route: 'barlovento' },
