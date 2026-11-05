@@ -16,6 +16,7 @@ import { aDay } from './events.ts';
 import { type Hail, type Meeting, type Reckoning, sailSighted } from './meet.ts';
 import { type FightRecord, NO_TALLY, type Tally } from './record.ts';
 import { START_VOYAGE, type Voyage, raise } from './journey.ts';
+import type { Rumor } from './rumors.ts';
 import { type Pace, type Rations, type Stores, startCrew, startStores } from './stores.ts';
 
 /** The chart: the lanes, and where each landmark lies on them. The same for every run. */
@@ -59,6 +60,10 @@ export interface WorldState {
   spice: number;
   /** What has happened that happens once a voyage, and grievances carried to the next landmark. See happenings.ts. */
   seen: string[];
+  /** Rumors heard: of what, from whom, true or not, and whether you mean to follow. See rumors.ts. */
+  rumors: Rumor[];
+  /** The island a storm drove you onto, while you lie there. See landfalls.ts. */
+  landfall: string | null;
   /** Home: the run is won. */
   won: boolean;
   /** Lost: sunk, or too few hands to work her. The run is over. */
@@ -123,6 +128,8 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace'): WorldStat
     raided: [],
     spice: 0,
     seen: [],
+    rumors: [],
+    landfall: null,
     won: false,
     sunk: false,
     ending: null,

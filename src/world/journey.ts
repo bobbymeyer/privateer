@@ -10,6 +10,7 @@ import type { Sea, WorldState } from './world.ts';
 import { PLATE_LANDMARK, overhaul } from './treasure.ts';
 import { arriving } from './happenings.ts';
 import { SPICE_WORTH } from './stores.ts';
+import { arriveDetour, followed, hearAt } from './rumors.ts';
 
 export interface Voyage {
   /** The landmark you last raised. */
@@ -30,22 +31,28 @@ export function howHome(v: Voyage): Return {
   return 'turned';
 }
 
-/** Where you can make for from here: the next landmarks, and, once you've left Plymouth, home. */
-export function choices(v: Voyage): string[] {
-  const next = landmark(v.at).next;
+/** The next landmarks from here: the way's, and any detour you mean to follow that branches here. */
+function nextFrom(v: Voyage, detours: string[]): string[] {
+  const rumored = detours.filter((k) => landmark(k).detour?.from.includes(v.at) && !v.visited.includes(k));
+  return [...landmark(v.at).next, ...rumored];
+}
+
+/** Where you can make for from here: the next landmarks, any detour you're following, and, once you've left Plymouth, home. */
+export function choices(v: Voyage, detours: string[] = []): string[] {
+  const next = nextFrom(v, detours);
   if (v.at === START_LANDMARK || next.includes(HOME_LANDMARK)) return next;
   return [...next, HOME_LANDMARK];
 }
 
 /** The one way on from here, if the way doesn't divide (turning for home aside); null at a fork. */
-export function onward(v: Voyage): string | null {
-  const next = landmark(v.at).next;
+export function onward(v: Voyage, detours: string[] = []): string | null {
+  const next = nextFrom(v, detours);
   return next.length === 1 ? next[0] : null;
 }
 
-/** Make for a landmark: one of the next, or home. */
+/** Make for a landmark: one of the next, a detour you're following, or home. */
 export function makeFor(s: WorldState, key: string): WorldState {
-  if (!choices(s.voyage).includes(key)) throw new Error(`you can’t make for ${landmark(key).name} from ${landmark(s.voyage.at).name}`);
+  if (!choices(s.voyage, followed(s)).includes(key)) throw new Error(`you can’t make for ${landmark(key).name} from ${landmark(s.voyage.at).name}`);
   return { ...s, voyage: { ...s.voyage, bound: key } };
 }
 
@@ -59,7 +66,7 @@ export const daysTo = (sea: Sea, s: WorldState, key: string) => sea.map.distTo(s
  */
 export function raise(sea: Sea, s: WorldState): WorldState {
   const v = s.voyage;
-  const candidates = [...new Set([...(v.bound ? [v.bound] : []), ...choices(v)])];
+  const candidates = [...new Set([...(v.bound ? [v.bound] : []), ...choices(v, followed(s))])];
   const raised = candidates.find((k) => sea.map.landmarks[k] === s.player);
   if (!raised || raised === v.at) return s;
   const voyage: Voyage = { at: raised, bound: null, visited: [...v.visited, raised] };
@@ -73,7 +80,10 @@ export function raise(sea: Sea, s: WorldState): WorldState {
     const gold = s.gold + sold;
     return { ...s, voyage, gold, spice: 0, won: true, ending: 'home', log: [...log, { turn: s.turn, text: `Plymouth: ${said}, with ${gold}`, stop: true }] };
   }
-  const raisedIt: WorldState = arriving({ ...s, voyage, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] }, raised);
+  let w: WorldState = arriving({ ...s, voyage, landfall: null, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] }, raised);
   // Off Cape San Francisco, the first time: the treasure ship.
-  return raised === PLATE_LANDMARK && !v.visited.includes(PLATE_LANDMARK) ? overhaul(sea, raisedIt) : raisedIt;
+  if (raised === PLATE_LANDMARK && !v.visited.includes(PLATE_LANDMARK)) w = overhaul(sea, w);
+  // A detour: whether the rumor was true. Anywhere else: a rumor, maybe.
+  w = l.detour ? arriveDetour(sea, w, raised) : hearAt(w, raised);
+  return w;
 }

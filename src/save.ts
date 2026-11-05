@@ -9,12 +9,14 @@
 
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 
 /** From each version to the next, since the voyage was simplified (12): a run in progress shouldn't be lost to an update. */
 const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, unknown>> = {
   // 12 → 13: spice, and the once-a-voyage happenings.
   12: (w) => ({ ...w, spice: 0, seen: [] }),
+  // 13 → 14: rumors, and the island a storm put you on.
+  13: (w) => ({ ...w, rumors: [], landfall: null }),
 };
 
 export const SAVE_KEY = 'privateer:run';

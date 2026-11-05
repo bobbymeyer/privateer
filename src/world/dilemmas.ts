@@ -9,6 +9,9 @@
 import { type Roller, roll } from './random.ts';
 import { capacity, deaths, topUp } from './stores.ts';
 import { DISCONTENT_LOST } from './happenings.ts';
+import { landmark } from './landmarks.ts';
+import { DETOURS, SOURCES, type Source, heed } from './rumors.ts';
+import { driven } from './landfalls.ts';
 import type { Sea, WorldState } from './world.ts';
 import { FEVER_NURSE, FEVER_NURSE_DAYS, FEVER_PRESS, FLUX, FOUL_LOST, WEEVIL_LOST, WEEVIL_SICK, feverDeaths, fluxDeaths } from './weather.ts';
 
@@ -32,7 +35,9 @@ export type Dilemma =
   /** A gentleman stirring the hands at San Julián, as Doughty did: try him, maroon him, or let it be. */
   | { kind: 'gentleman' }
   /** Hands who want to stay in the islands: let them go, or double the watch. */
-  | { kind: 'deserters' };
+  | { kind: 'deserters' }
+  /** A rumor of a detour: follow it, or let it be. Whether it's true is settled already, and not said. See rumors.ts. */
+  | { kind: 'rumor'; key: string; source: Source; told: string; truth: boolean };
 
 export interface Choice {
   key: string;
@@ -93,6 +98,8 @@ export function describe(d: Dilemma): { title: string; text: string } {
       return { title: 'aground', text: 'on a reef in the Indies, fast by the bow, with the tide falling. Drake sat a day on one like it, and threw cloves and guns over to float her.' };
     case 'gentleman':
       return { title: 'a gentleman adventurer', text: 'one of the gentlemen who put money in the voyage has been telling the hands you will drown them all, and some of them listen. Drake tried Doughty here, and beheaded him.' };
+    case 'rumor':
+      return { title: `a rumor: ${landmark(d.key).name}`, text: `${d.told} says ${DETOURS[d.key].word}.` };
     case 'deserters':
       return { title: 'hands who would stay', text: 'some of the hands have found the islands kinder than the ship, and mean to stay when she sails.' };
   }
@@ -150,6 +157,13 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
         { key: 'maroon', label: 'put him ashore', stakes: 'he goes, and his friends may go with him: 1 to 3 hands' },
         { key: 'leave', label: 'let it be', stakes: `even odds that ${range(DISCONTENT_LOST)} hands slip away at the next landmark` },
       ];
+    case 'rumor': {
+      const from = landmark(d.key).detour!.from.filter((k) => !s.voyage.visited.includes(k) || k === s.voyage.at).map((k) => landmark(k).name);
+      return [
+        { key: 'follow', label: 'see for yourself', stakes: `${landmark(d.key).name} goes among your choices at ${from.join(' or ')}; ${trustOf(d.source)}` },
+        { key: 'ignore', label: 'let it be', stakes: 'sailors’ talk: you keep to the way' },
+      ];
+    }
     case 'deserters':
       return [
         { key: 'go', label: 'let them go', stakes: `${range(DESERTERS)} hands stay behind` },
@@ -160,12 +174,12 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
 
 /** Make the choice. Throws if there's nothing to choose, or the choice is barred. */
 export function choose(sea: Sea, s: WorldState, key: string): WorldState {
-  void sea;
   const d = s.dilemma;
   if (!d) throw new Error('there is nothing to choose');
   const c = choices(s, d).find((x) => x.key === key);
   if (!c) throw new Error(`no choice ${key}`);
   if (c.barred) throw new Error(c.barred);
+  if (d.kind === 'rumor') return heed(s, key === 'follow');
   const r: Roller = { rng: s.rng };
   let w: WorldState = { ...s, dilemma: null };
   const log = (text: string) => (w = { ...w, log: [...w.log, { turn: w.turn, text }] });
@@ -330,5 +344,11 @@ export function choose(sea: Sea, s: WorldState, key: string): WorldState {
       break;
     }
   }
+  // A storm in the right waters may drive you onto an island: likelier running before it.
+  if (d.kind === 'storm') w = driven(sea, w, key === 'run', r);
   return { ...w, rng: r.rng };
 }
+
+/** How far to trust a source, said plainly. */
+const trustOf = (source: Source) =>
+  SOURCES[source].truth >= 0.8 ? 'he has no reason to lie' : SOURCES[source].truth >= 0.65 ? 'likely enough' : 'it may be true'

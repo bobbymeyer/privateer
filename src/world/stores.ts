@@ -20,6 +20,8 @@ import { SHIP_CLASSES } from '../outfit.ts';
 import { type Landmark, type ShoreWork, landmark } from './landmarks.ts';
 import { type Roller, roll } from './random.ts';
 import type { Sea, WorldState } from './world.ts';
+import { landfallHere } from './landfalls.ts';
+import { trueHere } from './rumors.ts';
 
 export interface Stores {
   /** Provisions, in rations: one hand for one day at full ration. */
@@ -132,7 +134,15 @@ export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
 // --- At a landmark -----------------------------------------------------------
 
 /** The landmark you're lying at, if you're at one. */
-export const landmarkHere = (sea: Sea, s: WorldState): Landmark | null => (sea.map.landmarks[s.voyage.at] === s.player ? landmark(s.voyage.at) : null);
+export function landmarkHere(sea: Sea, s: WorldState): Landmark | null {
+  // An island a storm put you on.
+  const island = landfallHere(sea, s);
+  if (island) return island;
+  if (sea.map.landmarks[s.voyage.at] !== s.player) return null;
+  const l = landmark(s.voyage.at);
+  // A detour that was only a rumor: nothing to be had there.
+  return trueHere(s, l.key) ? l : { ...l, offers: {} };
+}
 
 /** The shore work to be done here. */
 export const shoreHere = (sea: Sea, s: WorldState): ShoreWork[] => landmarkHere(sea, s)?.offers.shore ?? [];

@@ -8,7 +8,7 @@
  * Pacific or back the way you came; the Moluccas or Manila.
  */
 
-export type LandmarkKind = 'port' | 'anchorage' | 'strait' | 'cape' | 'sea' | 'home';
+export type LandmarkKind = 'port' | 'anchorage' | 'strait' | 'cape' | 'sea' | 'home' | 'island';
 
 export interface Landmark {
   key: string;
@@ -22,6 +22,16 @@ export interface Landmark {
   next: string[];
   /** What's to be had here. */
   offers: Offers;
+  /**
+   * A detour, off the main way: known only by a rumor (rumors.ts), made for
+   * from any of `from`, and left by `next` to rejoin the way.
+   */
+  detour?: { from: string[] };
+  /**
+   * A landfall a storm may drive you to (landfalls.ts): never made for, only
+   * blown onto. `near` ties it into the lanes, so the ship can sail on from it.
+   */
+  landfall?: { near: string[] };
 }
 
 export type ShoreWork = 'water' | 'forage' | 'careen';
@@ -126,6 +136,63 @@ export const LANDMARKS: Landmark[] = [
     key: 'brazil-home', name: 'the coast of Brazil, homeward', kind: 'anchorage', at: [-38.0, -9.5], next: ['plymouth-home'], offers: { shore: ['water', 'forage', 'careen'] },
     text: 'Water and wood for the last crossing. The Portuguese know what you’ve done by now.',
   },
+  // --- Detours, known only by a rumor -------------------------------------------
+  {
+    key: 'cabo-san-lucas', name: 'Cabo San Lucas', kind: 'cape', at: [-109.9, 22.6], next: ['ladrones'], offers: { shore: ['water'] },
+    detour: { from: ['guatulco', 'nova-albion'] },
+    text: 'The tip of California, where the galleon from Manila makes her landfall after five months at sea, her crew half dead of the scurvy. Cavendish lay in wait here in 1587 and took the Santa Ana.',
+  },
+  {
+    key: 'solomons', name: 'the Isles of Solomon', kind: 'anchorage', at: [159.9, -9.4], next: ['ternate'], offers: { shore: ['water', 'forage', 'careen'], market: 'islanders' },
+    detour: { from: ['guatulco', 'nova-albion', 'cabo-san-lucas', 'ladrones'] },
+    text: 'Islands Mendaña found in 1568 and named for King Solomon’s mines. Water and fruit and a welcome, the islanders say; gold, the Spaniards say.',
+  },
+  {
+    key: 'macau', name: 'off Macau', kind: 'sea', at: [113.3, 21.6], next: ['java'], offers: {},
+    detour: { from: ['ladrones', 'manila', 'ternate'] },
+    text: 'The Portuguese at Macau, by the Emperor’s leave, and every year the Great Ship of Amacon sails for Nagasaki with China’s silk and comes back with Japan’s silver. Macau itself is too strong to touch.',
+  },
+  {
+    key: 'banda', name: 'the Banda islands', kind: 'anchorage', at: [129.9, -4.6], next: ['java'], offers: { shore: ['water', 'forage'] },
+    detour: { from: ['ternate'] },
+    text: 'The only place in the world the nutmeg grows. The Sultan of Ternate has kinsmen here, and no love for the Portuguese.',
+  },
+  {
+    key: 'goa', name: 'Goa', kind: 'port', at: 'Goa', next: ['cape'], offers: { raid: 'fortress' },
+    detour: { from: ['java'] },
+    text: 'Golden Goa, the Viceroy’s city, the richest in Portuguese India: churches, warehouses, the pepper of Malabar. Walled, and its fleet is often in the river.',
+  },
+  {
+    key: 'azores', name: 'off the Azores', kind: 'sea', at: [-28.5, 38.0], next: ['plymouth-home'], offers: {},
+    detour: { from: ['sierra-leone', 'brazil-home'] },
+    text: 'Where the carracks from Goa make their landfall before Lisbon, low in the water with the whole year’s trade of the Indies. The Madre de Deus was taken here, in time.',
+  },
+  // --- Landfalls a storm drives you to ---------------------------------------------
+  {
+    key: 'bermuda', name: 'Bermuda, the Isle of Devils', kind: 'island', at: [-64.8, 32.3], next: [], offers: { shore: ['water', 'forage', 'careen'] },
+    landfall: { near: ['plymouth-home', 'canaries'] },
+    text: 'The Isle of Devils, the Spanish call it, and keep away: reefs all round it, and the birds crying in the night like the damned. Inside the reefs, wild hogs, birds by the thousand, and sweet water.',
+  },
+  {
+    key: 'st-helena', name: 'St Helena', kind: 'island', at: [-5.7, -15.9], next: [], offers: { shore: ['water', 'forage'] },
+    landfall: { near: ['cape', 'sierra-leone', 'brazil'] },
+    text: 'The Portuguese secret: a rock in the middle of the South Atlantic with water, lemons, figs and goats run wild, and nobody on it but the odd castaway.',
+  },
+  {
+    key: 'mauritius', name: 'Mauritius', kind: 'island', at: [57.6, -20.2], next: [], offers: { shore: ['water', 'forage', 'careen'] },
+    landfall: { near: ['cape', 'java'] },
+    text: 'Cirne, the Portuguese call it, and nobody lives there: ebony forests, tortoises, and great fat birds that cannot fly and do not know to run.',
+  },
+  {
+    key: 'galapagos', name: 'the Galápagos', kind: 'island', at: [-90.4, -0.7], next: [], offers: { shore: ['forage', 'careen'] },
+    landfall: { near: ['cacafuego', 'guatulco'] },
+    text: 'The Enchanted Isles, where Berlanga drifted in 1535: black rock, little water, and tortoises so big a man can ride them, that live for weeks in the hold.',
+  },
+  {
+    key: 'juan-fernandez', name: 'Juan Fernández', kind: 'island', at: [-78.9, -33.6], next: [], offers: { shore: ['water', 'forage', 'careen'] },
+    landfall: { near: ['valparaiso', 'mocha'] },
+    text: 'Found by the pilot Juan Fernández in 1574, out of sight of the coast of Chile: goats on the hills, and streams of sweet water.',
+  },
   {
     key: 'plymouth-home', name: 'Plymouth', kind: 'home', at: 'Plymouth', next: [], offers: {},
     text: 'Home.',
@@ -139,3 +206,6 @@ export const landmark = (key: string): Landmark => {
   if (!l) throw new Error(`no landmark ${key}`);
   return l;
 };
+
+/** The main way: neither a detour nor a landfall. */
+export const onTheWay = (l: Landmark) => !l.detour && !l.landfall;

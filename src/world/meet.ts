@@ -26,6 +26,7 @@ import { type Roller, pick, roll } from './random.ts';
 import { recordFight, tallied, whatOf } from './record.ts';
 import { fightCost, landmarkHere, prizeStores } from './stores.ts';
 import { plateExtra } from './treasure.ts';
+import { GOA_EXTRA, PRIZES, type Prize, hearFromPrisoners } from './rumors.ts';
 import type { Sea, WorldState } from './world.ts';
 
 export interface Meeting {
@@ -38,6 +39,8 @@ export interface Meeting {
   raid: string | null;
   /** The treasure ship. */
   plate: boolean;
+  /** A prize at the end of a rumor: the Manila galleon, the Great Ship, the carrack from Goa. */
+  prize?: Prize;
 }
 
 /** A sail in sight, waiting on your choice: attack, or let her pass. */
@@ -46,6 +49,8 @@ export interface Hail {
   nation: Nation;
   /** The treasure ship off Cape San Francisco: asleep, or warned by your raids. See treasure.ts. */
   plate?: 'asleep' | 'warned';
+  /** A prize at the end of a rumor. See rumors.ts. */
+  prize?: Prize;
 }
 
 export interface Reckoning {
@@ -129,13 +134,16 @@ function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, force
 export function attack(s: WorldState): WorldState {
   const h = s.hail;
   if (!h) throw new Error('there is no sail in sight');
-  return startFight(s, { kind: h.kind, nation: h.nation, raid: null, plate: !!h.plate }, false, h.plate ? plateExtra(h.plate === 'warned') : {});
+  return startFight(s, { kind: h.kind, nation: h.nation, raid: null, plate: !!h.plate, ...(h.prize ? { prize: h.prize } : {}) }, false, hailExtra(h));
 }
+
+/** What the sail in sight brings to a fight over a ship of her kind: the treasure ship's silver, a rumored prize's. */
+export const hailExtra = (h: Hail): Extra => (h.plate ? plateExtra(h.plate === 'warned') : h.prize ? PRIZES[h.prize].extra : {});
 
 /** Let her go her way. */
 export function letPass(s: WorldState): WorldState {
   if (!s.hail) throw new Error('there is no sail in sight');
-  const what = s.hail.plate ? 'the treasure ship' : whatOf(s.hail.kind, s.hail.nation, null);
+  const what = s.hail.plate ? 'the treasure ship' : s.hail.prize ? PRIZES[s.hail.prize].name : whatOf(s.hail.kind, s.hail.nation, null);
   return { ...s, hail: null, log: [...s.log, { turn: s.turn, text: `you let ${what} pass` }] };
 }
 
@@ -152,7 +160,9 @@ export function raid(sea: Sea, s: WorldState): WorldState {
   const here = raidHere(sea, s);
   if (!here) throw new Error('there is no town here to raid');
   const w = { ...s, raided: [...s.raided, here.key], log: [...s.log, { turn: s.turn, text: `the boats go in to ${landmark(here.key).name}` }] };
-  return startFight(w, { kind: here.kind, nation: 'spain', raid: here.key, plate: false }, false);
+  // Goa is Portuguese, and the richest of all.
+  const goa = here.key === 'goa';
+  return startFight(w, { kind: here.kind, nation: goa ? 'portugal' : 'spain', raid: here.key, plate: false }, false, goa ? GOA_EXTRA : {});
 }
 
 /** One move in the fight at hand; settled when it ends. */
@@ -182,9 +192,9 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   if (f.payout > 0 && outcome !== 'sunk') w = { ...w, log: [...w.log, { turn: w.turn, text: `${f.payout} gold into the strongroom` }] };
 
   // The tally, and the fight told, for the end of the run.
-  const who = whatOf(m.kind, m.nation, m.raid ? landmark(m.raid).name : null, m.plate);
+  const who = m.prize ? PRIZES[m.prize].name : whatOf(m.kind, m.nation, m.raid ? landmark(m.raid).name : null, m.plate);
   w = { ...w, tally: tallied(w.tally, outcome, f.payout, who, m.raid !== null), lastFight: recordFight(f, who, m.kind, m.nation, s.hull) };
-  return {
+  const done: WorldState = {
     ...w,
     rng: r.rng,
     gold: w.gold + (outcome === 'sunk' ? 0 : f.payout),
@@ -193,4 +203,6 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     encounter: null,
     reckoning: { kind: m.kind, nation: m.nation, outcome, payout: f.payout, raid: m.raid, said: w.log.slice(before).map((l) => l.text) },
   };
+  // Prisoners taken, and they talk: a rumor, sometimes.
+  return taken && (m.nation === 'spain' || m.nation === 'portugal') ? hearFromPrisoners(done, m.nation) : done;
 }

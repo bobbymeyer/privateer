@@ -143,7 +143,12 @@ export function buildMap(): SeaMap {
   // Open-sea landmarks sit off the ports, not on them: the Canaries aren't Las Palmas harbour.
   const water = nodes.filter((n) => n.kind !== 'underway' && !n.port);
   for (const l of LANDMARKS) marks[l.key] = typeof l.at === 'string' ? nodes.find((n) => n.port?.name === l.at)!.id : nearest(l.at, water).id;
-  const legs: [NodeId, NodeId][] = LANDMARKS.flatMap((l) => l.next.map((k): [NodeId, NodeId] => [marks[l.key], marks[k]]));
+  // Each leg, each way into a rumored detour, and each storm landfall tied to the landmarks near it.
+  const legs: [NodeId, NodeId][] = LANDMARKS.flatMap((l) => [
+    ...l.next.map((k): [NodeId, NodeId] => [marks[l.key], marks[k]]),
+    ...(l.detour?.from ?? []).map((k): [NodeId, NodeId] => [marks[k], marks[l.key]]),
+    ...(l.landfall?.near ?? []).map((k): [NodeId, NodeId] => [marks[l.key], marks[k]]),
+  ]);
   const laneEdges = buildLanes(nodes, adj, deepAdj, distances_, distances(deepAdj), legs);
   const laneAdj: NodeId[][] = nodes.map(() => []);
   for (const key of laneEdges) {
