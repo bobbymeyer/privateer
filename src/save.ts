@@ -9,7 +9,7 @@
 
 import type { WorldState } from './world/world.ts';
 
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 /** From each version to the next, since the voyage was simplified (12): a run in progress shouldn't be lost to an update. */
 const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, unknown>> = {
@@ -17,6 +17,8 @@ const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, 
   12: (w) => ({ ...w, spice: 0, seen: [] }),
   // 13 → 14: rumors, and the island a storm put you on.
   13: (w) => ({ ...w, rumors: [], landfall: null }),
+  // 14 → 15: whose money, how lawful, and the reckoning at home. An old voyage sailed on its own stake.
+  14: (w) => ({ ...w, backer: 'own', stake: 0, infamy: 0, grievance: 0, fame: 0, verdict: null, settled: { queen: 0, gentlemen: 0, gift: 0, restitution: 0, seized: 0 } }),
 };
 
 export const SAVE_KEY = 'privateer:run';

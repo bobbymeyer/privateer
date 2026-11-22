@@ -96,8 +96,8 @@ test('spice bought in the Moluccas sells on the quay at home', () => {
   assert.throws(() => buySpice(sea, w), /no room/);
   assert.throws(() => buySpice(sea, lyingAt(sea, fresh(), 'canaries')), /no spice/);
   const home = raise(sea, { ...w, player: map.landmarks['plymouth-home'], voyage: { at: 'sierra-leone', bound: 'plymouth-home', visited: ['plymouth', 'ternate', 'cape', 'sierra-leone'] } });
-  assert.ok(home.won);
-  assert.equal(home.gold, w.gold + w.spice * SPICE_WORTH);
+  assert.equal(home.dilemma?.kind, 'reckoning', 'the reckoning first');
+  assert.equal(home.gold, w.gold + w.spice * SPICE_WORTH, 'on its own stake: nobody to share with');
   assert.equal(home.spice, 0);
   assert.ok(said(home, /sold on the quay/));
 });

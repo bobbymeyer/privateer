@@ -27,6 +27,8 @@ export interface Score {
   treasure: number;
   hands: number;
   ship: number;
+  /** Shown at court, and not disowned: see reckoning.ts. */
+  fame: number;
   /** What the ship you chose counts for. */
   multiplier: number;
   total: number;
@@ -47,22 +49,27 @@ export const LIKE_TITLES: Record<Like, string> = {
 export function score(w: WorldState): Score {
   const c = SHIP_CLASSES[w.ship];
   if (!w.won) {
-    return { treasure: 0, hands: 0, ship: 0, multiplier: c.multiplier, total: 0, like: 'oxenham', title: LIKE_TITLES.oxenham, text: 'lost. Oxenham crossed the isthmus of Panama in 1577, took the silver, and was hanged at Lima.' };
+    return { treasure: 0, hands: 0, ship: 0, fame: 0, multiplier: c.multiplier, total: 0, like: 'oxenham', title: LIKE_TITLES.oxenham, text: 'lost. Oxenham crossed the isthmus of Panama in 1577, took the silver, and was hanged at Lima.' };
   }
   const treasure = w.gold;
   const hands = w.crew * HAND_WORTH;
   const ship = Math.round((w.hull / w.maxHull) * SHIP_WORTH);
-  const parts = { treasure, hands, ship, multiplier: c.multiplier, total: Math.round((treasure + hands + ship) * c.multiplier) };
+  const fame = w.fame;
+  const parts = { treasure, hands, ship, fame, multiplier: c.multiplier, total: Math.round((treasure + hands + ship + fame) * c.multiplier) };
   const how = howHome(w.voyage);
   const rich = w.gold >= RICH;
   const mostHome = w.crew >= c.complement / 2;
-  if (rich && how === 'round' && mostHome) {
+  if (w.verdict === 'pirate') {
+    return { ...parts, like: rich ? 'cavendish' : 'fenton', title: 'named a pirate', text: `home, and named a pirate: the prize seized, and what's left of it hidden in the West Country. ${rich ? 'rich all the same.' : ''}`.trim() };
+  }
+  const disowned = w.verdict === 'disowned' ? ' disowned at court to please Spain.' : '';
+  if (rich && how === 'round' && mostHome && !disowned) {
     return { ...parts, like: 'drake', title: LIKE_TITLES.drake, text: 'round the world, rich, and most of the crew home. the Queen will want to see you.' };
   }
   if (rich) {
     const way = how === 'round' ? 'round the world' : how === 'back' ? 'home the way you went' : 'home';
-    return { ...parts, like: 'cavendish', title: LIKE_TITLES.cavendish, text: `${way}, rich${mostHome ? '' : ', and dear in men'}. Cavendish came home in 1588 with his sails of silk, and half his crew left behind.` };
+    return { ...parts, like: 'cavendish', title: LIKE_TITLES.cavendish, text: `${way}, rich${mostHome ? '' : ', and dear in men'}.${disowned} Cavendish came home in 1588 with his sails of silk, and half his crew left behind.` };
   }
   const poorer = w.gold < c.purse;
-  return { ...parts, like: 'fenton', title: LIKE_TITLES.fenton, text: `home again, ${poorer ? 'poorer than you left' : 'with little to show for it'}. Fenton turned back off Brazil in 1582 and was blamed for it.` };
+  return { ...parts, like: 'fenton', title: LIKE_TITLES.fenton, text: `home again, ${poorer ? 'poorer than you left' : 'with little to show for it'}.${disowned} Fenton turned back off Brazil in 1582 and was blamed for it.` };
 }

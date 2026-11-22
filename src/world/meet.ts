@@ -28,6 +28,7 @@ import { fightCost, landmarkHere, prizeStores } from './stores.ts';
 import { plateExtra } from './treasure.ts';
 import { GOA_EXTRA, PRIZES, type Prize, hearFromPrisoners } from './rumors.ts';
 import type { Sea, WorldState } from './world.ts';
+import { infamyFor } from './reckoning.ts';
 
 export interface Meeting {
   kind: TargetKind;
@@ -51,6 +52,8 @@ export interface Hail {
   plate?: 'asleep' | 'warned';
   /** A prize at the end of a rumor. See rumors.ts. */
   prize?: Prize;
+  /** A friend's merchant — French, Hanseatic, Dutch — and taking her is piracy. See reckoning.ts. */
+  neutral?: true;
 }
 
 export interface Reckoning {
@@ -70,18 +73,29 @@ interface Waters {
   name: string;
   box: [number, number, number, number];
   /** Who you meet there, and how often of the sails sighted. */
-  sails: { kind: TargetKind; nation: Nation; weight: number }[];
+  sails: { kind: TargetKind; nation: Nation; weight: number; neutral?: true }[];
 }
+
+/** What a friend's merchant carries over her kind's usual: richer than her guns suggest, which is the temptation. */
+export const NEUTRAL_CARGO = 12;
 
 /** Who sails where, in 1580. Waters not listed are empty of anyone worth the name. */
 export const WATERS: Waters[] = [
   {
     name: 'off Spain and the Barbary coast', box: [-20, 25, 10, 46],
-    sails: [{ kind: 'privateer', nation: 'spain', weight: 1 }, { kind: 'privateer', nation: 'portugal', weight: 1 }, { kind: 'corsair', nation: 'barbary', weight: 1 }],
+    sails: [
+      { kind: 'privateer', nation: 'spain', weight: 1 }, { kind: 'privateer', nation: 'portugal', weight: 1 }, { kind: 'corsair', nation: 'barbary', weight: 1 },
+      // Hanseatic hulks with grain for Lisbon, French and Dutch traders: friends, at least on paper.
+      { kind: 'merchant', nation: 'hanse', weight: 1, neutral: true }, { kind: 'merchant', nation: 'france', weight: 0.5, neutral: true }, { kind: 'merchant', nation: 'netherlands', weight: 0.5, neutral: true },
+    ],
   },
-  { name: 'the coast of Brazil', box: [-55, -36, -28, 2], sails: [{ kind: 'merchant', nation: 'portugal', weight: 1 }] },
+  {
+    name: 'the coast of Brazil', box: [-55, -36, -28, 2],
+    // Norman ships still come for the brazilwood, as they did for the French colony at Guanabara.
+    sails: [{ kind: 'merchant', nation: 'portugal', weight: 2 }, { kind: 'merchant', nation: 'france', weight: 1, neutral: true }],
+  },
   { name: 'the coast of Chile and Peru', box: [-86, -45, -68, 5], sails: [{ kind: 'merchant', nation: 'spain', weight: 1 }] },
-  { name: 'the Guinea coast', box: [-30, -5, 15, 25], sails: [{ kind: 'merchant', nation: 'portugal', weight: 1 }] },
+  { name: 'the Guinea coast', box: [-30, -5, 15, 25], sails: [{ kind: 'merchant', nation: 'portugal', weight: 2 }, { kind: 'merchant', nation: 'france', weight: 1, neutral: true }] },
   {
     name: 'the East', box: [70, -15, 150, 25],
     sails: [{ kind: 'merchant', nation: 'portugal', weight: 3 }, { kind: 'treasure-ship', nation: 'portugal', weight: 1 }],
@@ -116,7 +130,7 @@ export function sailSighted(sea: Sea, s: WorldState): WorldState {
   if (hostile(sail.kind)) {
     return startFight({ ...w, log: [...w.log, { turn: w.turn, text: `a sail: ${what}, bearing down on you`, stop: true }] }, { kind: sail.kind, nation: sail.nation, raid: null, plate: false }, true);
   }
-  return { ...w, hail: { kind: sail.kind, nation: sail.nation }, log: [...w.log, { turn: w.turn, text: `a sail: ${what}`, stop: true }] };
+  return { ...w, hail: { kind: sail.kind, nation: sail.nation, ...(sail.neutral ? { neutral: true as const } : {}) }, log: [...w.log, { turn: w.turn, text: `a sail: ${what}${sail.neutral ? ', a friend’s' : ''}`, stop: true }] };
 }
 
 function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean, extra: Extra = {}): WorldState {
@@ -130,15 +144,19 @@ function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, force
   return { ...s, rng: r.rng, hail: null, log, encounter: { ...who, fight, forced } };
 }
 
-/** Attack the sail in sight. */
+/** Attack the sail in sight. A friend's merchant: that's piracy, whatever comes of it. */
 export function attack(s: WorldState): WorldState {
   const h = s.hail;
   if (!h) throw new Error('there is no sail in sight');
+  if (h.neutral) {
+    const infamy = infamyFor(s);
+    s = { ...s, infamy: s.infamy + infamy, log: [...s.log, { turn: s.turn, text: `you fire on ${whatOf(h.kind, h.nation, null)}: piracy, and the Admiralty will hear of it` }] };
+  }
   return startFight(s, { kind: h.kind, nation: h.nation, raid: null, plate: !!h.plate, ...(h.prize ? { prize: h.prize } : {}) }, false, hailExtra(h));
 }
 
 /** What the sail in sight brings to a fight over a ship of her kind: the treasure ship's silver, a rumored prize's. */
-export const hailExtra = (h: Hail): Extra => (h.plate ? plateExtra(h.plate === 'warned') : h.prize ? PRIZES[h.prize].extra : {});
+export const hailExtra = (h: Hail): Extra => (h.plate ? plateExtra(h.plate === 'warned') : h.prize ? PRIZES[h.prize].extra : h.neutral ? { cargo: NEUTRAL_CARGO } : {});
 
 /** Let her go her way. */
 export function letPass(s: WorldState): WorldState {
@@ -194,10 +212,14 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   // The tally, and the fight told, for the end of the run.
   const who = m.prize ? PRIZES[m.prize].name : whatOf(m.kind, m.nation, m.raid ? landmark(m.raid).name : null, m.plate);
   w = { ...w, tally: tallied(w.tally, outcome, f.payout, who, m.raid !== null), lastFight: recordFight(f, who, m.kind, m.nation, s.hull) };
+  // What's taken from Spain and Portugal is lawful, and the ambassador keeps count.
+  const iberian = m.nation === 'spain' || m.nation === 'portugal';
+  const won = outcome === 'sunk' ? 0 : f.payout;
   const done: WorldState = {
     ...w,
     rng: r.rng,
-    gold: w.gold + (outcome === 'sunk' ? 0 : f.payout),
+    grievance: w.grievance + (iberian ? won : 0),
+    gold: w.gold + won,
     hull: f.ship.hull,
     sunk: outcome === 'sunk',
     encounter: null,

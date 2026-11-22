@@ -21,6 +21,7 @@
     CHANDLER, ISLANDERS_COST, SPICE_WORTH, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade,
   } from '../world/stores.ts';
   import { PRIZES, followed } from '../world/rumors.ts';
+  import { BACKERS, BACKER_KEYS, type Backer, courtRisk, grievanceWord, infamyFor, lawfulness, restitutionFor } from '../world/reckoning.ts';
   import { advance, createSea, createWorld, dateOf, type Sea, type WorldState, waiting } from '../world/world.ts';
   import { forget, load, store } from '../save.ts';
   import { type Entry, best, dailySeed, entryFor, isWin, loadLog, raised, saveLog, scoreOf, today, withEntry } from '../logbook.ts';
@@ -45,17 +46,19 @@
   /** The date, if this run is that day's voyage. */
   let daily: string | null = $state(resuming?.daily ?? (asked !== null && asked === dailySeed(today()) ? today() : null));
   let world: WorldState | null = $state.raw(null);
-  /** Choosing a ship: a new run waits on it. */
+  /** Choosing a ship, then whose money: a new run waits on both. */
   let choosing = $state(!resuming);
+  let chosenShip: string | null = $state(null);
   setTimeout(() => {
     sea = createSea();
     if (resuming) world = resuming.world;
   }, 30);
 
-  function begin(ship: string) {
+  function begin(ship: string, backer: Backer) {
     if (!sea) return;
-    world = createWorld(sea, seed, ship);
+    world = createWorld(sea, seed, ship, backer);
     choosing = false;
+    chosenShip = null;
     logged = false;
     said = '';
     shown = null;
@@ -67,6 +70,7 @@
     seed = day ? dailySeed(day) : Math.floor(Math.random() * 2 ** 31);
     world = null;
     choosing = true;
+    chosenShip = null;
     logOpen = false;
     intro = false;
   }
@@ -319,6 +323,9 @@
           <div class:low={world.stores.powder === 0}><span class="label">powder</span>{world.stores.powder}</div>
           <div><span class="label">gold</span>{world.gold}</div>
           {#if world.spice}<div><span class="label">spice</span>{world.spice} {world.spice === 1 ? 'ton' : 'tons'}, {world.spice * SPICE_WORTH} at home</div>{/if}
+          <div><span class="label">backed by</span>{BACKERS[world.backer].name}</div>
+          <div class:low={world.infamy > 0}><span class="label">your name</span>{lawfulness(world)}</div>
+          <div><span class="label">Spain's grievance</span>{grievanceWord(world)}</div>
         </div>
         <div class="settings">
           <div class="row" role="group" aria-label="rations">
@@ -402,17 +409,33 @@
         <div class="sheet intro">
           <h2>Plymouth, 1580</h2>
           <p>Drake is home with a hold full of Spanish silver, and everyone with a ship thinks the same thing: I could do that too. Sail round the world his way, or turn back when you must, take what Spain leaves lying about, and come home to Plymouth. The gold you bring home, the hands alive and the ship are your score.</p>
-          <h3>choose your ship</h3>
-          <ul class="plain ships">
-            {#each SHIPS as k (k)}
-              {@const c = SHIP_CLASSES[k]}
-              <li>
-                <button onclick={() => begin(k)}>a {c.name}</button>
-                <span>{c.text}.</span>
-                <span class="faint">{c.purse} gold · hull {c.hull} · {startCrew(k)} of {c.complement} hands · {deckSize(k)} cards{Object.keys(c.cards).length ? `, with ${cardWords(c.cards)}` : ''} · the score ×{c.multiplier}</span>
-              </li>
-            {/each}
-          </ul>
+          {#if !chosenShip}
+            <h3>choose your ship</h3>
+            <ul class="plain ships">
+              {#each SHIPS as k (k)}
+                {@const c = SHIP_CLASSES[k]}
+                <li>
+                  <button onclick={() => (chosenShip = k)}>a {c.name}</button>
+                  <span>{c.text}.</span>
+                  <span class="faint">{c.purse} gold · hull {c.hull} · {startCrew(k)} of {c.complement} hands · {deckSize(k)} cards{Object.keys(c.cards).length ? `, with ${cardWords(c.cards)}` : ''} · the score ×{c.multiplier}</span>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            {@const c = SHIP_CLASSES[chosenShip]}
+            <h3>a {c.name}: whose money do you sail on?</h3>
+            <ul class="plain ships">
+              {#each BACKER_KEYS as b (b)}
+                {@const def = BACKERS[b]}
+                <li>
+                  <button onclick={() => begin(chosenShip!, b)}>{def.name}</button>
+                  <span>{def.text}.</span>
+                  <span class="faint">{c.purse + def.gold(chosenShip)} gold to fit out with{def.spares ? `, ${def.spares} spares and ${def.powder} powder besides` : ''}</span>
+                </li>
+              {/each}
+            </ul>
+            <div class="row"><button onclick={() => (chosenShip = null)}>another ship</button></div>
+          {/if}
         </div>
       </div>
     {:else if intro}
@@ -434,6 +457,12 @@
             <dd>Privateers and corsairs off Spain and Barbary come at you; merchants off Brazil, Peru and in the East are yours to take or let pass. Off Cape San Francisco, the treasure ship, unless your raids on the coast have warned her.</dd>
             <dt>a fight</dt>
             <dd>Cards. Three are dealt: keep two, which play in the order you pick them; the third goes to the bottom. Sail, then shot, then board, each in order, and they hit harder. A fight spends powder and costs hands; with no powder the guns are silent. A prize's hold fills yours.</dd>
+            <dt>whose money</dt>
+            <dd>The Crown, gentlemen adventurers, or your own stake: more money to fit out with, for a share of what you bring home.</dd>
+            <dt>privateer or pirate</dt>
+            <dd>Spain's and Portugal's ships and towns are fair game, but Spain keeps count. A French, Hanseatic or Dutch merchant is a friend's: richer than she looks, and taking her is piracy.</dd>
+            <dt>home</dt>
+            <dd>Your backers take their shares. Then the reckoning: show yourself at court for the fame, at a risk of being disowned to please Spain; lie low; or give the Queen a gift.</dd>
             <dt>the score</dt>
             <dd>Treasure home, two for every hand alive, up to twenty for the ship, times what your ship counts for: a voyage like Drake's, Cavendish's or Fenton's, or Oxenham's, lost.</dd>
           </dl>
@@ -490,6 +519,9 @@
           {#if h.prize}
             <p>{PRIZES[h.prize].text}</p>
           {/if}
+          {#if h.neutral}
+            <p>a friend's ship, not Spain's, and richer than her guns suggest. take her and it is piracy: {infamyFor(world) === 2 ? 'twice over under the Crown’s commission, ' : ''}the Admiralty will ask about her when you come home{world.backer === 'crown' ? ', and the Queen wants a clean commission' : ''}.</p>
+          {/if}
           {#if h.plate}
             <p>the treasure ship of the South Sea, with the year's silver from Callao for Panama. {h.plate === 'warned' ? 'word of your raids on the coast has gone ahead of you, and she is ready for you.' : 'she has never seen an enemy in these waters, and takes you for one of her own.'}</p>
           {/if}
@@ -507,6 +539,12 @@
         <div class="sheet">
           <h2>{told.title}</h2>
           <p>{told.text}</p>
+          {#if d.kind === 'reckoning'}
+            <p class="faint">
+              in the strongroom: {world.gold}{world.settled.queen ? ` · the Queen's third paid: ${world.settled.queen}` : ''}{world.settled.gentlemen ? ` · the gentlemen paid: ${world.settled.gentlemen}` : ''}
+              · Spain's grievance: {grievanceWord(world)}{world.grievance ? `, restitution demanded: ${restitutionFor(world)}` : ''} · your name: {lawfulness(world)}{courtRisk(world) ? ` · at court, ${Math.round(courtRisk(world) * 100)} in 100 you're disowned` : ''}
+            </p>
+          {/if}
           <ul class="plain choices">
             {#each choices(world, d) as c (c.key)}
               <li>
@@ -529,10 +567,16 @@
                 <tr><td>treasure home</td><td class="num">{sc.treasure}</td></tr>
                 <tr><td>{world.crew} hands home, {HAND_WORTH} each</td><td class="num">{sc.hands}</td></tr>
                 <tr><td>the ship, {world.hull} hull of {world.maxHull}</td><td class="num">{sc.ship}</td></tr>
+                <tr><td>fame at court{world.verdict === 'disowned' ? ': disowned' : world.verdict === 'low' ? ': you lay low' : world.verdict === 'pirate' ? ': named a pirate' : ''}</td><td class="num">{sc.fame}</td></tr>
                 <tr><td>a {SHIP_CLASSES[world.ship].name}, ×{sc.multiplier}</td><td class="num"></td></tr>
                 <tr class="total"><td>the score</td><td class="num">{sc.total}</td></tr>
               </tbody>
             </table>
+          {/if}
+          {#if world.won}
+            {@const paid = [['the Queen’s third', world.settled.queen], ['the gentlemen adventurers', world.settled.gentlemen], ['a gift for the Queen', world.settled.gift], ['restitution to Spain', world.settled.restitution], ['seized by the Admiralty', world.settled.seized]].filter(([, n]) => n)}
+            {#if paid.length}<p class="faint">paid away at home: {paid.map(([who, n]) => `${who}, ${n}`).join(' · ')}</p>{/if}
+            {#if world.grievance && world.verdict !== 'pirate'}<p class="faint">“take the Indies from him, and you take away his treasure, which is nervus belli”: Hakluyt, of the King of Spain.</p>{/if}
           {/if}
           {#if world.sunk && world.lastFight && world.lastFight.outcome === 'sunk'}
             {@const f = world.lastFight}

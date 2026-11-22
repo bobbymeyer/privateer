@@ -12,6 +12,7 @@ import { DISCONTENT_LOST } from './happenings.ts';
 import { landmark } from './landmarks.ts';
 import { DETOURS, SOURCES, type Source, heed } from './rumors.ts';
 import { driven } from './landfalls.ts';
+import { GIFT_PARDON, SEIZED, courtRisk, fameFor, giftFor, outlawed, reckon, restitutionFor } from './reckoning.ts';
 import type { Sea, WorldState } from './world.ts';
 import { FEVER_NURSE, FEVER_NURSE_DAYS, FEVER_PRESS, FLUX, FOUL_LOST, WEEVIL_LOST, WEEVIL_SICK, feverDeaths, fluxDeaths } from './weather.ts';
 
@@ -37,7 +38,9 @@ export type Dilemma =
   /** Hands who want to stay in the islands: let them go, or double the watch. */
   | { kind: 'deserters' }
   /** A rumor of a detour: follow it, or let it be. Whether it's true is settled already, and not said. See rumors.ts. */
-  | { kind: 'rumor'; key: string; source: Source; told: string; truth: boolean };
+  | { kind: 'rumor'; key: string; source: Source; told: string; truth: boolean }
+  /** Home, and the reckoning: show yourself at court, lie low, or give the Queen a gift. See reckoning.ts. */
+  | { kind: 'reckoning' };
 
 export interface Choice {
   key: string;
@@ -102,6 +105,8 @@ export function describe(d: Dilemma): { title: string; text: string } {
       return { title: `a rumor: ${landmark(d.key).name}`, text: `${d.told} says ${DETOURS[d.key].word}.` };
     case 'deserters':
       return { title: 'hands who would stay', text: 'some of the hands have found the islands kinder than the ship, and mean to stay when she sails.' };
+    case 'reckoning':
+      return { title: 'the reckoning', text: 'Plymouth, and the voyage is over but for this. your backers have had their shares. now the court will hear of what you did, and so will Spain’s ambassador, who demanded Drake’s head for less.' };
   }
 }
 
@@ -155,7 +160,7 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
       return [
         { key: 'try', label: 'try him, and behead him', stakes: 'a man dead, and nobody will talk of drowning again' },
         { key: 'maroon', label: 'put him ashore', stakes: 'he goes, and his friends may go with him: 1 to 3 hands' },
-        { key: 'leave', label: 'let it be', stakes: `even odds that ${range(DISCONTENT_LOST)} hands slip away at the next landmark` },
+        { key: 'leave', label: 'let it be', stakes: `${s.backer === 'gentlemen' ? 'his fellow adventurers aboard will see to it that' : 'even odds that'} ${range(DISCONTENT_LOST)} hands slip away at the next landmark` },
       ];
     case 'rumor': {
       const from = landmark(d.key).detour!.from.filter((k) => !s.voyage.visited.includes(k) || k === s.voyage.at).map((k) => landmark(k).name);
@@ -169,6 +174,23 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
         { key: 'go', label: 'let them go', stakes: `${range(DESERTERS)} hands stay behind` },
         { key: 'watch', label: 'double the watch', stakes: `a day, and even so ${range(SLIP_AWAY)} may slip over the side, one time in three` },
       ];
+    case 'reckoning': {
+      const risk = Math.round(courtRisk(s) * 100);
+      const gift = giftFor(s);
+      const pirateAfterGift = outlawed({ ...s, infamy: Math.max(0, s.infamy - GIFT_PARDON) });
+      return [
+        {
+          key: 'court', label: 'show yourself at court',
+          stakes: outlawed(s) ? `with your name, and no favour: named a pirate, and ${Math.round(SEIZED * 100)}% of the prize seized` : `${fameFor(s.gold)} fame to the score${risk ? `; ${risk} in 100 you are disowned to please Spain, hand back ${restitutionFor(s)} and have no fame` : ', and nobody to say otherwise'}`,
+        },
+        { key: 'low', label: 'lie low', stakes: outlawed(s) ? `even odds they come for you anyway, and ${Math.round(SEIZED * 100)}% of the prize is seized` : 'safe, and no fame' },
+        {
+          key: 'gift', label: 'a gift for the Queen',
+          stakes: pirateAfterGift ? `${gift} from the treasure, and even so your name is too black: named a pirate` : `${gift} from the treasure${s.infamy ? `, ${Math.min(s.infamy, GIFT_PARDON)} of the questions forgotten` : ''}, and court is safe: ${fameFor(s.gold - gift)} fame`,
+          ...(s.gold <= 0 ? { barred: 'nothing to give' } : {}),
+        },
+      ];
+    }
   }
 }
 
@@ -180,6 +202,11 @@ export function choose(sea: Sea, s: WorldState, key: string): WorldState {
   if (!c) throw new Error(`no choice ${key}`);
   if (c.barred) throw new Error(c.barred);
   if (d.kind === 'rumor') return heed(s, key === 'follow');
+  if (d.kind === 'reckoning') {
+    const r: Roller = { rng: s.rng };
+    const w = reckon(s, key as 'court' | 'low' | 'gift', () => roll(r));
+    return { ...w, rng: r.rng };
+  }
   const r: Roller = { rng: s.rng };
   let w: WorldState = { ...s, dilemma: null };
   const log = (text: string) => (w = { ...w, log: [...w.log, { turn: w.turn, text }] });

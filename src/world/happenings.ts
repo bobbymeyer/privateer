@@ -180,7 +180,8 @@ export function arriving(s: WorldState, key: string): WorldState {
   let w = s;
   if (w.seen.includes('discontent')) {
     w = { ...w, seen: w.seen.filter((x) => x !== 'discontent') };
-    if (roll(r) < DISCONTENT_CHANCE) {
+    // A gentleman who put money in has friends aboard who did too: it always comes to a head.
+    if (roll(r) < (w.backer === 'gentlemen' ? 1 : DISCONTENT_CHANCE)) {
       const lost = Math.min(w.crew, DISCONTENT_LOST[0] + Math.floor(roll(r) * (DISCONTENT_LOST[1] - DISCONTENT_LOST[0] + 1)));
       w = said({ ...w, crew: w.crew - lost }, `the gentleman's friends slipped away in the night: ${lost} hands gone`, true);
     } else w = said(w, 'the grumbling has died down, for now');
