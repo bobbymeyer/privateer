@@ -111,6 +111,13 @@ function answer(w: WorldState): WorldState {
         : w.dilemma.kind === 'gentleman' ? 'try'
         : w.dilemma.kind === 'deserters' ? 'watch'
         : w.dilemma.kind === 'rumor' ? (RUMORS ? 'follow' : 'ignore')
+        : w.dilemma.kind === 'gold-mutiny' ? 'firm'
+        : w.dilemma.kind === 'stores-fire' ? (open.includes('fight') ? 'fight' : 'shut')
+        : w.dilemma.kind === 'eve' ? (w.hull >= w.maxHull * 0.8 ? 'press' : 'stand')
+        : w.dilemma.kind === 'feast' ? 'deputy'
+        : w.dilemma.kind === 'jailed' ? (open.includes('pay') && w.gold > 40 ? 'pay' : 'leave')
+        : w.dilemma.kind === 'papers' ? (open.includes('bribe') ? 'bribe' : 'hand')
+        : w.dilemma.kind === 'ore' ? 'leave'
         : w.dilemma.kind === 'reckoning' ? (outlawed(w) ? (open.includes('gift') && !outlawed({ ...w, infamy: w.infamy - GIFT_PARDON }) ? 'gift' : 'low') : courtRisk(w) < 0.3 ? 'court' : w.gold > 100 ? 'gift' : 'low')
         : open[0];
       w = choose(sea, w, want);

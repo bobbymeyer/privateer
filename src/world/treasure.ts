@@ -26,7 +26,8 @@ export const WARNED_HULL = 4;
 export const PACIFIC_TOWNS = ['valparaiso', 'callao'];
 
 /** Whether you've raided a town on the coast: then the treasure ship is warned. */
-export const coastAwake = (s: WorldState): boolean => s.raided.some((k) => PACIFIC_TOWNS.includes(k));
+/** Whether the coast is awake: a town on it raided, or word carried ahead by men you lost (see happenings.ts). */
+export const coastAwake = (s: WorldState): boolean => s.raided.some((k) => PACIFIC_TOWNS.includes(k)) || s.seen.includes('coast-alarm');
 
 /** Asleep or warned, she strikes when she's beaten, and her silver comes whole: Drake's men spent four days moving it. */
 export const plateExtra = (warned: boolean): Extra => ({ hull: warned ? WARNED_HULL : ASLEEP_HULL, cargo: PLATE_CARGO, takenWhole: true });

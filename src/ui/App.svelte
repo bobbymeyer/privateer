@@ -452,7 +452,7 @@
             <dt>pace</dt>
             <dd>Easy loses a day in three and spares the hull; cracking on gains one and wears it.</dd>
             <dt>the way's events</dt>
-            <dd>Storms, fever, foul water, weevils: each asks you how to meet it, and says what it costs.</dd>
+            <dd>Storms, fever, foul water, weevils, a leak, a wreck, canoes, a reef, the hands wanting Spanish gold, fire in the bread room, a storm on the eve of a raid, a feast ashore, hands in the lock-up, your papers searched, shining ore: each asks you how to meet it, and says what it costs.</dd>
             <dt>a sail</dt>
             <dd>Privateers and corsairs off Spain and Barbary come at you; merchants off Brazil, Peru and in the East are yours to take or let pass. Off Cape San Francisco, the treasure ship, unless your raids on the coast have warned her.</dd>
             <dt>a fight</dt>

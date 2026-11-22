@@ -18,7 +18,7 @@ const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, 
   // 13 → 14: rumors, and the island a storm put you on.
   13: (w) => ({ ...w, rumors: [], landfall: null }),
   // 14 → 15: whose money, how lawful, and the reckoning at home. An old voyage sailed on its own stake.
-  14: (w) => ({ ...w, backer: 'own', stake: 0, infamy: 0, grievance: 0, fame: 0, verdict: null, settled: { queen: 0, gentlemen: 0, gift: 0, restitution: 0, seized: 0 } }),
+  14: (w) => ({ ...w, backer: 'own', stake: 0, infamy: 0, grievance: 0, fame: 0, verdict: null, settled: { queen: 0, gentlemen: 0, gift: 0, restitution: 0, seized: 0 }, lastPrize: 0 }),
 };
 
 export const SAVE_KEY = 'privateer:run';

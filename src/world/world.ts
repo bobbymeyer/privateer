@@ -76,6 +76,8 @@ export interface WorldState {
   fame: number;
   verdict: Verdict | null;
   settled: Settled;
+  /** The day of the last prize taken: the hands count from it. */
+  lastPrize: number;
   /** Home: the run is won. */
   won: boolean;
   /** Lost: sunk, or too few hands to work her. The run is over. */
@@ -153,6 +155,7 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     fame: 0,
     verdict: null,
     settled: NOTHING_SETTLED,
+    lastPrize: 0,
     won: false,
     sunk: false,
     ending: null,

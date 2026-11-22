@@ -41,13 +41,13 @@ test('each backer fits you out differently: gentlemen most, the Crown less but w
   assert.throws(() => createWorld(sea, 1, 'pinnace', 'pope' as never), /no such backer/);
 });
 
-test('at home the backers take their shares: the Queen a third, the gentlemen their stake and a quarter of the profit', () => {
+test('at home the backers take their shares: the Queen a third, the gentlemen half of what’s over your purse', () => {
   const crown = homeward({ gold: 300 }, 'crown');
   assert.equal(sharesDue(crown).queen, Math.round(300 * CROWN_SHARE));
   const g = homeward({ gold: 400 }, 'gentlemen');
   const purse = SHIP_CLASSES.pinnace.purse;
-  assert.equal(sharesDue(g).gentlemen, Math.round(g.stake + (400 - purse - g.stake) / 4));
-  assert.equal(sharesDue(homeward({ gold: 50 }, 'gentlemen')).gentlemen, Math.min(50, g.stake), 'no profit: they take what there is, to their stake');
+  assert.equal(sharesDue(g).gentlemen, Math.round((400 - purse) / 2));
+  assert.equal(sharesDue(homeward({ gold: 50 }, 'gentlemen')).gentlemen, 0, 'home poorer than you left: they lose their stake');
   assert.deepEqual(sharesDue(homeward({ gold: 400 })), { queen: 0, gentlemen: 0 });
   const back = home({ gold: 300 }, 'crown');
   assert.equal(back.gold, 300 - Math.round(300 * CROWN_SHARE));

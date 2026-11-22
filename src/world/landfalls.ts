@@ -14,6 +14,7 @@ import { LANDMARKS, type Landmark, landmark } from './landmarks.ts';
 import { type Roller, roll } from './random.ts';
 import { capacity, provisionDay, topUp } from './stores.ts';
 import type { Sea, WorldState } from './world.ts';
+import { ORE_CHANCE } from './happenings.ts';
 
 /** A storm met in a landfall's waters drives you to it this often; running before it, more often. */
 export const LANDFALL_CHANCE = 1 / 8;
@@ -55,7 +56,10 @@ export function driven(sea: Sea, s: WorldState, ran: boolean, r: Roller): WorldS
   if (w.sunk) return w;
   w = { ...w, player: sea.map.landmarks[island.key], landfall: island.key, seen: [...w.seen, island.key], calm: Math.min(w.calm, w.turn) };
   w = { ...w, log: [...w.log, { turn: w.turn, text: `the storm drove you ${days} days before it, onto ${island.name}`, stop: true }] };
-  return arrive(w, island.key, r);
+  w = arrive(w, island.key, r);
+  // Shining rock on a beach nobody has dug.
+  if (!w.dilemma && !w.seen.includes('ore-found') && roll(r) < ORE_CHANCE) w = { ...w, dilemma: { kind: 'ore' }, seen: [...w.seen, 'ore-found'], log: [...w.log, { turn: w.turn, text: 'shining ore on the beach', stop: true }] };
+  return w;
 }
 
 /** What each island does to you, coming in. */

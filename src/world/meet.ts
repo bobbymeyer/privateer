@@ -133,11 +133,11 @@ export function sailSighted(sea: Sea, s: WorldState): WorldState {
   return { ...w, hail: { kind: sail.kind, nation: sail.nation, ...(sail.neutral ? { neutral: true as const } : {}) }, log: [...w.log, { turn: w.turn, text: `a sail: ${what}${sail.neutral ? ', a friend’s' : ''}`, stop: true }] };
 }
 
-function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean, extra: Extra = {}): WorldState {
+function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean, extra: Extra = {}, noGuns = false): WorldState {
   const r: Roller = { rng: s.rng };
   const seed = Math.floor(roll(r) * 2 ** 31);
-  // No powder, no guns: the shot cards stay in the locker.
-  const deck = s.stores.powder > 0 ? deckOf(s.ship) : deckOf(s.ship).filter((c) => cardType(c) !== 'shot');
+  // No powder, no guns: the shot cards stay in the locker. Nor have men landed without the ship.
+  const deck = s.stores.powder > 0 && !noGuns ? deckOf(s.ship) : deckOf(s.ship).filter((c) => cardType(c) !== 'shot');
   // She came at you: she's bearing down from far. You fired first: within hail.
   const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deck, extra, forced ? FAR : CLOSE);
   const log = s.stores.powder > 0 ? s.log : [...s.log, { turn: s.turn, text: 'no powder aboard: the guns are silent, and it is sails and boarders' }];
@@ -172,16 +172,36 @@ export function raidHere(sea: Sea, s: WorldState): { key: string; kind: 'town' |
   return { key: l.key, kind: l.offers.raid };
 }
 
-/** Raid the Spanish town you're lying off: once, whatever comes of it. */
+/** A storm getting up on the eve of a raid, this often: Ribault's ships were scattered so, going for San Agustín in 1565. */
+export const EVE_CHANCE = 1 / 5;
+
+/** Raid the Spanish town you're lying off: once, whatever comes of it. Sometimes a storm gets up first, and you choose how to go in. */
 export function raid(sea: Sea, s: WorldState): WorldState {
   if (s.encounter || s.hail || s.dilemma) throw new Error('there is something to finish first');
   const here = raidHere(sea, s);
   if (!here) throw new Error('there is no town here to raid');
-  const w = { ...s, raided: [...s.raided, here.key], log: [...s.log, { turn: s.turn, text: `the boats go in to ${landmark(here.key).name}` }] };
-  // Goa is Portuguese, and the richest of all.
-  const goa = here.key === 'goa';
-  return startFight(w, { kind: here.kind, nation: goa ? 'portugal' : 'spain', raid: here.key, plate: false }, false, goa ? GOA_EXTRA : {});
+  const r: Roller = { rng: s.rng };
+  const w = { ...s, raided: [...s.raided, here.key] };
+  if (roll(r) < EVE_CHANCE) {
+    return { ...w, rng: r.rng, dilemma: { kind: 'eve', town: here.key }, log: [...w.log, { turn: w.turn, text: `on the eve of the raid on ${landmark(here.key).name}, the glass falling and a storm getting up`, stop: true }] };
+  }
+  return raidFight({ ...w, rng: r.rng }, here.key);
 }
+
+/** How you go in: in the teeth of a storm, or after standing off while the town readies (`extra`), or with the men landed and the ship's guns left behind (`noGuns`). */
+export function raidFight(s: WorldState, key: string, how: { extra?: Extra; noGuns?: boolean } = {}): WorldState {
+  const kind = landmark(key).offers.raid ?? 'town';
+  const w = { ...s, log: [...s.log, { turn: s.turn, text: `the boats go in to ${landmark(key).name}` }] };
+  // Goa is Portuguese, and the richest of all.
+  const goa = key === 'goa';
+  const base: Extra = goa ? GOA_EXTRA : {};
+  const extra: Extra = { ...base, ...how.extra, hull: (base.hull ?? 0) + (how.extra?.hull ?? 0), reliefSooner: (base.reliefSooner ?? 0) + (how.extra?.reliefSooner ?? 0) };
+  return startFight(w, { kind, nation: goa ? 'portugal' : 'spain', raid: key, plate: false }, false, extra, how.noGuns);
+}
+
+/** A Spanish patrol that won't be refused: she comes at you. */
+export const patrol = (s: WorldState): WorldState =>
+  startFight({ ...s, log: [...s.log, { turn: s.turn, text: 'a Spanish patrol, bearing down on you', stop: true }] }, { kind: 'privateer', nation: 'spain', raid: null, plate: false }, true);
 
 /** One move in the fight at hand; settled when it ends. */
 export function fight(sea: Sea, s: WorldState, action: Action): WorldState {
@@ -219,6 +239,7 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     ...w,
     rng: r.rng,
     grievance: w.grievance + (iberian ? won : 0),
+    lastPrize: taken && won > 0 ? s.turn : w.lastPrize,
     gold: w.gold + won,
     hull: f.ship.hull,
     sunk: outcome === 'sunk',

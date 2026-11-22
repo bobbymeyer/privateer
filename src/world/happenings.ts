@@ -35,6 +35,19 @@ const indies: Where = (sea, s) => {
   const { lat, lon } = at(sea, s);
   return lat > -10 && lat < 6 && lon > 110 && lon < 135;
 };
+/** The coast of Chile and Peru, Spain's soft underbelly. */
+const pacificCoast: Where = (sea, s) => {
+  const { lat, lon } = at(sea, s);
+  return lon > -86 && lon < -68 && lat > -45 && lat < 5;
+};
+/** Spanish waters, where patrols ask for papers: off Spain, and the coast of Chile and Peru. */
+const spanishWaters: Where = (sea, s) => {
+  const { lat, lon } = at(sea, s);
+  return (lon > -20 && lon < 10 && lat > 25 && lat < 46) || pacificCoast(sea, s);
+};
+/** Days without a prize before the hands start to think of Spanish gold on their own account. */
+export const PRIZELESS_DAYS = 90;
+
 /** Bound through the Strait: no wrecks drifting there, nothing but rock. */
 const openSea: Where = (sea, s) => !(Math.abs(at(sea, s).lat) > 50 && at(sea, s).lon > -76 && at(sea, s).lon < -66);
 
@@ -145,6 +158,13 @@ export const HAPPENINGS: Happening[] = [
   { key: 'wreck', chance: 1 / 220, where: openSea, happen: (s) => ask(s, 'wreck', 'a wreck drifting, dismasted, nobody on her deck') },
   { key: 'canoes', chance: 1 / 30, where: pacificIslands, happen: (s) => ask(s, 'canoes', 'canoes putting out from an island, a hundred of them') },
   { key: 'reef', chance: 1 / 30, where: indies, happen: (s) => ask(s, 'reef', 'aground on a reef, with the tide falling') },
+  {
+    key: 'gold-mutiny', chance: 1 / 40, once: true,
+    where: (sea, s) => pacificCoast(sea, s) && s.turn - s.lastPrize > PRIZELESS_DAYS,
+    happen: (s) => ask(s, 'gold-mutiny', 'a party of the hands armed, and talking of Spanish gold'),
+  },
+  { key: 'stores-fire', chance: 1 / 300, where: anywhere, happen: (s) => ask(s, 'stores-fire', 'fire in the bread room') },
+  { key: 'patrol-papers', chance: 1 / 200, where: spanishWaters, happen: (s) => (s.dilemma ? s : said({ ...s, dilemma: { kind: 'papers', at: null } }, 'a Spanish patrol, and she wants your papers', true)) },
 ];
 
 /** A day at sea's happenings, after the weather. At most one asks. */
@@ -170,6 +190,19 @@ export function happeningsDay(sea: Sea, s: WorldState, r: Roller): WorldState {
 /** Islands where hands are tempted to stay: the girls, the fruit, the idleness. */
 export const TEMPTING = ['ladrones', 'ternate', 'java'];
 export const TEMPTED_CHANCE = 0.35;
+/** Rulers who might ask you ashore to feast: the Sultan of Ternate, the King of Bantam, the islanders' chief. */
+export const FEASTING = ['ternate', 'java', 'solomons'];
+export const FEAST_CHANCE = 0.5;
+/** Ports with a lock-up and a governor to keep it, abroad. */
+export const JAILING = ['ternate', 'java'];
+export const JAILED_CHANCE = 0.2;
+/** Iberian islands where they search a stranger's papers. */
+export const SEARCHING = ['canaries', 'cape-verde'];
+export const SEARCHED_CHANCE = 0.25;
+/** Remote shores with shining rock on them; and the islands a storm drives you onto (landfalls.ts). Once a voyage. */
+export const ORE_SHORES = ['nova-albion', 'solomons', 'strait'];
+export const ORE_CHANCE = 0.3;
+
 /** Left be, the gentleman's grumbling costs this many hands at the next landmark, this often. */
 export const DISCONTENT_CHANCE = 0.5;
 export const DISCONTENT_LOST = [2, 5] as const;
@@ -190,6 +223,15 @@ export function arriving(s: WorldState, key: string): WorldState {
     w = ask({ ...w, seen: [...w.seen, 'gentleman'] }, 'gentleman', 'a gentleman adventurer stirring the hands against you, as Doughty did');
   } else if (TEMPTING.includes(key) && roll(r) < TEMPTED_CHANCE) {
     w = ask(w, 'deserters', 'some of the hands want to stay in the islands');
+  }
+  // One asking thing at a time: whichever comes first of the rest.
+  const put = (dilemma: NonNullable<WorldState['dilemma']>, text: string) => (w = w.dilemma ? w : said({ ...w, dilemma }, text, true));
+  if (FEASTING.includes(key) && roll(r) < FEAST_CHANCE) put({ kind: 'feast', at: key }, 'an invitation to feast ashore');
+  if (JAILING.includes(key) && roll(r) < JAILED_CHANCE) put({ kind: 'jailed', at: key }, 'some of the hands in the lock-up after a brawl ashore');
+  if (SEARCHING.includes(key) && roll(r) < SEARCHED_CHANCE) put({ kind: 'papers', at: key }, 'officers come aboard to search your papers');
+  if (ORE_SHORES.includes(key) && !w.seen.includes('ore-found') && roll(r) < ORE_CHANCE) {
+    put({ kind: 'ore' }, 'shining ore on the beach');
+    w = { ...w, seen: [...w.seen, 'ore-found'] };
   }
   return { ...w, rng: r.rng };
 }

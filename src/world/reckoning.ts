@@ -9,7 +9,7 @@
  *
  * | backer | at the start | at home |
  * | the Crown | more money, and spares and powder | the Queen's third; her favour shields you at court, but she wants a clean commission |
- * | gentlemen adventurers | the most money | their stake back, and a quarter of the profit over it; their friends aboard make trouble |
+ * | gentlemen adventurers | the most money | half of what comes home over your own purse, nothing if less; their friends aboard make trouble |
  * | your own stake | nothing more | you keep it all |
  *
  * **Privateer or pirate.** Spain's and Portugal's ships and towns are fair
@@ -56,7 +56,7 @@ export const BACKERS: Record<Backer, BackerDef> = {
     gold: (ship) => Math.round(SHIP_CLASSES[ship].purse * 0.5) + 40,
     spares: 0,
     powder: 0,
-    text: 'gentlemen of the court put money in, hoping for three to one. at home they take their stake back, and a quarter of the profit over it; and some of them sail with you',
+    text: 'gentlemen of the court put money in, hoping for three to one. at home they take half of what you bring over your own purse, and nothing if you come home poorer; and some of them sail with you',
   },
   own: {
     name: 'your own stake',
@@ -70,8 +70,8 @@ export const BACKER_KEYS = Object.keys(BACKERS) as Backer[];
 
 /** The Queen's share of what comes home, under a Crown commission. */
 export const CROWN_SHARE = 1 / 3;
-/** The gentlemen's share of the profit over their stake and your purse. */
-export const GENTLEMEN_SHARE = 1 / 4;
+/** The gentlemen's share of what comes home over your own purse: their stake is in it, and their risk. */
+export const GENTLEMEN_SHARE = 1 / 2;
 
 // --- Privateer or pirate ---------------------------------------------------------
 
@@ -91,11 +91,8 @@ export const grievanceWord = (s: WorldState) => (s.grievance <= 0 ? 'none' : s.g
 /** What the backers take at home, from the gold you bring in. */
 export function sharesDue(s: WorldState): { queen: number; gentlemen: number } {
   if (s.backer === 'crown') return { queen: Math.round(s.gold * CROWN_SHARE), gentlemen: 0 };
-  if (s.backer === 'gentlemen') {
-    const purse = SHIP_CLASSES[s.ship].purse;
-    const profit = Math.max(0, s.gold - purse - s.stake);
-    return { queen: 0, gentlemen: Math.min(s.gold, Math.round(s.stake + profit * GENTLEMEN_SHARE)) };
-  }
+  // Adventurers share the risk: half of what comes home over your own purse, and nothing if you come home poorer.
+  if (s.backer === 'gentlemen') return { queen: 0, gentlemen: Math.round(Math.max(0, s.gold - SHIP_CLASSES[s.ship].purse) * GENTLEMEN_SHARE) };
   return { queen: 0, gentlemen: 0 };
 }
 
@@ -143,10 +140,12 @@ const said = (s: WorldState, text: string, stop = false): WorldState => ({ ...s,
  * then the reckoning waits on your choice. Called by `raise` on raising home.
  */
 export function comeHome(s: WorldState): WorldState {
+  // The ore assayed: Frobisher's two hundred tons of 1578 were iron pyrites, and went to mend the roads.
+  if (s.seen.includes('ore')) s = said(s, 'the shining ore assayed at the Tower: iron pyrites, fool’s gold, fit to mend the roads with');
   const due = sharesDue(s);
   let w: WorldState = { ...s, gold: s.gold - due.queen - due.gentlemen, settled: { ...NOTHING_SETTLED, queen: due.queen, gentlemen: due.gentlemen } };
   if (due.queen) w = said(w, `the Queen's third paid into the Exchequer: ${due.queen}`);
-  if (due.gentlemen) w = said(w, `the gentlemen adventurers paid their stake and their quarter: ${due.gentlemen}`);
+  if (due.gentlemen) w = said(w, `the gentlemen adventurers paid their half: ${due.gentlemen}`);
   const demand = restitutionFor(w);
   const words = [
     w.grievance > 0 ? `Spain's ambassador demands restitution: ${demand}` : '',
