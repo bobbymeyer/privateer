@@ -18,7 +18,7 @@ const fresh = (over: Partial<WorldState> = {}): WorldState => ({ ...victualled(c
 function lie(w: WorldState, days: number): WorldState {
   for (let d = 0; d < days; d++) {
     w = aDay(sea, { ...w, turn: w.turn + 1 });
-    if (w.dilemma) w = choose(sea, w, choices(w, w.dilemma)[0].key);
+    if (w.dilemma) w = choose(sea, w, choices(w, w.dilemma).find((c) => !c.barred)!.key);
     if (w.sunk) break;
   }
   return w;

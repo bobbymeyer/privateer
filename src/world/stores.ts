@@ -203,9 +203,10 @@ export const ISLANDERS_COST = 3;
 export const ISLANDERS_DAYS = 21;
 
 /** The market where you're lying, if there is one. */
-export const marketHere = (sea: Sea, s: WorldState) => landmarkHere(sea, s)?.offers.market ?? null;
+export const marketHere = (sea: Sea, s: WorldState) => (s.seen.includes(`shut:${s.voyage.at}`) ? null : (landmarkHere(sea, s)?.offers.market ?? null));
 
-export const price = (s: WorldState, ware: Ware) => Math.ceil(CHANDLER[ware].cost * (s.voyage.at === 'plymouth' ? 1 : ABROAD));
+/** Plymouth's prices at home, and wherever a ruler's favour gets you them (the feast ashore, happenings.ts); half as dear again elsewhere. */
+export const price = (s: WorldState, ware: Ware) => Math.ceil(CHANDLER[ware].cost * (s.voyage.at === 'plymouth' || s.seen.includes(`favour:${s.voyage.at}`) ? 1 : ABROAD));
 
 /** Room for another lot of this. */
 export function room(s: WorldState, ware: Ware): boolean {
@@ -227,7 +228,7 @@ export function buy(sea: Sea, s: WorldState, ware: Ware): WorldState {
 /** What a ton of spice fetches on the quay at Plymouth. Drake brought home six tons of cloves; he threw three more over on a reef. */
 export const SPICE_WORTH = 20;
 /** Tons of spice she can stow: a ton for every five of her complement. */
-export const spiceRoom = (s: WorldState) => Math.floor(complement(s) / 5);
+export const spiceRoom = (s: WorldState) => Math.max(0, Math.floor(complement(s) / 5) - (s.seen.includes('ore') ? 2 : 0));
 /** Spice for sale where you're lying, if any. */
 export const spiceHere = (sea: Sea, s: WorldState) => landmarkHere(sea, s)?.offers.spice ?? null;
 

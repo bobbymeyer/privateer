@@ -18,6 +18,7 @@ import { type FightRecord, NO_TALLY, type Tally } from './record.ts';
 import { START_VOYAGE, type Voyage, raise } from './journey.ts';
 import type { Rumor } from './rumors.ts';
 import { type Pace, type Rations, type Stores, startCrew, startStores } from './stores.ts';
+import { BACKERS, type Backer, NOTHING_SETTLED, type Settled, type Verdict } from './reckoning.ts';
 
 /** The chart: the lanes, and where each landmark lies on them. The same for every run. */
 export interface Sea {
@@ -64,6 +65,19 @@ export interface WorldState {
   rumors: Rumor[];
   /** The island a storm drove you onto, while you lie there. See landfalls.ts. */
   landfall: string | null;
+  /** Whose money you sail on, and what they put in: see reckoning.ts. */
+  backer: Backer;
+  stake: number;
+  /** Ships taken that weren't Spain's or Portugal's: a name for piracy. */
+  infamy: number;
+  /** What you've taken from Spain and Portugal: what their ambassador will want back. */
+  grievance: number;
+  /** Home: the fame of it, how it came out at court, and what was paid away. */
+  fame: number;
+  verdict: Verdict | null;
+  settled: Settled;
+  /** The day of the last prize taken: the hands count from it. */
+  lastPrize: number;
   /** Home: the run is won. */
   won: boolean;
   /** Lost: sunk, or too few hands to work her. The run is over. */
@@ -100,10 +114,14 @@ export function dateOf(turn: number): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-/** A new voyage, in the ship you chose, at Plymouth with her purse. */
-export function createWorld(sea: Sea, seed: number, ship = 'pinnace'): WorldState {
+/** A new voyage, in the ship you chose, on whose money, at Plymouth with her purse. */
+export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Backer = 'own'): WorldState {
   const c = SHIP_CLASSES[ship];
   if (!c) throw new Error(`no such ship: ${ship}`);
+  const b = BACKERS[backer];
+  if (!b) throw new Error(`no such backer: ${backer}`);
+  const stake = b.gold(ship);
+  const stores = startStores(ship);
   const r: Roller = { rng: (seed ^ 0x0ce4) >>> 0 };
   roll(r);
   return {
@@ -114,12 +132,12 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace'): WorldStat
     hull: c.hull,
     maxHull: c.hull,
     crew: startCrew(ship),
-    stores: startStores(ship),
+    stores: { ...stores, spares: stores.spares + b.spares, powder: stores.powder + b.powder },
     fresh: 0,
     rations: 'full',
     pace: 'steady',
     calm: 0,
-    gold: c.purse,
+    gold: c.purse + stake,
     voyage: START_VOYAGE,
     dilemma: null,
     hail: null,
@@ -130,6 +148,14 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace'): WorldStat
     seen: [],
     rumors: [],
     landfall: null,
+    backer,
+    stake,
+    infamy: 0,
+    grievance: 0,
+    fame: 0,
+    verdict: null,
+    settled: NOTHING_SETTLED,
+    lastPrize: 0,
     won: false,
     sunk: false,
     ending: null,

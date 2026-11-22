@@ -9,6 +9,7 @@ import { attack, fight, hostile, letPass, raid, raidHere, SIGHT_CHANCE, sailSigh
 import { capacity, marketHere, shoreHere } from './stores.ts';
 import { lyingAt, victualled } from './testing.ts';
 import { createSea, createWorld, dateOf, type WorldState, waiting } from './world.ts';
+import { choose } from './dilemmas.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -85,9 +86,10 @@ test('a sail sighted, by the waters you are in', () => {
   };
   const iberia = sights(-12, 38);
   assert.ok(iberia['spain privateer'] && iberia['portugal privateer'] && iberia['barbary corsair'], JSON.stringify(iberia));
+  assert.ok(iberia['hanse merchant'], 'Hanseatic hulks for Lisbon, a friend’s');
   const brazil = sights(-38, -15);
-  assert.deepEqual(Object.keys(brazil), ['portugal merchant']);
-  const total = Object.values(brazil)[0];
+  assert.deepEqual(Object.keys(brazil).sort(), ['france merchant', 'portugal merchant']);
+  const total = Object.values(brazil).reduce((a, b) => a + b, 0);
   assert.ok(total > 3000 * SIGHT_CHANCE * 0.7 && total < 3000 * SIGHT_CHANCE * 1.3, `${total} sails in 3000 days`);
   assert.deepEqual(Object.keys(sights(-78, -20)), ['spain merchant']);
   const east = sights(110, 0);
@@ -145,13 +147,16 @@ test('a town on the way is raided once, whatever comes of it; taken, its storeho
   assert.fail('no sack in 40 tries');
 });
 
-test('raising Plymouth again ends the run', () => {
+test('raising Plymouth again brings the reckoning, and that ends the run', () => {
   const w = { ...createWorld(sea, 1), player: node(-6, 49.5), voyage: { at: 'sierra-leone', bound: HOME_LANDMARK, visited: ['plymouth', 'canaries', 'cape', 'sierra-leone'] } };
   let s = victualled(w);
-  for (let day = 0; day < 30 && !s.won; day++) {
+  for (let day = 0; day < 30 && s.dilemma?.kind !== 'reckoning'; day++) {
     const out = continueOn(sea, s);
-    s = { ...out.world, dilemma: null, hail: null, encounter: null };
+    s = out.world.dilemma?.kind === 'reckoning' ? out.world : { ...out.world, dilemma: null, hail: null, encounter: null };
   }
+  assert.equal(s.dilemma?.kind, 'reckoning');
+  assert.ok(!s.won, 'not over till the reckoning');
+  s = choose(sea, s, 'low');
   assert.ok(s.won);
   assert.equal(s.ending, 'home');
 });

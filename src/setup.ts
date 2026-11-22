@@ -46,6 +46,8 @@ export interface Extra {
   cargo?: number;
   /** Beaten, she strikes rather than sinks, and her whole hold is yours: the treasure ship. She can still run. */
   takenWhole?: boolean;
+  /** A town given warning: its relief starts coming this many rounds sooner. */
+  reliefSooner?: number;
 }
 
 /**
@@ -65,7 +67,7 @@ export function encounterWith(kind: TargetKind, seed: number, ship: { hull: numb
     target: { name: t.name, hull: t.hull, maxHull: t.hull, cargo: t.cargo, bounty: t.bounty, ...(t.takenWhole ? { takenWhole: true, fixed: true } : extra.takenWhole ? { takenWhole: true } : {}) },
     // A town lies where it lies: always close, the boats offshore.
     range: t.takenWhole ? START_RANGE : range,
-    reinforce: t.reinforce,
+    reinforce: t.reinforce && extra.reliefSooner ? { ...t.reinforce, from: Math.max(2, t.reinforce.from - extra.reliefSooner) } : t.reinforce,
   });
 }
 

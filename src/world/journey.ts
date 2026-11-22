@@ -11,6 +11,7 @@ import { PLATE_LANDMARK, overhaul } from './treasure.ts';
 import { arriving } from './happenings.ts';
 import { SPICE_WORTH } from './stores.ts';
 import { arriveDetour, followed, hearAt } from './rumors.ts';
+import { comeHome } from './reckoning.ts';
 
 export interface Voyage {
   /** The landmark you last raised. */
@@ -62,7 +63,7 @@ export const daysTo = (sea: Sea, s: WorldState, key: string) => sea.map.distTo(s
 /**
  * After a day's sail: have you raised a landmark? The one you're bound for,
  * or any of the next — you may have come at one another way. Raising home
- * ends the run.
+ * brings the reckoning (reckoning.ts), and that ends the run.
  */
 export function raise(sea: Sea, s: WorldState): WorldState {
   const v = s.voyage;
@@ -78,7 +79,8 @@ export function raise(sea: Sea, s: WorldState): WorldState {
     const sold = s.spice * SPICE_WORTH;
     const log = [...s.log, ...(sold ? [{ turn: s.turn, text: `${s.spice} tons of spice sold on the quay for ${sold}` }] : [])];
     const gold = s.gold + sold;
-    return { ...s, voyage, gold, spice: 0, won: true, ending: 'home', log: [...log, { turn: s.turn, text: `Plymouth: ${said}, with ${gold}`, stop: true }] };
+    // Not over yet: the shares, and the reckoning.
+    return comeHome({ ...s, voyage, gold, spice: 0, log: [...log, { turn: s.turn, text: `Plymouth: ${said}, with ${gold}`, stop: true }] });
   }
   let w: WorldState = arriving({ ...s, voyage, landfall: null, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] }, raised);
   // Off Cape San Francisco, the first time: the treasure ship.
