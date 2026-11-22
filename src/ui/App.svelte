@@ -576,7 +576,7 @@
           {#if world.won}
             {@const paid = [['the Queen’s third', world.settled.queen], ['the gentlemen adventurers', world.settled.gentlemen], ['a gift for the Queen', world.settled.gift], ['restitution to Spain', world.settled.restitution], ['seized by the Admiralty', world.settled.seized]].filter(([, n]) => n)}
             {#if paid.length}<p class="faint">paid away at home: {paid.map(([who, n]) => `${who}, ${n}`).join(' · ')}</p>{/if}
-            {#if world.grievance && world.verdict !== 'pirate'}<p class="faint">“take the Indies from him, and you take away his treasure, which is nervus belli”: Hakluyt, of the King of Spain.</p>{/if}
+            {#if world.grievance && world.verdict !== 'pirate'}<p class="faint">take the Indies from the King of Spain, Hakluyt wrote in 1584, and “you take away his treasure which is nervus belli”.</p>{/if}
           {/if}
           {#if world.sunk && world.lastFight && world.lastFight.outcome === 'sunk'}
             {@const f = world.lastFight}

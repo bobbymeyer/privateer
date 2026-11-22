@@ -27,6 +27,19 @@ better gunned and the deeper the hold.
 | sloop | 70 | 14 | 30 of 45 | 16, a raking fire more | ×1.5 |
 | brigantine | 30 | 17 | 47 of 70 | 17, a broadside and a raking fire more | ×1 |
 
+**Choose whose money you sail on** (`BACKERS` in `src/world/reckoning.ts`).
+Most voyages were paid for privately; the Crown put in ships and money when
+it suited it, as Elizabeth did in Drake's.
+
+| backer | fits you out with | at home |
+| --- | --- | --- |
+| the Crown | 30% of the ship's purse and 20 more, 2 spares and 2 powder | the Queen's third of what you bring home; she wants a clean commission (infamy counts double), and her favour shields you at court |
+| gentlemen adventurers | half the ship's purse and 40 more | half of what comes home over your own purse, nothing if you come home poorer; their friends aboard bring the San Julián grumbling to a head |
+| your own stake | nothing more | nothing shared |
+
+Each ship suits a different backer: the gentlemen a pinnace, the Crown a
+sloop, your own stake a brigantine (see the balance below).
+
 **Fit out** at Plymouth's chandler: food at 4 for 300 rations, water at 1
 for 300, five hands for 4, a bundle of spares or a barrel of powder for 3.
 Abroad, a chandler is half as dear again. You start with two months' food
@@ -54,6 +67,19 @@ canoes, a reef in the Indies, a gentleman stirring the crew at San Julián,
 hands who'd stay in the islands. Between them the days differ by where you
 are: seals off Patagonia, ice and fog in the high latitudes, crossing the
 line, rats, a fire in the galley, the worm in her planking.
+
+Seven more come from *Colonization, Piracy, and Trade in Early Modern
+Europe* (Palgrave, 2017), each from something that happened:
+
+| event | where | the choices | after |
+| --- | --- | --- | --- |
+| the hands want Spanish gold | off Chile and Peru, 90 days without a prize | lead them (20 to 60, fresh food, the treasure ship warned), hold firm (they may slip away), maroon the ringleaders (3 to 6; caught, they talk) | Laudonnière's men at Fort Caroline, 1564 |
+| fire in the bread room | anywhere, rarely | fight it (a bundle of spares, 15% of the food) or let it burn (35%); starving or driven hard, the hands remember Charlesfort | Charlesfort, 1563 |
+| a storm on the eve of a raid | one raid in five | go in now (1 to 2 hull, 1 to 3 hands), stand off (3 days' stores, the town warned), or land the men without the ship's guns (even odds 2 to 4 cut off) | Ribault at San Agustín, 1565 |
+| a feast ashore | Ternate, Bantam, the Isles of Solomon | go (favour: Plymouth's prices there, fresh food; one in ten, poison and a ransom), send a gentleman, or decline | Drake at Ternate, 1579 |
+| hands in the lock-up | Ternate, Bantam | pay a quarter of the purse, leave them (2 to 4), or break them out (the market shut to you) | |
+| papers searched | the Canaries, Cape Verde, Spanish patrols | hand over the charts (and your rumors), bribe (15), or refuse (their guns, or a fight) | |
+| shining ore | Nova Albion, the Isles of Solomon, the Strait, a storm's island | load it (2 tons of hold) or leave it; the Tower calls it fool's gold | Frobisher, 1578 |
 
 **Spice.** Cloves at Ternate, pepper at Bantam, by the ton, a ton for every
 five of her complement; each sells for 20 on the quay at Plymouth. On a reef
@@ -85,6 +111,28 @@ How the prizes go, on a sound hull, by the fight bot over 300 fights:
 | the Great Ship | 13% | 34% | 71% |
 | the carrack from Goa | 6% | 24% | 64% |
 | Goa | 0% | 1% | 26% |
+
+**Privateer or pirate.** Spain's and Portugal's ships and towns are fair
+game, one crown since 1580. A French, Hanseatic or Dutch merchant isn't:
+they sail off Iberia, Brazil and Guinea with 12 more in the hold than a
+merchant's usual, and taking one is piracy, a point of `infamy` (two under
+the Crown). What you take from Spain and Portugal is lawful, but it mounts
+up as Spain's `grievance`. The status strip says both in a word.
+
+**The reckoning** (`src/world/reckoning.ts`). Raising Plymouth sells the
+spice and pays your backers, and then the voyage waits on one more choice.
+Spain's ambassador, as Mendoza did over Drake, wants restitution: half the
+grievance, no more than half the gold.
+
+| choice | what comes of it |
+| --- | --- |
+| show yourself at court | fame: 30% of the gold, 20 to 150, to the score. A risk of being disowned to please Spain (the grievance over 1200, and 12 points a point of infamy; four tenths of it under the Crown): restitution paid, no fame |
+| lie low | safe, no fame |
+| a gift for the Queen | a fifth of the treasure, 2 infamy forgotten, and court is safe |
+
+With 4 infamy or more and no Crown favour, court names you a pirate and the
+Admiralty seizes three quarters of the prize; lying low, even odds of the
+same. Drake's voyage needs not to be disowned or named.
 
 **Storm landfalls** (`src/world/landfalls.ts`). A storm met in the right
 waters drives you onto an island one time in eight, one in five running
@@ -249,8 +297,23 @@ silver, follows every rumor (and attacks a rumored prize on a hull still a
 quarter sound), and fights by one-step lookahead.
 
 ```
-npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--runs 40] [--from 0] [--raid] [--wake] [--no-rumors] [--trace]
+npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--trace]
 ```
+
+It never fires on a friend's merchant unless `--pirate`. At the reckoning it
+goes to court when the risk is under three in ten, gives the Queen a gift
+when it isn't and there's more than 100 to give from, and lies low
+otherwise.
+
+Over 40 voyages a ship and a backer, mean score counting the lost as 0:
+
+| ship | the Crown | gentlemen adventurers | your own stake |
+| --- | --- | --- | --- |
+| pinnace | 50% home, mean score 161 | 48%, 184 | 40%, 131 |
+| sloop | 55%, 131 | 48%, 102 | 45%, 94 |
+| brigantine | 50%, 123 | 55%, 87 | 53%, 142 |
+
+Before backers, on its own stake, it did as follows.
 
 Over 40 voyages a ship:
 
@@ -279,7 +342,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 116 tests
+npm test                     # the rules and the voyage, 134 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
@@ -319,6 +382,7 @@ src/
     treasure.ts  the treasure ship off Cape San Francisco, asleep or warned
     rumors.ts    rumors heard, the detours they open, and what's at the end of them
     landfalls.ts storms that drive you onto an island
+    reckoning.ts whose money you sail on, privateer or pirate, and the reckoning at home
     reading.ts   what you can tell of a ship before you engage her
     record.ts    the voyage's tally, and the last fight told
     score.ts     the score, and the voyage of the time it was like
