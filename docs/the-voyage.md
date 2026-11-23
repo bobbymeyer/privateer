@@ -83,7 +83,13 @@ Every day at sea costs:
 - **canvas and timber**: storms take them, and without spares a storm takes
   the hull instead;
 The crew is a number, two thirds of the ship's complement at the start.
-Too few and she can't be sailed at all.
+Fewer than a third of it and she can't be sailed at all: a bigger ship
+wants more hands to work her.
+
+The long legs are where voyages are lost: the crossing from Cape Verde to
+Brazil, the Pacific (shortened by the trades), and Java to the Cape. On the
+coast of Chile and Peru there's water only by raiding a town or taking it
+from the river by night, at the risk of being seen.
 
 ## what you do at a landmark
 
