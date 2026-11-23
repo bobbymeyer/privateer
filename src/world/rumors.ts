@@ -133,11 +133,11 @@ function offer(s: WorldState, key: string, source: Source, r: Roller): WorldStat
 const open = (s: WorldState, key: string) => !rumorOf(s, key) && reachable(s, key);
 
 /** On raising a landmark: a rumor heard there, sometimes. At most one. */
-export function hearAt(s: WorldState, at: string): WorldState {
+export function hearAt(s: WorldState, at: string, sure = false): WorldState {
   if (s.dilemma || s.hail || s.encounter) return s;
   const r: Roller = { rng: s.rng };
   const here = Object.entries(DETOURS).filter(([k, d]) => d.heardAt[at] && open(s, k));
-  if (!here.length || roll(r) >= RUMOR_CHANCE) return { ...s, rng: r.rng };
+  if (!here.length || (!sure && roll(r) >= RUMOR_CHANCE)) return { ...s, rng: r.rng };
   const [key, d] = pick(r, here);
   return { ...offer(s, key, d.heardAt[at]!, r), rng: r.rng };
 }
@@ -147,6 +147,14 @@ export function tellOf(s: WorldState, key: string, source: Source): WorldState {
   if (!open(s, key)) return { ...s, log: [...s.log, { turn: s.turn, text: 'nothing in their news you can use' }] };
   const r: Roller = { rng: s.rng };
   return { ...offer(s, key, source, r), rng: r.rng };
+}
+
+/** News from a friendly sail, of any detour you could still make for. Nothing to tell if there's none. */
+export function newsOf(s: WorldState, source: Source): WorldState {
+  const r: Roller = { rng: s.rng };
+  const keys = Object.keys(DETOURS).filter((k) => open(s, k));
+  if (!keys.length) return { ...s, rng: r.rng, log: [...s.log, { turn: s.turn, text: 'nothing in their news you can use' }] };
+  return { ...offer(s, pick(r, keys), source, r), rng: r.rng };
 }
 
 /** After a prize taken: her people talk, sometimes. */

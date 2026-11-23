@@ -15,6 +15,7 @@ import { type Roller, pick, roll } from './random.ts';
 import { capacity, topUp } from './stores.ts';
 import type { Sea, WorldState } from './world.ts';
 import { alive, nameOf } from './hands.ts';
+import { PEOPLES, hostileTo, peopleAt } from './peoples.ts';
 
 type Where = (sea: Sea, s: WorldState) => boolean;
 const at = (sea: Sea, s: WorldState) => sea.map.nodes[s.player];
@@ -201,6 +202,8 @@ export const FEAST_CHANCE = 0.5;
 /** Ports with a lock-up and a governor to keep it, abroad. */
 export const JAILING = ['ternate', 'java'];
 export const JAILED_CHANCE = 0.2;
+/** Hands ashore wronging the people of the coast, on arriving: this often. */
+export const MISCONDUCT_CHANCE = 0.15;
 /** Iberian islands where they search a stranger's papers. */
 export const SEARCHING = ['canaries', 'cape-verde'];
 export const SEARCHED_CHANCE = 0.25;
@@ -234,6 +237,9 @@ export function arriving(s: WorldState, key: string): WorldState {
   const put = (dilemma: NonNullable<WorldState['dilemma']>, text: string) => (w = w.dilemma ? w : said({ ...w, dilemma }, text, true));
   if (FEASTING.includes(key) && roll(r) < FEAST_CHANCE) put({ kind: 'feast', at: key }, 'an invitation to feast ashore');
   if (JAILING.includes(key) && roll(r) < JAILED_CHANCE) put({ kind: 'jailed', at: key }, 'some of the hands in the lock-up after a brawl ashore');
+  // Hands ashore among a people who aren't hostile yet: sometimes they make them so.
+  const people = peopleAt(key);
+  if (people && !hostileTo(w, people) && roll(r) < MISCONDUCT_CHANCE) put({ kind: 'misconduct', people }, `trouble ashore: some of the hands have wronged ${PEOPLES[people].name}`);
   if (SEARCHING.includes(key) && roll(r) < SEARCHED_CHANCE) put({ kind: 'papers', at: key }, 'officers come aboard to search your papers');
   if (ORE_SHORES.includes(key) && !w.seen.includes('ore-found') && roll(r) < ORE_CHANCE) {
     put({ kind: 'ore' }, 'shining ore on the beach');

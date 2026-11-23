@@ -18,7 +18,7 @@
   import { read } from '../world/reading.ts';
   import { HAND_WORTH, LIKE_TITLES, score } from '../world/score.ts';
   import {
-    CHANDLER, ISLANDERS_COST, SPICE_WORTH, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade, WOOD_WORTH, buyWood, woodHere, woodRoom,
+    CHANDLER, ISLANDERS_COST, SPICE_WORTH, TRUCK_AT, TRUCK_ROOM, barter, barterHere, BARTER_DAYS, shoreDays, takeHere, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade, WOOD_WORTH, buyWood, woodHere, woodRoom,
   } from '../world/stores.ts';
   import { PRIZES, followed } from '../world/rumors.ts';
   import { JEWELS, favourOf, setAside, toHerTaste } from '../world/jewels.ts';
@@ -28,6 +28,9 @@
   import { FIX_WORDS, type Warning, warningKey, warnings } from '../world/warnings.ts';
   import { EPITAPH_LENGTH, loadGraves, saveGraves, withEpitaph, withGraves } from '../graves.ts';
   import { forget, load, store } from '../save.ts';
+  import { PEOPLES, TAKEN_DAYS, peopleHere, standingWord, takeWhatYouNeed, remember } from '../world/peoples.ts';
+  import { loadPeoples, savePeoples } from '../peoples.ts';
+  import { shareText } from '../share.ts';
   import { type Entry, best, dailySeed, entryFor, isWin, loadLog, raised, saveLog, scoreOf, today, withEntry } from '../logbook.ts';
   import { ambient, bell, coin, gun, knell, setSound, soundOn, storm } from './sound.ts';
   import Fight from './Fight.svelte';
@@ -62,7 +65,7 @@
 
   function begin(ship: string, backer: Backer) {
     if (!sea) return;
-    world = createWorld(sea, seed, ship, backer, takeChronicler);
+    world = createWorld(sea, seed, ship, backer, takeChronicler, loadPeoples());
     buried = [];
     sailAnywayOn = '';
     choosing = false;
@@ -115,6 +118,8 @@
   function logRun(w: WorldState) {
     log = withEntry(log, entryFor(w, seed, daily, new Date()));
     saveLog(log);
+    // What this voyage left behind on the coasts it met, for the next English ship.
+    savePeoples(remember(loadPeoples(), w));
     // The dead of this voyage, where they lie: a later voyage passing finds them.
     if (sea) {
       buried = gravesOf(w, seed, dateOf, SHIP_CLASSES[w.ship].name, placeOf(sea, w));
@@ -322,6 +327,40 @@
   const RATIONS: [WorldState['rations'], string][] = [['full', 'full'], ['short', 'short'], ['starving', 'starvation']];
   const PACES: [WorldState['pace'], string][] = [['easy', 'easy'], ['steady', 'steady'], ['hard', 'crack on']];
   const WARES: Ware[] = ['food', 'water', 'hands', 'spares', 'powder'];
+  /** What the chandler here sells: truck only at Plymouth, where it's English goods. */
+  const waresHere = (w: WorldState): Ware[] => (w.voyage.at === TRUCK_AT ? [...WARES, 'truck'] : WARES);
+  /** The people of the coast you're lying at, and where they stand. */
+  const people = $derived(sea && now() && here ? peopleHere(now()!) : null);
+  const canBarter = $derived(sea && now() ? barterHere(sea, now()!) : false);
+  const canTake = $derived(sea && now() ? takeHere(sea, now()!) : false);
+
+  // --- Sharing -----------------------------------------------------------------------
+
+  /** The voyage in a few lines, copied to the clipboard; or shown to select, where the clipboard won't take it. */
+  let copied = $state('');
+  let shareShown = $state('');
+  async function copyLog() {
+    if (!world) return;
+    const text = shareText(world, seed, daily);
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = 'copied';
+      shareShown = '';
+    } catch {
+      copied = '';
+      shareShown = text;
+    }
+  }
+
+  // --- A phone -----------------------------------------------------------------------
+
+  /** A narrow screen: the status folded, and continue on kept at the bottom. */
+  let phone = $state(false);
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const mq = window.matchMedia('(max-width: 600px)');
+    phone = mq.matches;
+    mq.addEventListener?.('change', (e) => (phone = e.matches));
+  }
   /** The last things that happened, newest first. */
   const recent = $derived(now()?.log.slice(-6).reverse() ?? []);
   /** What won't last the leg ahead, said beside the casks and the chandler while you can still put it right. */
@@ -335,6 +374,27 @@
   <main><p class="faint">charting the seas…</p></main>
 {:else}
   <main>
+    {#snippet gauges(w: WorldState)}
+        <div class="gauges">
+          <div class:low={w.crew < complement(w) / 2}><span class="label">hands</span><span class="bar"><span style="width: {pct(w.crew, complement(w))}"></span></span>{w.crew} of {complement(w)}</div>
+          <div class:low={days.food <= 10}><span class="label">food</span><span class="bar"><span style="width: {pct(w.stores.food, capacity(w).food)}"></span></span>{days.food} days</div>
+          <div class:low={days.water <= 10}><span class="label">water</span><span class="bar"><span style="width: {pct(w.stores.water, capacity(w).water)}"></span></span>{days.water} days</div>
+          <div class:low={scurvy(w) !== 'none'}><span class="label">fresh food</span>{w.fresh} days ago{scurvy(w) === 'killing' ? ': the scurvy is killing' : scurvy(w) === 'coming' ? `: scurvy at ${SCURVY_DAYS}` : ''}</div>
+          <div class:low={w.hull <= w.maxHull / 3}><span class="label">hull</span><span class="bar"><span style="width: {pct(w.hull, w.maxHull)}"></span></span>{w.hull} of {w.maxHull}</div>
+          <div class:low={w.stores.spares === 0}><span class="label">spares</span>{w.stores.spares}</div>
+          <div class:low={w.stores.powder === 0}><span class="label">powder</span>{w.stores.powder}</div>
+          <div><span class="label">gold</span>{w.gold}</div>
+          {#if w.spice}<div><span class="label">spice</span>{w.spice} {w.spice === 1 ? 'ton' : 'tons'}, {w.spice * SPICE_WORTH} at home</div>{/if}
+          {#if w.wood}<div><span class="label">brazilwood</span>{w.wood} {w.wood === 1 ? 'ton' : 'tons'}, {w.wood * WOOD_WORTH} at home</div>{/if}
+          {#if w.jewels.length}<div title={w.jewels.map((j) => j.name).join('; ')}><span class="label">jewels</span>{w.jewels.length}, {w.jewels.reduce((t, j) => t + j.value, 0)} to a goldsmith</div>{/if}
+          <div><span class="label">backed by</span>{BACKERS[w.backer].name}</div>
+          <div class:low={w.infamy > 0}><span class="label">your name</span>{lawfulness(w)}</div>
+          <div><span class="label">Spain's grievance</span>{grievanceWord(w)}</div>
+          {#if w.truck}<div><span class="label">truck</span>{w.truck} {w.truck === 1 ? 'chest' : 'chests'}</div>{/if}
+          {#if w.french}<div><span class="label">commission</span>a French one too</div>{/if}
+          {#if w.company > w.turn}<div><span class="label">in company</span>the Rochellers, {w.company - w.turn} days</div>{/if}
+        </div>
+    {/snippet}
     <header>
       <h1>privateer</h1>
       <p class="faint">{world ? `${dateOf(world.turn)} · a ${SHIP_CLASSES[world.ship].name}` : 'Plymouth, 1580'}{daily ? ` · today's voyage, ${daily}` : ''}</p>
@@ -356,22 +416,20 @@
           {#if here}<strong>{here.name}</strong>{:else}at sea{/if}
           {#if making && making !== world.voyage.at} · bound for {making === HOME_LANDMARK ? 'home' : landmark(making).name}, {daysTo(sea, world, making)} days{/if}
         </p>
-        <div class="gauges">
-          <div class:low={world.crew < complement(world) / 2}><span class="label">hands</span><span class="bar"><span style="width: {pct(world.crew, complement(world))}"></span></span>{world.crew} of {complement(world)}</div>
-          <div class:low={days.food <= 10}><span class="label">food</span><span class="bar"><span style="width: {pct(world.stores.food, capacity(world).food)}"></span></span>{days.food} days</div>
-          <div class:low={days.water <= 10}><span class="label">water</span><span class="bar"><span style="width: {pct(world.stores.water, capacity(world).water)}"></span></span>{days.water} days</div>
-          <div class:low={scurvy(world) !== 'none'}><span class="label">fresh food</span>{world.fresh} days ago{scurvy(world) === 'killing' ? ': the scurvy is killing' : scurvy(world) === 'coming' ? `: scurvy at ${SCURVY_DAYS}` : ''}</div>
-          <div class:low={world.hull <= world.maxHull / 3}><span class="label">hull</span><span class="bar"><span style="width: {pct(world.hull, world.maxHull)}"></span></span>{world.hull} of {world.maxHull}</div>
-          <div class:low={world.stores.spares === 0}><span class="label">spares</span>{world.stores.spares}</div>
-          <div class:low={world.stores.powder === 0}><span class="label">powder</span>{world.stores.powder}</div>
-          <div><span class="label">gold</span>{world.gold}</div>
-          {#if world.spice}<div><span class="label">spice</span>{world.spice} {world.spice === 1 ? 'ton' : 'tons'}, {world.spice * SPICE_WORTH} at home</div>{/if}
-          {#if world.wood}<div><span class="label">brazilwood</span>{world.wood} {world.wood === 1 ? 'ton' : 'tons'}, {world.wood * WOOD_WORTH} at home</div>{/if}
-          {#if world.jewels.length}<div title={world.jewels.map((j) => j.name).join('; ')}><span class="label">jewels</span>{world.jewels.length}, {world.jewels.reduce((t, j) => t + j.value, 0)} to a goldsmith</div>{/if}
-          <div><span class="label">backed by</span>{BACKERS[world.backer].name}</div>
-          <div class:low={world.infamy > 0}><span class="label">your name</span>{lawfulness(world)}</div>
-          <div><span class="label">Spain's grievance</span>{grievanceWord(world)}</div>
-        </div>
+        {#if phone}
+          <details class="fold">
+            <summary>
+              <span class:low={world.crew < complement(world) / 2}>{world.crew} hands</span> ·
+              <span class:low={days.food <= 10}>food {days.food}d</span> ·
+              <span class:low={days.water <= 10}>water {days.water}d</span> ·
+              <span class:low={world.hull <= world.maxHull / 3}>hull {world.hull}/{world.maxHull}</span>
+              <span class="faint"> · more</span>
+            </summary>
+            {@render gauges(world)}
+          </details>
+        {:else}
+          {@render gauges(world)}
+        {/if}
         <details class="of-note">
           <summary>hands of note: {world.hands.filter((h) => !h.dead && !h.ran && !h.fate).length} of {world.hands.length} aboard</summary>
           <ul class="plain">
@@ -400,12 +458,16 @@
         {#if said && said !== recent[0]?.text}<p class="said">{said}</p>{/if}
         {#if here}
           <p class="landmark">{here.text}</p>
+          {#if people}
+            {@const word = standingWord(world, people)}
+            <p class:warn={word === 'hostile'} class:faint={word !== 'hostile'}>{PEOPLES[people].name}: {word}{word === 'friendly' ? ', and their guides make the work ashore a day quicker' : word === 'hostile' ? ': no trade, and arrows from the trees at the work ashore' : ': deal fairly and they may come round; there may be arrows at the work ashore'}.</p>
+          {/if}
           {#each short as w (w.kind)}<p class="warn">{w.text}{w.fix ? ` ${FIX_WORDS[w.fix]}.` : ''}</p>{/each}
           {#if shore.length}
             <div class="row">
               {#each shore as work (work)}
                 <button disabled={sailing} onclick={() => attempt(() => ashore(sea!, world!, work, advance))}>
-                  {work === 'water' ? 'fill the casks' : work === 'forage' ? 'forage and fish' : 'careen her'} ({SHORE_DAYS[work]} days)
+                  {work === 'water' ? 'fill the casks' : work === 'forage' ? 'forage and fish' : 'careen her'} ({shoreDays(world, work)} {shoreDays(world, work) === 1 ? 'day' : 'days'})
                 </button>
               {/each}
             </div>
@@ -413,14 +475,24 @@
           {#if market === 'chandler'}
             <p class="faint">the chandler{world.voyage.at === 'plymouth' ? '' : ', half as dear again as Plymouth'}. food bought here is fresh.</p>
             <div class="row">
-              {#each WARES as ware (ware)}
+              {#each waresHere(world) as ware (ware)}
                 <button disabled={sailing || world.gold < price(world, ware) || !room(world, ware)} onclick={() => attempt(() => buy(sea!, world!, ware))}>
-                  {ware === 'hands' ? `${CHANDLER[ware].lot} hands` : `${CHANDLER[ware].lot} ${CHANDLER[ware].unit} of ${CHANDLER[ware].name}`} ({price(world, ware)})
+                  {ware === 'hands' ? `${CHANDLER[ware].lot} hands` : ware === 'truck' ? `a chest of truck: knives, beads and cloth (${world.truck} of ${TRUCK_ROOM})` : `${CHANDLER[ware].lot} ${CHANDLER[ware].unit} of ${CHANDLER[ware].name}`} ({price(world, ware)})
                 </button>
               {/each}
             </div>
           {:else if market === 'islanders'}
-            <div class="row"><button disabled={sailing || world.gold < ISLANDERS_COST} onclick={() => attempt(() => trade(sea!, world!))}>trade with the islanders ({ISLANDERS_COST}): the casks filled, {ISLANDERS_DAYS} days of fresh food</button></div>
+            <div class="row">
+              <button disabled={sailing || world.gold < ISLANDERS_COST} onclick={() => attempt(() => trade(sea!, world!))}>trade with the islanders ({ISLANDERS_COST}): the casks filled, {ISLANDERS_DAYS} days of fresh food</button>
+              {#if world.truck}<button disabled={sailing} onclick={() => attempt(() => trade(sea!, world!, 'truck'))}>pay in truck: a chest</button>{/if}
+            </div>
+          {/if}
+          {#if canBarter || canTake}
+            <div class="row">
+              {#if canBarter}<button disabled={sailing || world.truck < 1} onclick={() => attempt(() => barter(sea!, world!))}>a chest of truck for fresh food and water: {BARTER_DAYS} days{world.truck < 1 ? ' (no truck aboard)' : ''}</button>{/if}
+              {#if canTake}<button disabled={sailing} onclick={() => attempt(() => takeWhatYouNeed(world!))}>take what you need: {TAKEN_DAYS} days, by force</button>{/if}
+            </div>
+            {#if canTake && people}<p class="faint">taken by force, {PEOPLES[people].name} turn against you, and remember it.</p>{/if}
           {/if}
           {#if spice}
             <p class="faint">{spice.name}, by the ton, sold on the quay at Plymouth for {SPICE_WORTH}. room for {spiceRoom(world)} tons.</p>
@@ -435,7 +507,8 @@
             <p class="faint">{town.kind === 'fortress' ? 'walled, and its guns are heavy.' : 'an open town: a battery or two, the walls, and the townsfolk.'} {['valparaiso', 'callao'].includes(town.key) && !world.voyage.visited.includes('cacafuego') ? 'word of a raid here would go north ahead of you.' : ''}</p>
           {/if}
         {/if}
-        <div class="row primary">
+        <div class="row primary" class:dock={phone}>
+          {#if phone && making && making !== world.voyage.at && !atFork}<span class="faint docked">{making === HOME_LANDMARK ? 'home' : landmark(making).name}, {daysTo(sea, world, making)} days</span>{/if}
           {#if world.voyage.at === HOME_LANDMARK}
             <!-- Home: nothing to sail for; the reckoning and the end screen say the rest. -->
           {:else if atFork}
@@ -700,7 +773,13 @@
             <button onclick={() => newRun()}>a new run</button>
             <button onclick={() => newRun(today())}>today's voyage</button>
             <button onclick={() => (logOpen = true)}>logbook</button>
+            <button onclick={copyLog}>copy the log</button>
+            {#if copied}<span class="faint">{copied}: paste it wherever you like</span>{/if}
           </div>
+          {#if shareShown}
+            <p class="faint">the clipboard won't take it here; select it and copy:</p>
+            <textarea class="share" readonly rows={shareShown.split('\n').length} value={shareShown} onfocus={(e) => (e.currentTarget as HTMLTextAreaElement).select()}></textarea>
+          {/if}
         </div>
       </div>
     {/if}
@@ -731,7 +810,7 @@
   .low { color: var(--theirs); }
   .low .bar { border-color: currentColor; }
   .low .bar span { background: currentColor; }
-  .settings { display: flex; flex-wrap: wrap; gap: 0 1.5rem; }
+  .settings { display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; }
   .settings .row { margin: 0; }
   .act { border-top: 1.5px solid var(--ink); padding-top: 0.75rem; }
   .landmark { border-left: 3px solid var(--ink); padding-left: 0.75rem; }
@@ -768,4 +847,24 @@
   .logbook th { font-weight: 400; color: var(--faint); }
   .logbook .num { text-align: right; font-variant-numeric: tabular-nums; }
   .logbook .lost { color: var(--theirs); }
+  .share { width: 100%; font: inherit; font-size: 0.9rem; border: 1px solid var(--rule); padding: 0.4rem; }
+  .fold summary { cursor: pointer; }
+  .fold summary .low { color: var(--theirs); }
+  .fold .gauges { margin-top: 0.5rem; }
+  .docked { flex-basis: 100%; font-size: 0.9rem; }
+  /* A touch screen has no space bar to press. */
+  @media (pointer: coarse) {
+    .keys { display: none; }
+  }
+  /* A phone: continue on kept at the bottom, within reach of a thumb; buttons big enough to hit. */
+  @media (max-width: 600px) {
+    main { padding-bottom: 7rem; }
+    .row button, .choices button { min-height: 2.6rem; }
+    .dock { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 0.5rem 16px calc(0.5rem + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1.5px solid var(--ink); z-index: 1; }
+    .dock button { font-size: 0.95rem; }
+    .primary.dock .go { padding: 0.5rem 1.2rem; }
+    .overlay { padding: 1rem 8px; z-index: 2; }
+    .sheet { padding: 1rem; }
+    .gauges { grid-template-columns: 1fr; }
+  }
 </style>

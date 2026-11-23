@@ -23,6 +23,7 @@ import type { LogEntry, Sea, WorldState } from './world.ts';
 import { landfallHere } from './landfalls.ts';
 import { trueHere } from './rumors.ts';
 import { alive } from './hands.ts';
+import { FAIR, GUIDED_DAYS, GUIDED_FORAGE, PEOPLES, ambush, deal, friendly, hostileTo, peopleHere } from './peoples.ts';
 
 export interface Stores {
   /** Provisions, in rations: one hand for one day at full ration. */
@@ -172,6 +173,8 @@ export const shoreHere = (sea: Sea, s: WorldState): ShoreWork[] => landmarkHere(
 
 /** Days each takes. */
 export const SHORE_DAYS: Record<ShoreWork, number> = { water: 2, forage: 3, careen: 5 };
+/** Days the work takes here: a day less with a friendly people's guides. */
+export const shoreDays = (s: WorldState, what: ShoreWork) => Math.max(1, SHORE_DAYS[what] - (friendly(s, peopleHere(s)) ? GUIDED_DAYS : 0));
 
 /**
  * Work ashore for its days: the casks, the foraging, the careening. The
@@ -189,7 +192,8 @@ export function ashore(sea: Sea, s: WorldState, what: ShoreWork, advance: (sea: 
   }
   if (what === 'forage') {
     // Fish, fowl, seals, penguins, fruit, roots: a week's worth some days, a month's others. Fresh, whatever it is.
-    const got = Math.round(w.crew * (8 + roll(r) * 22));
+    // A friendly people show you where: half as good again.
+    const got = Math.round(w.crew * (8 + roll(r) * 22) * (friendly(w, peopleHere(w)) ? GUIDED_FORAGE : 1));
     w = { ...w, fresh: 0, stores: { ...w.stores, food: topUp(w.stores.food, got, cap.food) } };
     log(`foraging: fresh food, ${Math.round(got / Math.max(1, w.crew))} days of it`);
   }
@@ -201,8 +205,10 @@ export function ashore(sea: Sea, s: WorldState, what: ShoreWork, advance: (sea: 
     w = { ...w, hull: Math.min(w.maxHull, w.hull + used * 2 + 1 + (alive(w, 'carpenter') ? 1 : 0)), stores: { ...w.stores, spares: w.stores.spares - used } };
     log(`careened: weed scraped, seams caulked${used ? `, ${used} of the spares used` : ''}`);
   }
+  // Arrows from the trees, if the people of this coast are wary of you, or worse.
+  w = ambush(w, r);
   w = { ...w, rng: r.rng };
-  for (let d = 0; d < SHORE_DAYS[what]; d++) {
+  for (let d = 0; d < shoreDays(s, what); d++) {
     w = advance(sea, w, w.player);
     if (w.encounter || w.hail || w.dilemma || w.sunk || w.won) break;
   }
@@ -218,6 +224,8 @@ export const CHANDLER = {
   spares: { lot: 1, cost: 3, name: 'canvas, cordage and timber', unit: 'bundle' },
   powder: { lot: 1, cost: 3, name: 'powder and shot', unit: 'barrel' },
   hands: { lot: 5, cost: 4, name: 'hands', unit: 'men' },
+  // Knives, beads, cloth: what the 1564 relief for Florida packed "to trade with" the people of the coast.
+  truck: { lot: 1, cost: 3, name: 'truck: knives, beads and cloth', unit: 'chest' },
 } as const;
 export type Ware = keyof typeof CHANDLER;
 /** Away from Plymouth, everything costs half as much again. */
@@ -227,25 +235,33 @@ export const ISLANDERS_COST = 3;
 export const ISLANDERS_DAYS = 21;
 
 /** The market where you're lying, if there is one. */
-export const marketHere = (sea: Sea, s: WorldState) => (s.seen.includes(`shut:${s.voyage.at}`) ? null : (landmarkHere(sea, s)?.offers.market ?? null));
+export const marketHere = (sea: Sea, s: WorldState) => (s.seen.includes(`shut:${s.voyage.at}`) || (landmarkHere(sea, s) && hostileTo(s, peopleHere(s))) ? null : (landmarkHere(sea, s)?.offers.market ?? null));
 
 /** Plymouth's prices at home, and wherever a ruler's favour gets you them (the feast ashore, happenings.ts); half as dear again elsewhere. */
 export const price = (s: WorldState, ware: Ware) => Math.ceil(CHANDLER[ware].cost * (s.voyage.at === 'plymouth' || s.seen.includes(`favour:${s.voyage.at}`) ? 1 : ABROAD));
 
+/** Chests of truck she can stow, besides the stores. */
+export const TRUCK_ROOM = 5;
+/** Truck is English goods: bought at Plymouth, and nowhere else. */
+export const TRUCK_AT = 'plymouth';
+
 /** Room for another lot of this. */
 export function room(s: WorldState, ware: Ware): boolean {
   if (ware === 'hands') return s.crew + CHANDLER.hands.lot <= complement(s);
+  if (ware === 'truck') return s.truck + CHANDLER.truck.lot <= TRUCK_ROOM;
   return s.stores[ware] + CHANDLER[ware].lot <= capacity(s)[ware];
 }
 
 /** Buy a lot from a chandler. Food bought in port is fresh, and resets the scurvy. */
 export function buy(sea: Sea, s: WorldState, ware: Ware): WorldState {
   if (marketHere(sea, s) !== 'chandler') throw new Error('there is no chandler here');
+  if (ware === 'truck' && s.voyage.at !== TRUCK_AT) throw new Error('truck is bought at Plymouth');
   if (!room(s, ware)) throw new Error(ware === 'hands' ? 'no room for more hands' : 'the hold is full');
   const cost = price(s, ware);
   if (s.gold < cost) throw new Error('not enough in the purse');
   const paid = { ...s, gold: s.gold - cost };
   if (ware === 'hands') return { ...paid, crew: s.crew + CHANDLER.hands.lot };
+  if (ware === 'truck') return { ...paid, truck: s.truck + CHANDLER.truck.lot };
   return { ...paid, stores: { ...s.stores, [ware]: s.stores[ware] + CHANDLER[ware].lot }, ...(ware === 'food' ? { fresh: 0 } : {}) };
 }
 
@@ -268,7 +284,10 @@ export function buyWood(sea: Sea, s: WorldState, cost = woodHere(sea, s)?.cost):
   if (cost == null) throw new Error('there is no brazilwood to be had here');
   if (s.wood >= woodRoom(s)) throw new Error('no room for more brazilwood');
   if (s.gold < cost) throw new Error('not enough in the purse');
-  return { ...s, gold: s.gold - cost, wood: s.wood + 1 };
+  const w: WorldState = { ...s, gold: s.gold - cost, wood: s.wood + 1 };
+  // Bought from the Tupinambá who cut it: fair dealing.
+  const p = peopleHere(s);
+  return p && woodHere(sea, s) ? deal(w, p, FAIR) : w;
 }
 /** Spice for sale where you're lying, if any. */
 export const spiceHere = (sea: Sea, s: WorldState) => landmarkHere(sea, s)?.offers.spice ?? null;
@@ -282,19 +301,52 @@ export function buySpice(sea: Sea, s: WorldState): WorldState {
   return { ...s, gold: s.gold - spice.cost, spice: s.spice + 1 };
 }
 
-/** Trade with islanders: the casks filled, and three weeks of fresh food, for a little. */
-export function trade(sea: Sea, s: WorldState): WorldState {
+/** Trade with islanders: the casks filled, and three weeks of fresh food, for a little gold or a chest of truck. Fair dealing. */
+export function trade(sea: Sea, s: WorldState, pay: 'gold' | 'truck' = 'gold'): WorldState {
   if (marketHere(sea, s) !== 'islanders') throw new Error('there is nobody here to trade with');
-  if (s.gold < ISLANDERS_COST) throw new Error('not enough in the purse');
+  if (pay === 'gold' && s.gold < ISLANDERS_COST) throw new Error('not enough in the purse');
+  if (pay === 'truck' && s.truck < 1) throw new Error('no truck left to trade');
   const cap = capacity(s);
-  return {
+  const w: WorldState = {
     ...s,
-    gold: s.gold - ISLANDERS_COST,
+    ...(pay === 'gold' ? { gold: s.gold - ISLANDERS_COST } : { truck: s.truck - 1 }),
     fresh: 0,
     stores: { ...s.stores, water: Math.max(s.stores.water, cap.water), food: topUp(s.stores.food, s.crew * ISLANDERS_DAYS, cap.food) },
-    log: [...s.log, { turn: s.turn, text: 'water, fruit and fresh meat from the islanders' }],
+    log: [...s.log, { turn: s.turn, text: `water, fruit and fresh meat from the islanders${pay === 'truck' ? ', for a chest of truck' : ''}` }],
   };
+  const p = peopleHere(s);
+  return p ? deal(w, p, FAIR) : w;
 }
+
+/** Truck for fresh food: on a coast with a people and no market. */
+export const BARTER_DAYS = 8;
+/** Whether there's a people here to barter with: they're on this coast, there's no market, and they'll still deal with you. */
+export const barterHere = (sea: Sea, s: WorldState) => {
+  const p = landmarkHere(sea, s) ? peopleHere(s) : null;
+  return !!p && !marketHere(sea, s) && !hostileTo(s, p);
+};
+
+/** A chest of truck for fresh food and water, from the people of the coast: fair dealing. */
+export function barter(sea: Sea, s: WorldState): WorldState {
+  if (!barterHere(sea, s)) throw new Error('there is nobody here who will trade');
+  if (s.truck < 1) throw new Error('no truck left to trade');
+  const p = peopleHere(s)!;
+  const cap = capacity(s);
+  const w: WorldState = {
+    ...s,
+    truck: s.truck - 1,
+    fresh: 0,
+    stores: { ...s.stores, water: Math.max(s.stores.water, cap.water), food: topUp(s.stores.food, s.crew * BARTER_DAYS, cap.food) },
+    log: [...s.log, { turn: s.turn, text: `a chest of truck for fresh food and water from ${PEOPLES[p].name}: ${BARTER_DAYS} days of it` }],
+  };
+  return deal(w, p, FAIR);
+}
+
+/** Whether you could take what you need here: a people's coast with food to be had, by foraging or from a market of theirs. */
+export const takeHere = (sea: Sea, s: WorldState) => {
+  const l = landmarkHere(sea, s);
+  return !!l && !!peopleHere(s) && (!!l.offers.shore?.includes('forage') || l.offers.market === 'islanders');
+};
 
 // --- The fight -----------------------------------------------------------------
 

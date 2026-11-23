@@ -47,14 +47,14 @@ export interface BackerDef {
 export const BACKERS: Record<Backer, BackerDef> = {
   crown: {
     name: 'the Crown',
-    gold: (ship) => Math.round(SHIP_CLASSES[ship].purse * 0.4) + 10,
-    spares: 2,
-    powder: 2,
+    gold: (ship) => Math.round(SHIP_CLASSES[ship].purse * 0.5),
+    spares: 1,
+    powder: 1,
     text: 'the Queen puts money in, and stores from the dockyard at Deptford. she takes a third of what you bring home, and wants a clean commission; her favour shields you at court',
   },
   gentlemen: {
     name: 'gentlemen adventurers',
-    gold: (ship) => Math.round(SHIP_CLASSES[ship].purse * 0.6) + 25,
+    gold: (ship) => Math.round(SHIP_CLASSES[ship].purse * 0.8),
     spares: 0,
     powder: 0,
     text: 'gentlemen of the court put money in, hoping for three to one. at home they take half of what you bring over your own purse, and nothing if you come home poorer; and some of them sail with you',
@@ -104,7 +104,7 @@ export function sharesDue(s: WorldState): { queen: number; gentlemen: number } {
  */
 export function courtRisk(s: WorldState): number {
   if (proofOfService(s)) return 0;
-  const raw = Math.min(0.9, s.grievance / 1200 + s.infamy * 0.12);
+  const raw = Math.min(0.9, s.grievance / 1200 + s.infamy * 0.12 + (s.french ? FRENCH_COURT : 0));
   const jewels = Math.max(0, 1 - favourOf(s) / JEWEL_FAVOUR);
   return Math.round(100 * raw * (s.backer === 'crown' ? 0.4 : 1) * jewels) / 100;
 }
@@ -125,6 +125,10 @@ export const GIFT_SHARE = 0.2;
 export const GIFT_MIN = 10;
 /** A gift wipes this much infamy before you go to court. */
 export const GIFT_PARDON = 2;
+/** A gift forgives this much under a French commission: the Queen likes a captain with two masters less. */
+export const pardonOf = (s: WorldState) => (s.french ? 1 : GIFT_PARDON);
+/** And at court, a French commission adds this to the risk of being disowned. */
+export const FRENCH_COURT = 0.15;
 /** Disowned: this share of Spain's grievance goes back, no more than half the gold. */
 export const RESTITUTION = 0.5;
 
@@ -191,7 +195,7 @@ export function reckon(s: WorldState, choice: 'court' | 'low' | 'gift', roll: ()
     const gift = giftGold(w);
     settled.gift = gift;
     w = present(w);
-    w = said({ ...w, gold: w.gold - gift, infamy: Math.max(0, w.infamy - GIFT_PARDON), settled }, gift ? `a gift for the Queen from the treasure, ${gift}, and she receives you` : 'the jewels are gift enough, and she receives you');
+    w = said({ ...w, gold: w.gold - gift, infamy: Math.max(0, w.infamy - pardonOf(w)), settled }, gift ? `a gift for the Queen from the treasure, ${gift}, and she receives you` : 'the jewels are gift enough, and she receives you');
     if (outlawed(w)) w = pirate();
     else {
       const fame = fameFor(w.gold) + pleased;

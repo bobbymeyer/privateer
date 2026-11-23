@@ -14,11 +14,12 @@ import { DETOURS, SOURCES, type Source, heed } from './rumors.ts';
 import { driven } from './landfalls.ts';
 import { patrol, raidFight } from './meet.ts';
 import { followed } from './rumors.ts';
-import { GIFT_PARDON, SEIZED, courtRisk, fameFor, giftGold, outlawed, pleasure, reckon, restitutionFor } from './reckoning.ts';
+import { pardonOf, SEIZED, courtRisk, fameFor, giftGold, outlawed, pleasure, reckon, restitutionFor } from './reckoning.ts';
 import { favourOf, proofOfService, saleValue } from './jewels.ts';
 import { NORMAN_WOOD_COST, SETTLEMENT_COST, SETTLEMENT_DAYS, SETTLEMENT_DEALS } from './brazil.ts';
 import { WOOD_WORTH, woodRoom } from './stores.ts';
-import { tellOf } from './rumors.ts';
+import { newsOf, tellOf } from './rumors.ts';
+import { FAIR, HARSH, PEOPLES, type People, deal } from './peoples.ts';
 import type { Sea, WorldState } from './world.ts';
 import { FEVER_NURSE, FEVER_NURSE_DAYS, FEVER_PRESS, FLUX, FOUL_LOST, WEEVIL_LOST, WEEVIL_SICK, feverDeaths, fluxDeaths } from './weather.ts';
 import { alive, mourn } from './hands.ts';
@@ -65,7 +66,11 @@ export type Dilemma =
   /** A Portuguese settlement on the coast of Brazil, not yet sworn to Philip: treat with it, or keep clear. See brazil.ts. */
   | { kind: 'settlement' }
   /** A Norman ship loading brazilwood at Guanabara: trade for news, buy her brazilwood, or let her be. */
-  | { kind: 'normans' };
+  | { kind: 'normans' }
+  /** Hands who've wronged the people of a coast: punish them, pay amends, or let it pass. See peoples.ts. */
+  | { kind: 'misconduct'; people: People }
+  /** Huguenot privateers out of La Rochelle: keep company, trade news, take a French commission, or part. See huguenots.ts. */
+  | { kind: 'huguenots' };
 
 export interface Choice {
   key: string;
@@ -99,6 +104,13 @@ export const JAILED = [2, 4] as const;
 export const PAPERS_BRIBE = 15;
 /** Shining ore: the tons of hold it takes. */
 export const ORE_ROOM = 2;
+
+/** Amends paid in gold, when there's no truck to pay them in. */
+export const AMENDS = 5;
+/** Keeping company with the Huguenots: this many days. */
+export const COMPANY_DAYS = 6;
+/** The people whose canoes these are: the Chamorro north of the line, the islanders of the Solomons south of it. */
+const canoePeople = (sea: Sea, s: WorldState): People => (sea.map.nodes[s.player].lat >= 0 ? 'chamorro' : 'solomons');
 
 /** A leak pumped and pressed on with. */
 export const LEAK_HULL = 2;
@@ -172,6 +184,10 @@ export function describe(d: Dilemma): { title: string; text: string } {
       return { title: 'a Portuguese settlement', text: 'a sugar mill and a church on the shore, and the smoke of a town beyond. Portugal took the King of Spain for its king this year, and nobody knows yet whether Brazil will. they may deal with an English ship, or send word south.' };
     case 'normans':
       return { title: 'a Norman ship', text: 'a ship of Dieppe in the bay, her boats ferrying brazilwood out from the beach where the Tupinambá stack it, as they did for Villegagnon. her master is glad of an Englishman to talk to.' };
+    case 'misconduct':
+      return { title: 'trouble ashore', text: `some of the hands ashore have taken what wasn't given and laid hands on ${PEOPLES[d.people].name}. their elders have come down to the boats. the Spaniards, the English like to say, sought not the people but their goods; this is how it starts.` };
+    case 'huguenots':
+      return { title: 'Huguenots', text: 'two ships of La Rochelle, flying the white cross of the Prince of Condé: Huguenot privateers out after Spanish prizes, as Coligny sent them. their captain hails you as a friend and a fellow Protestant.' };
     case 'reckoning':
       return { title: 'the reckoning', text: 'Plymouth, and the voyage is over but for this. your backers have had their shares. now the court will hear of what you did, and so will Spain’s ambassador, who demanded Drake’s head for less.' };
   }
@@ -215,8 +231,9 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
     case 'canoes':
       return [
         { key: 'trade', label: 'trade with them', stakes: `${CANOE_COST} gold in trinkets: the casks filled, ${CANOE_DAYS} days of fresh food`, ...(s.gold < CANOE_COST ? { barred: 'nothing in the purse to trade' } : {}) },
+        ...(s.truck > 0 ? [{ key: 'truck', label: 'trade truck', stakes: `a chest of knives and beads: the casks filled, ${CANOE_DAYS} days of fresh food, and their goodwill` }] : []),
         { key: 'alongside', label: 'let them come aboard', stakes: 'fruit for nothing, a week of it, but they will take what they can lift' },
-        { key: 'warn', label: 'fire a gun over them', stakes: 'a barrel of powder, and they keep off', ...(s.stores.powder <= 0 ? { barred: 'no powder' } : {}) },
+        { key: 'warn', label: 'fire a gun over them', stakes: 'a barrel of powder, and they keep off; they won’t forget it', ...(s.stores.powder <= 0 ? { barred: 'no powder' } : {}) },
       ];
     case 'reef':
       return [
@@ -303,13 +320,26 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
         { key: 'leave', label: 'let her be', stakes: 'a wave, and on your way' },
       ];
     }
+    case 'misconduct':
+      return [
+        { key: 'punish', label: 'flog the men before them', stakes: `${PEOPLES[d.people].name} see justice done and think the better of you; one time in three the man flogged runs` },
+        { key: 'amends', label: 'pay amends', stakes: s.truck > 0 ? 'a chest of truck, and it is mended' : `${AMENDS} gold, and it is mended`, ...(s.truck <= 0 && s.gold < AMENDS ? { barred: 'nothing to pay with' } : {}) },
+        { key: 'pass', label: 'let it pass', stakes: `nothing now; ${PEOPLES[d.people].name} turn against you, and remember it` },
+      ];
+    case 'huguenots':
+      return [
+        { key: 'company', label: 'keep company', stakes: `${COMPANY_DAYS} days together: privateers and corsairs stand off from two ships, but you sail at the slower one's pace` },
+        { key: 'news', label: 'trade news', stakes: 'what they know of the Spanish and Portuguese, for what you know' },
+        { key: 'commission', label: 'take a French commission', stakes: 'a letter from the Huguenot leaders as well as your own: what you take from Spain angers its ambassador half as much, but the Queen likes it less at court', ...(s.backer === 'crown' ? { barred: 'the Queen’s commission forbids a second master' } : s.french ? { barred: 'you carry one already' } : {}) },
+        { key: 'part', label: 'part company', stakes: 'a salute of guns, and on your way' },
+      ];
     case 'reckoning': {
       const sale = saleValue(s);
       const pleased = pleasure(s);
       const risk = Math.round(courtRisk(s) * 100);
       const gift = giftGold(s);
       const ring = proofOfService(s);
-      const pirateAfterGift = outlawed({ ...s, infamy: Math.max(0, s.infamy - GIFT_PARDON - (ring ? 1 : 0)) });
+      const pirateAfterGift = outlawed({ ...s, infamy: Math.max(0, s.infamy - pardonOf(s) - (ring ? 1 : 0)) });
       const jewels = favourOf(s) ? `; the jewels set aside presented to her${pleased ? `, ${pleased} more fame for her pleasure in them` : ''}` : '';
       return [
         {
@@ -319,7 +349,7 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
         { key: 'low', label: 'lie low', stakes: `${s.jewels.length ? 'every jewel sold, ' : ''}${outlawed(s) ? `even odds they come for you anyway, and ${Math.round(SEIZED * 100)}% of the prize is seized` : 'safe, and no fame'}` },
         {
           key: 'gift', label: 'a gift for the Queen',
-          stakes: pirateAfterGift ? `${gift} from the treasure, and even so your name is too black: named a pirate` : `${gift ? `${gift} from the treasure` : 'the jewels are gift enough'}${s.infamy ? `, ${Math.min(s.infamy, GIFT_PARDON + (ring ? 1 : 0))} of the questions forgotten` : ''}, and court is safe: ${fameFor(s.gold + sale - gift) + pleased} fame`,
+          stakes: pirateAfterGift ? `${gift} from the treasure, and even so your name is too black: named a pirate` : `${gift ? `${gift} from the treasure` : 'the jewels are gift enough'}${s.infamy ? `, ${Math.min(s.infamy, pardonOf(s) + (ring ? 1 : 0))} of the questions forgotten` : ''}, and court is safe: ${fameFor(s.gold + sale - gift) + pleased} fame`,
           ...(s.gold <= 0 && !favourOf(s) ? { barred: 'nothing to give' } : {}),
         },
       ];
@@ -441,6 +471,7 @@ function decide(sea: Sea, s: WorldState, key: string): WorldState {
       const cap = capacity(w);
       w = { ...w, gold: w.gold - CANOE_COST, fresh: 0, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water), food: topUp(w.stores.food, w.crew * CANOE_DAYS, cap.food) } };
       log('beads and knives for coconuts, fish and fresh water');
+      w = deal(w, canoePeople(sea, w), FAIR);
       break;
     }
     case 'canoes:alongside': {
@@ -459,7 +490,15 @@ function decide(sea: Sea, s: WorldState, key: string): WorldState {
     case 'canoes:warn':
       w = { ...w, stores: { ...w.stores, powder: w.stores.powder - 1 } };
       log('a gun fired over the canoes, and they turn back for the beach');
+      w = deal(w, canoePeople(sea, w), -1);
       break;
+    case 'canoes:truck': {
+      const cap = capacity(w);
+      w = { ...w, truck: w.truck - 1, fresh: 0, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water), food: topUp(w.stores.food, w.crew * CANOE_DAYS, cap.food) } };
+      log('a chest of knives and beads for coconuts, fish and fresh water');
+      w = deal(w, canoePeople(sea, w), FAIR);
+      break;
+    }
     case 'reef:lighten':
       if (w.spice > 0) {
         const over = Math.ceil(w.spice / 2);
@@ -634,6 +673,42 @@ function decide(sea: Sea, s: WorldState, key: string): WorldState {
     }
     case 'normans:leave':
       log('you leave the Normans to their loading');
+      break;
+    case 'misconduct:punish': {
+      const p = (d as { people: People }).people;
+      log(`the men flogged at the gangway before ${PEOPLES[p].name}`);
+      if (roll(r) < 1 / 3) {
+        w = { ...w, crew: w.crew - 1 };
+        log('the man flogged slipped away in the night');
+      }
+      w = deal(w, p, FAIR);
+      break;
+    }
+    case 'misconduct:amends': {
+      const p = (d as { people: People }).people;
+      w = w.truck > 0 ? { ...w, truck: w.truck - 1 } : { ...w, gold: w.gold - AMENDS };
+      log(`amends paid to ${PEOPLES[p].name}, and the matter mended`);
+      break;
+    }
+    case 'misconduct:pass': {
+      const p = (d as { people: People }).people;
+      log('you let it pass');
+      w = deal(w, p, HARSH);
+      break;
+    }
+    case 'huguenots:company':
+      w = { ...w, company: w.turn + COMPANY_DAYS };
+      log(`in company with the Rochellers, ${COMPANY_DAYS} days`);
+      break;
+    case 'huguenots:news':
+      log('news traded with the Rochellers over their wine');
+      return newsOf({ ...w, rng: r.rng }, 'gossip');
+    case 'huguenots:commission':
+      w = { ...w, french: true };
+      log('a commission from the Huguenot leaders at La Rochelle, signed for the Prince of Condé');
+      break;
+    case 'huguenots:part':
+      log('a salute of guns, and the Rochellers go their way');
       break;
   }
   // A storm in the right waters may drive you onto an island: likelier running before it.
