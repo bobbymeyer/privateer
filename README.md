@@ -25,7 +25,7 @@ better gunned and the deeper the hold.
 | --- | --- | --- | --- | --- | --- |
 | pinnace | 120 | 12 | 20 of 30 | 15 cards | ×2 |
 | sloop | 70 | 14 | 30 of 45 | 16, a raking fire more | ×1.5 |
-| brigantine | 30 | 17 | 47 of 70 | 17, a broadside and a raking fire more | ×1 |
+| brigantine | 20 | 17 | 47 of 70 | 17, a broadside and a raking fire more | ×1 |
 
 **Choose whose money you sail on** (`BACKERS` in `src/world/reckoning.ts`).
 Most voyages were paid for privately; the Crown put in ships and money when
@@ -33,12 +33,19 @@ it suited it, as Elizabeth did in Drake's.
 
 | backer | fits you out with | at home |
 | --- | --- | --- |
-| the Crown | 30% of the ship's purse and 20 more, 2 spares and 2 powder | the Queen's third of what you bring home; she wants a clean commission (infamy counts double), and her favour shields you at court |
-| gentlemen adventurers | half the ship's purse and 40 more | half of what comes home over your own purse, nothing if you come home poorer; their friends aboard bring the San Julián grumbling to a head |
+| the Crown | 40% of the ship's purse and 10 more, 2 spares and 2 powder | the Queen's third of what you bring home; she wants a clean commission (infamy counts double), and her favour shields you at court |
+| gentlemen adventurers | 60% of the ship's purse and 25 more | half of what comes home over your own purse, nothing if you come home poorer; their friends aboard bring the San Julián grumbling to a head |
 | your own stake | nothing more | nothing shared |
 
-Each ship suits a different backer: the gentlemen a pinnace, the Crown a
-sloop, your own stake a brigantine (see the balance below).
+The gentlemen suit a pinnace best, the Crown a sloop or a brigantine (see
+the balance below).
+
+**A chronicler**, if you'll take one at fit-out: a gentleman-poet of the
+kind the promoters hired (Gascoigne for Gilbert, Churchyard for Frobisher;
+Parmenius drowned with Gilbert in 1583). He costs 10 gold and a berth and
+does no seamanship. Bring him home alive and his account of the voyage adds
+30 and half your fame to the score; if he dies, it dies with him; named a
+pirate, it's forbidden printing.
 
 **Fit out** at Plymouth's chandler: food at 4 for 300 rations, water at 1
 for 300, five hands for 4, a bundle of spares or a barrel of powder for 3.
@@ -84,6 +91,18 @@ Europe* (Palgrave, 2017), each from something that happened:
 **Spice.** Cloves at Ternate, pepper at Bantam, by the ton, a ton for every
 five of her complement; each sells for 20 on the quay at Plymouth. On a reef
 it's the spice you throw over first, as Drake did.
+
+**Brazil** (`src/world/brazil.ts`). From Cape Verde the way divides: the
+coast of Brazil, or the bay of Guanabara, where Villegagnon's France
+Antarctique stood from 1555 until the Portuguese took it in 1560. There,
+brazilwood from the Tupinambá at 3 a ton, for the red dye, sold to the
+dyers at home for 9; it shares the hold with spice. A Norman ship is in
+the bay six times in ten: buy her brazilwood at 2, or trade news for word
+of the carrack from Goa. On the coast of Brazil, seven times in ten, a
+Portuguese settlement not yet sworn to Philip (Portugal's colonies swore in
+1581–82): send a boat to treat, and 55 in 100 they deal, the casks filled and
+two weeks of fresh food for 5; else they turn you away and send word south,
+and the treasure ship is warned.
 
 **Rumors** (`src/world/rumors.ts`) open detours off the way. You hear one
 from prisoners after a prize, from islanders, from gossip at a chandler's,
@@ -133,6 +152,31 @@ grievance, no more than half the gold.
 With 4 infamy or more and no Crown favour, court names you a pirate and the
 Admiralty seizes three quarters of the prize; lying low, even odds of the
 same. Drake's voyage needs not to be disowned or named.
+
+**Jewels** (`src/world/jewels.ts`). A prize or a sacked town sometimes gives
+up a jewel from her great cabin or its church: a fifth of merchants, three
+in five treasure ships, two in five towns. Emeralds from New Granada off the
+Spanish Main, diamonds and pearls from the East, rubies and turquoise
+anywhere; and a fighting ship's captain, fallen, one time in four, his ring.
+
+| jewel | to a goldsmith | to the Queen |
+| --- | --- | --- |
+| a turquoise ring | 15 | half as much again: turquoise from Persia, which she loves |
+| a ring enamelled white and black | 20 | half as much again: her colours |
+| a ruby ring | 25 | as much |
+| a rope of pearls | 30 | as much |
+| an emerald from New Granada | 35 | as much |
+| a table-cut diamond | 60 | half as much again: from the East |
+| the dead commander's ring | 20 | proof of service: court is safe, a question forgotten |
+
+At the reckoning each is sold or set aside for the Queen. Set aside, they
+count toward the gift (it costs that much less gold), lessen the risk at
+court (by their worth to her over 120), and her pleasure in them is fame,
+half their worth. Lying low, they're all sold. The numbers are Levin and
+Auble's, doubled to the game's gold: a turquoise ring at £10 in 1514, a ruby
+at £13; John Mabbe's eighteen rings "enameled white and black with Turcas"
+offered her in 1576; Desmond's turquoise ring sent her in 1582 as proof of
+his death.
 
 **Storm landfalls** (`src/world/landfalls.ts`). A storm met in the right
 waters drives you onto an island one time in eight, one in five running
@@ -193,6 +237,19 @@ They're counted among the hands. When hands die, each named one goes with
 a chance of his share of the dead (twice that for the gunner in a fight, the
 surgeon in a fever, the boy over the side), and the log says who and of
 what. The end screen lists them, and the voyage's dead by cause.
+
+**Captives** (`src/world/captives.ts`). Men who leave the ship alive
+(deserters, the marooned, hands left in a lock-up or cut off in a raid) may
+be taken and talk: six times in ten on a coast Spain or Portugal holds, now
+and then elsewhere. Before the treasure ship, word goes up the coast and
+warns her; after, Spain's grievance grows by 25. A ship lost on a Spanish
+coast with too few hands to work her: her men are tried at Lima, Goa or
+Seville, the gunner and the carpenter sent to the galleys, the rest hanged
+as heretics, as Menéndez hanged the French at Matanzas in 1565. The other
+way: a Spanish or Portuguese prize frees an Englishman one time in eight,
+and Callao's jail one of Oxenham's company half the time; he joins as a
+hand, takes the place of a hand of note who's gone, and knows the coast (a
+rumor, if there's one to hear).
 
 **Graves** (`src/graves.ts`). When a voyage ends, its dead are written in
 the browser where they fell, with an epitaph you can change on the end
@@ -331,7 +388,7 @@ silver, follows every rumor (and attacks a rumored prize on a hull still a
 quarter sound), and fights by one-step lookahead.
 
 ```
-npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--trace]
+npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--chronicler] [--trace]
 ```
 
 It never fires on a friend's merchant unless `--pirate`. At the reckoning it
@@ -339,19 +396,25 @@ goes to court when the risk is under three in ten, gives the Queen a gift
 when it isn't and there's more than 100 to give from, and lies low
 otherwise.
 
-Over 40 voyages a ship and a backer, mean score counting the lost as 0:
+It sets the dead commander's ring aside for the Queen and sells the other
+jewels unless it means to give a gift; treats with a Portuguese settlement;
+buys brazilwood at Guanabara, or the Normans', with what's over a margin.
+
+Over 100 voyages a ship and a backer, mean score counting the lost as 0:
 
 | ship | the Crown | gentlemen adventurers | your own stake |
 | --- | --- | --- | --- |
-| pinnace | 50% home, mean score 161 | 48%, 184 | 40%, 131 |
-| sloop | 55%, 131 | 48%, 102 | 45%, 94 |
-| brigantine | 50%, 123 | 55%, 87 | 53%, 142 |
+| pinnace | 55% home, mean score 208 | 51%, 247 | 45%, 165 |
+| sloop | 56%, 180 | 51%, 161 | 51%, 141 |
+| brigantine | 58%, 186 | 63%, 146 | 53%, 189 |
 
-With the hands of note, over 100 voyages a ship on its own stake: the
-pinnace home 44%, the sloop 53%, the brigantine 62%, against 45%, 50% and
-54% with them all dead from the start. The carpenter's and surgeon's help
-was cut back to keep it so; at first the six together put a voyage home
-fifteen in a hundred more often.
+The brigantine's purse came down from 30 to 20, and the backers' money was
+made more a share of the ship's purse, to bring her back toward the rest;
+backed by gentlemen she still gets home more often than the band the others
+keep to. Jewels: about one voyage home in two brings one, the brigantine
+more. With a chronicler, on its own stake, he came home alive about a
+quarter of the time (26, 26 and 24 of 100), worth 42, 47 and 70 to the
+score when he did; mean scores rose to 190, 158 and 207.
 
 Before backers, on its own stake, it did as follows.
 
@@ -382,7 +445,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 146 tests
+npm test                     # the rules and the voyage, 160 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
@@ -418,6 +481,9 @@ src/
     weather.ts   rain, fish, calms, williwaws, fever, foul water, weevils
     happenings.ts the rest of what happens on the way, by region, and on arriving
     hands.ts     the hands of note, who of them died and of what, and the graves they leave
+    captives.ts  men left ashore who talk, a crew taken on a Spanish coast, Englishmen freed
+    jewels.ts    jewels from prizes and towns, and what the Queen makes of them
+    brazil.ts    the coast of Brazil in 1580: a settlement that may deal, the Normans at Guanabara
     warnings.ts  the master's warning before a leg the stores won't see out
     dilemmas.ts  events that ask you something, and what each choice stakes
     stores.ts    hands, food, water, spares, powder; the shore; the market; a fight's cost and a prize's hold
