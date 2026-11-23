@@ -66,7 +66,13 @@ export interface Happening {
 
 const said = (s: WorldState, text: string, stop = false): WorldState => ({ ...s, log: [...s.log, { turn: s.turn, text, ...(stop ? { stop } : {}) }] });
 const lose = (s: WorldState, days: number): WorldState => ({ ...s, calm: Math.max(s.calm, s.turn + days) });
-const ask = (s: WorldState, kind: NonNullable<WorldState['dilemma']>['kind'], text: string): WorldState => (s.dilemma ? s : said({ ...s, dilemma: { kind } as WorldState['dilemma'] }, text, true));
+/**
+ * The same event doesn't ask twice within this many days: a long voyage
+ * shouldn't be seven leaks. Storms, and what comes on arriving, aren't held back.
+ */
+export const ASK_AGAIN = 40;
+export const asksAgain = (s: WorldState, kind: string) => s.turn - (s.asked?.[kind] ?? -Infinity) >= ASK_AGAIN;
+const ask = (s: WorldState, kind: NonNullable<WorldState['dilemma']>['kind'], text: string): WorldState => (s.dilemma || !asksAgain(s, kind) ? s : said({ ...s, dilemma: { kind } as WorldState['dilemma'] }, text, true));
 
 /** The sea, and nothing else: lines that cost nothing, so the days aren't all alike. */
 const THE_SEA: Record<string, string[]> = {

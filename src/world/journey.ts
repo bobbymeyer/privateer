@@ -14,6 +14,7 @@ import { arriveBrazil } from './brazil.ts';
 import { arriveDetour, followed, hearAt } from './rumors.ts';
 import { comeHome } from './reckoning.ts';
 import { friendly, meetPeople, peopleAt } from './peoples.ts';
+import { inTrades, nextStep } from './course.ts';
 
 export interface Voyage {
   /** The landmark you last raised. */
@@ -62,7 +63,20 @@ export function makeFor(s: WorldState, key: string): WorldState {
 }
 
 /** Days from here to a landmark, sailing the lanes. */
-export const daysTo = (sea: Sea, s: WorldState, key: string) => sea.map.distTo(sea.map.landmarks[key])[s.player];
+export function daysTo(sea: Sea, s: WorldState, key: string): number {
+  const dest = sea.map.landmarks[key];
+  const steps = sea.map.distTo(dest)[s.player];
+  if (!Number.isFinite(steps) || steps <= 0) return steps;
+  // Before the Pacific trades she makes three days' way in two: count the leg as she'll sail it.
+  let inTrade = 0;
+  for (let n = s.player, d = steps; d > 0; d--) {
+    const next = nextStep(sea, { ...s, player: n }, dest);
+    if (next === null) break;
+    if (inTrades(sea, next)) inTrade++;
+    n = next;
+  }
+  return steps - Math.floor(inTrade / 3);
+}
 
 /**
  * After a day's sail: have you raised a landmark? The one you're bound for,
@@ -71,7 +85,9 @@ export const daysTo = (sea: Sea, s: WorldState, key: string) => sea.map.distTo(s
  */
 export function raise(sea: Sea, s: WorldState): WorldState {
   const v = s.voyage;
-  const candidates = [...new Set([...(v.bound ? [v.bound] : []), ...choices(v, followed(s))])];
+  // Bound for one landmark, only that one: the lane to the coast of Brazil passes the bay of
+  // Guanabara, and passing it isn't putting in there. Not yet bound, any way on from here.
+  const candidates = v.bound ? [v.bound] : choices(v, followed(s));
   const raised = candidates.find((k) => sea.map.landmarks[k] === s.player);
   if (!raised || raised === v.at) return s;
   const voyage: Voyage = { at: raised, bound: null, visited: [...v.visited, raised] };

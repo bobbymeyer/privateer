@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { choices, choose, describe } from './dilemmas.ts';
-import { HAPPENINGS, arriving, happeningsDay } from './happenings.ts';
+import { ASK_AGAIN, HAPPENINGS, arriving, asksAgain, happeningsDay } from './happenings.ts';
 import { raise } from './journey.ts';
 import { SPICE_WORTH, buySpice, spiceRoom } from './stores.ts';
 import { decode, encode } from '../save.ts';
@@ -113,4 +113,17 @@ test('a save from before the happenings comes forward', () => {
 test('the table: every happening has a place and a chance', () => {
   for (const h of HAPPENINGS) assert.ok(h.chance > 0 && h.chance <= 1, h.key);
   assert.ok(HAPPENINGS.length >= 16);
+});
+
+test('the same event does not ask again too soon', () => {
+  const at = fresh({ player: node(-30, 10) });
+  let leaks = 0;
+  for (let rng = 1; rng < 3000; rng++) {
+    const r = { rng };
+    const w = happeningsDay(sea, { ...at, turn: 100, asked: { leak: 90 } }, r);
+    if (w.dilemma?.kind === 'leak') leaks++;
+  }
+  assert.equal(leaks, 0, 'ten days after a leak, no leak');
+  assert.ok(asksAgain({ ...at, turn: 100, asked: { leak: 100 - ASK_AGAIN } } as WorldState, 'leak'));
+  assert.ok(asksAgain({ ...at, asked: {} } as WorldState, 'leak'));
 });

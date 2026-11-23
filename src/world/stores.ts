@@ -46,7 +46,7 @@ export const TROPIC_THIRST = 1.5;
 /** Days without fresh food before scurvy kills. */
 export const SCURVY_DAYS = 42;
 /** Hands dead of scurvy a day, per hand, per day past SCURVY_DAYS. */
-export const SCURVY_RATE = 0.0001;
+export const SCURVY_RATE = 0.0003;
 /** And of thirst, and of hunger, a day, per hand, when it's run out. */
 export const THIRST_RATE = 0.08;
 export const HUNGER_RATE = 0.03;
@@ -54,6 +54,10 @@ export const HUNGER_RATE = 0.03;
 export const STARVING_HUNGER = 0.05;
 /** Fewer hands than this and she can't be sailed: the run is over. */
 export const MIN_HANDS = 8;
+/** And a bigger ship wants more to work her: a third of her complement, at the least, to man the sails and the pumps. */
+export const WORKING_SHARE = 1 / 3;
+/** The fewest hands that can work her: a pinnace's handful, a brigantine's watch. */
+export const minHands = (s: { ship: string }) => Math.max(MIN_HANDS, Math.ceil(complement(s) * WORKING_SHARE));
 /** Days at sea between a point of hull lost to weed and worm, by pace. */
 export const WEAR_DAYS: Record<Pace, number> = { easy: 60, steady: 40, hard: 25 };
 
@@ -120,7 +124,7 @@ export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
     // Down to half her complement: worth stopping for, whatever else is said.
     if (w.crew + dead >= half && crew < half) log('half her hands gone: the ship sails short-handed now', true);
   }
-  if (w.crew < MIN_HANDS) {
+  if (w.crew < minHands(w)) {
     log('too few hands left to work her: the ship is lost', true);
     return { ...w, sunk: true };
   }
@@ -139,14 +143,19 @@ const FIRST_DEATH: Record<string, string> = {
   hunger: 'men are dying of hunger',
   scurvy: 'the scurvy has begun to kill',
 };
-/** A run of the same dying, a day or two apart, is one line in the log, moved to the end as it grows. */
-export const FOLD_GAP = 2;
+/**
+ * A run of the same dying is one line in the log, moved to the end as it
+ * grows, as long as the deaths come no further apart than this. Thirst and
+ * hunger kill most days; the scurvy a man every few days for weeks, and each
+ * of those is the same sickness, not news to stop the ship for again.
+ */
+export const FOLD_GAP: Record<string, number> = { thirst: 7, hunger: 7, scurvy: 21 };
 
 export function foldDeaths(log: LogEntry[], kind: string, dead: number, turn: number): LogEntry[] {
   for (let i = log.length - 1; i >= 0; i--) {
     const f = log[i].fold;
     if (!f || f.kind !== kind) continue;
-    if (turn - f.to > FOLD_GAP) break;
+    if (turn - f.to > (FOLD_GAP[kind] ?? 7)) break;
     const fold = { kind, dead: f.dead + dead, from: f.from, to: turn };
     const days = fold.to - fold.from + 1;
     const text = `${kind}: ${fold.dead} ${fold.dead === 1 ? 'hand' : 'hands'} dead over ${days} ${days === 1 ? 'day' : 'days'}`;
@@ -172,7 +181,11 @@ export function landmarkHere(sea: Sea, s: WorldState): Landmark | null {
 export const shoreHere = (sea: Sea, s: WorldState): ShoreWork[] => landmarkHere(sea, s)?.offers.shore ?? [];
 
 /** Days each takes. */
-export const SHORE_DAYS: Record<ShoreWork, number> = { water: 2, forage: 3, careen: 5 };
+export const SHORE_DAYS: Record<ShoreWork, number> = { water: 2, forage: 3, careen: 5, night: 2 };
+/** Watering by night at a Spanish town: this often you're seen, and word goes up the coast. */
+export const NIGHT_SEEN = 0.3;
+/** Seen after the treasure ship, it's one more thing for Spain's ambassador. */
+export const NIGHT_GRIEVANCE = 15;
 /** Days the work takes here: a day less with a friendly people's guides. */
 export const shoreDays = (s: WorldState, what: ShoreWork) => Math.max(1, SHORE_DAYS[what] - (friendly(s, peopleHere(s)) ? GUIDED_DAYS : 0));
 
@@ -189,6 +202,19 @@ export function ashore(sea: Sea, s: WorldState, what: ShoreWork, advance: (sea: 
   if (what === 'water') {
     w = { ...w, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water) } };
     log('casks filled');
+  }
+  if (what === 'night') {
+    // The boats in to the river mouth after dark, the casks rolled down and back, as Drake watered on this coast.
+    w = { ...w, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water) } };
+    if (roll(r) < NIGHT_SEEN) {
+      if (!w.voyage.visited.includes('cacafuego')) {
+        w = { ...w, seen: w.seen.includes('coast-alarm') ? w.seen : [...w.seen, 'coast-alarm'] };
+        log('casks filled by night, but the boats were seen from the town: word of you goes up the coast ahead, and the treasure ship will hear of it');
+      } else {
+        w = { ...w, grievance: w.grievance + NIGHT_GRIEVANCE };
+        log('casks filled by night, but the boats were seen: one more thing for Spain to complain of');
+      }
+    } else log('casks filled by night from the river, and nobody the wiser');
   }
   if (what === 'forage') {
     // Fish, fowl, seals, penguins, fruit, roots: a week's worth some days, a month's others. Fresh, whatever it is.

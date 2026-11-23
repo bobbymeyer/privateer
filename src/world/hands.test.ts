@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { choose } from './dilemmas.ts';
-import { type Named, type Role, ROLES, alive, causeOf, gravesOf, mourn, muster, visitGraves } from './hands.ts';
+import { type Named, type Role, ROLES, alive, causeOf, gravesOf, howDied, lossWords, mourn, muster, visitGraves } from './hands.ts';
 import { sailSighted } from './meet.ts';
 import { ashore, foldDeaths } from './stores.ts';
 import { warnings } from './warnings.ts';
@@ -115,7 +115,7 @@ test('the dead are graves where they fell, and a later voyage passing finds them
   // Another voyage, lying at San Julián.
   const later = lyingAt(sea, createWorld(sea, 6), 'san-julian');
   const found = visitGraves(sea, later, graves);
-  assert.match(found.log.at(-1)!.text, /^a grave on the shore at Port San Julián: .*, the gunner, .*, of scurvy\. “.+”$/);
+  assert.match(found.log.at(-1)!.text, /^a grave on the shore at Port San Julián: .*, the gunner, .*, dead of scurvy\. “.+”$/);
   assert.deepEqual(visitGraves(sea, found, graves).log, found.log, 'once a voyage');
   assert.deepEqual(visitGraves(sea, createWorld(sea, 6), graves).log, createWorld(sea, 6).log, 'not from Plymouth');
 });
@@ -164,4 +164,14 @@ test('a voyage from before the hands of note comes forward, mustered', () => {
   const saved = decode(text)!;
   assert.equal(saved.world.hands.length, 6);
   assert.deepEqual(saved.world.losses, {});
+});
+
+test('how a man died reads as a sentence says it', () => {
+  assert.equal(howDied('thirst'), 'dead of thirst');
+  assert.equal(howDied('the flux'), 'dead of the flux');
+  assert.equal(howDied('lost over the side'), 'lost over the side');
+  assert.equal(howDied('killed in the fight'), 'killed in the fight');
+  assert.equal(lossWords('lost over the side', 2), '2 lost over the side');
+  assert.equal(lossWords('killed in the fight', 4), '4 killed fighting');
+  assert.equal(lossWords('thirst', 18), '18 to thirst');
 });

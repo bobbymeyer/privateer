@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { continueOn } from './course.ts';
 import { choose } from './dilemmas.ts';
 import {
-  CHANDLER, EAT, ISLANDERS_COST, MIN_HANDS, SCURVY_DAYS, ashore, buy, capacity, daysOf, fightCost, marketHere, price, prizeStores, provisionDay, scurvy, shoreHere, startCrew, trade,
+  CHANDLER, EAT, ISLANDERS_COST, MIN_HANDS, SCURVY_DAYS, minHands, ashore, buy, capacity, daysOf, fightCost, foldDeaths, marketHere, price, prizeStores, provisionDay, scurvy, shoreHere, startCrew, trade,
 } from './stores.ts';
 import { lyingAt } from './testing.ts';
 import { advance, createSea, createWorld, type WorldState } from './world.ts';
@@ -49,7 +49,7 @@ test('the water gone, the hands die of thirst, and too few hands lose the ship',
     w = provisionDay(sea, { ...w, turn: ++days }, r);
   }
   assert.ok(w.sunk, 'lost at last');
-  assert.ok(w.crew < MIN_HANDS);
+  assert.ok(w.crew < minHands(w));
   assert.ok(days < 60, `${days} days without water`);
   assert.ok(w.log.some((l) => /thirst/.test(l.text)));
 });
@@ -155,4 +155,38 @@ test('a prize fills the hold as far as there is room; a town’s storehouses are
   assert.equal(town.stores.water, capacity(w).water);
   const full = prizeStores({ ...w, stores: capacity(w) }, 'privateer', false, r);
   assert.deepEqual(full.stores, capacity(w));
+});
+
+test('the scurvy a man every few days is one bout, not news to stop for each time', () => {
+  let log = foldDeaths([], 'scurvy', 1, 100);
+  assert.ok(log.at(-1)!.stop, 'the first death stops her');
+  log = foldDeaths(log, 'scurvy', 1, 104);
+  assert.ok(!log.at(-1)!.stop);
+  log = foldDeaths(log, 'scurvy', 1, 112);
+  assert.ok(!log.at(-1)!.stop);
+  assert.equal(log.length, 1);
+  assert.equal(log.at(-1)!.text, 'scurvy: 3 hands dead over 13 days');
+  // A new bout, after fresh food and weeks of health, stops her again.
+  log = foldDeaths(log, 'scurvy', 1, 160);
+  assert.ok(log.at(-1)!.stop);
+});
+
+test('water by night at a Spanish town fills the casks, and is sometimes seen', () => {
+  const at = lyingAt(sea, { ...createWorld(sea, 1), stores: { food: 1000, water: 10, spares: 0, powder: 0 } }, 'callao');
+  assert.ok(shoreHere(sea, at).includes('night'));
+  let seen = 0;
+  for (let rng = 1; rng < 200; rng++) {
+    const w = ashore(sea, { ...at, rng }, 'night', (_s, x) => x);
+    assert.equal(w.stores.water, capacity(w).water);
+    if (w.seen.includes('coast-alarm')) seen++;
+  }
+  assert.ok(seen > 30 && seen < 90, `seen ${seen} of 199`);
+  assert.ok(!shoreHere(sea, lyingAt(sea, createWorld(sea, 1), 'canaries')).includes('night'));
+});
+
+test('a bigger ship wants more hands to work her: a third of her complement', () => {
+  assert.equal(minHands({ ship: 'pinnace' }), 10);
+  assert.equal(minHands({ ship: 'sloop' }), 15);
+  assert.equal(minHands({ ship: 'brigantine' }), 24);
+  assert.ok(minHands({ ship: 'pinnace' }) >= MIN_HANDS);
 });

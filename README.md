@@ -317,9 +317,15 @@ sail anyway. It shows beside the casks and the chandler too.
 
 **The dying, folded.** The first death of thirst, hunger or scurvy stops
 the ship; after that it's one running line, *thirst: 14 hands dead over 9
-days*, moved to the end of the log as it grows.
+days*, moved to the end of the log as it grows, while the deaths come
+within a week (the scurvy, three). An event that has asked won't ask again
+for forty days.
 
-The voyage saves as you go (`src/save.ts`, version 16; a run from before
+**Water by night.** At Valparaíso, Callao and Guatulco, the boats in to the
+river after dark: two days, the casks filled, seen three times in ten
+(before the treasure ship, word goes up the coast; after, Spain's grievance).
+
+The voyage saves as you go (`src/save.ts`, version 20; a run from before
 the simplification is dropped). Every voyage that ends goes in the
 logbook, with its score. *Today's voyage* is the same seed for everyone
 that day.
@@ -344,8 +350,8 @@ chart and adds its legs to the lanes. Days per leg, at a steady pace:
 | Valparaíso | Callao | 24 |
 | Callao | off Cape San Francisco | 15 |
 | off Cape San Francisco | **Guatulco** / **the Strait, homeward** | 22 / 61 |
-| Guatulco | **Nova Albion** / **the Ladrones** | 37 / 117 |
-| Nova Albion | the Ladrones | 87 |
+| Guatulco | **Nova Albion** / **the Ladrones** | 32 / 84 |
+| Nova Albion | the Ladrones | 79 |
 | the Ladrones | **Ternate** / **Manila** | 26 / 29 |
 | Ternate or Manila | Java | 28 |
 | Java | the Cape of Good Hope | 95 |
@@ -357,6 +363,11 @@ chart and adds its legs to the lanes. Days per leg, at a steady pace:
 You come home *round the world* (by the Ladrones or the Cape), *back the
 way you went* (by the Strait homeward), or *turned back*.
 
+**The Pacific trades.** Between 5° and 25° either side of the line, out of
+the east all year, the trades carry her two days' way every other day: the
+crossing in under three months, as the Manila galleon ran it. The days
+shown count it (`inTrades` in `course.ts`).
+
 **The Strait or the Horn.** On the map they're a day apart. At sea the
 Strait is the slow, sheltered way: bound through it, the williwaws hold you
 at anchor one day in two. The Horn is the fast way, with the storms: past
@@ -364,8 +375,9 @@ at anchor one day in two. The Horn is the fast way, with the storms: past
 
 **What wears down** (`src/world/stores.ts`, `src/world/weather.ts`):
 
-- **Hands**: a number against the complement. Fewer than 8 and she can't
-  be sailed: the voyage is lost.
+- **Hands**: a number against the complement. Fewer than a third of her
+  complement (a pinnace 10, a sloop 15, a brigantine 24) and she can't be
+  sailed: the voyage is lost.
 - **Food and water**, in rations: a hand for a day. Full rations eat 1,
   short 0.67, starvation 0.34, of both; water goes 1.5 times as fast in the
   tropics. A ship carries 180 days of food and 90 of water for her
@@ -440,84 +452,40 @@ the fight is taught from the start and nothing it costs counts.
 
 `npm run voyage` sails whole voyages with a captain bot (`cli/voyage.ts`):
 it fits out (hands, water, food, then spares and powder), takes forks at
-random, rations by the leg ahead, waters, forages and careens where there's
-a shore, buys and trades where it can, attacks merchants and the treasure
-ship on a sound enough hull, leaves the coast of Peru asleep for the
-silver, follows every rumor (and attacks a rumored prize on a hull still a
-quarter sound), and fights by one-step lookahead.
+random, rations by the leg ahead, waters (by night on the Spanish coast if
+it must), forages and careens where there's a shore, buys and trades where
+it can, attacks merchants and the treasure ship on a sound enough hull,
+leaves the coast of Peru asleep for the silver, and fights by one-step
+lookahead. It follows a rumor as a captain would: not the Northwest
+Passage, the River May or Cuzco's gold, not a prize too strong for her,
+not far on a prisoner's word (`--every-rumor` follows them all).
 
 ```
-npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--chronicler] [--french] [--no-truck] [--trace]
+npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--every-rumor] [--chronicler] [--french] [--no-truck] [--trace]
 ```
 
-It carries three chests of truck from Plymouth (none with `--no-truck`) and
-barters them where there's a people and no market, deals fairly (flogs the
-hands who wrong a people, trades truck with canoes), keeps company with the
-Huguenots, and takes their French commission only with `--french`.
+It carries three chests of truck, deals fairly with the peoples of the
+coasts, keeps company with the Huguenots, never fires on a friend's
+merchant unless `--pirate`, and at the reckoning goes to court when the
+risk is under three in ten, gives the Queen a gift when it isn't.
 
-It never fires on a friend's merchant unless `--pirate`. At the reckoning it
-goes to court when the risk is under three in ten, gives the Queen a gift
-when it isn't and there's more than 100 to give from, and lies low
-otherwise.
-
-It sets the dead commander's ring aside for the Queen and sells the other
-jewels unless it means to give a gift; treats with a Portuguese settlement;
-buys brazilwood at Guanabara, or the Normans', with what's over a margin.
-
-It practises on the fishing boat at the Canaries, and sets up the Queen's
-arms where nobody holds the land when it has a bundle of the spares to
-spare (never the truck, which is fresh food).
-
-Over 100 voyages a ship and a backer, mean score counting the lost as 0:
+The aim is that a sensible captain comes home 35–55% of the time with any
+ship and backer, and that Drake's voyage is rare but there. Over 100
+voyages each, seeds 0–99 and 100–199 (home %, voyages like Drake's):
 
 | ship | the Crown | gentlemen adventurers | your own stake |
 | --- | --- | --- | --- |
-| pinnace | 36% home, mean score 136 | 39%, 177 | 30%, 134 |
-| sloop | 40%, 104 | 37%, 96 | 39%, 123 |
-| brigantine | 47%, 132 | 48%, 86 | 58%, 174 |
+| pinnace | 58%, 2 · 49%, 3 | 55%, 1 · 52%, 4 | 56%, 5 · 43%, 5 |
+| sloop | 43%, 2 · 41%, 5 | 48%, 1 · 57%, 1 | 43%, 0 · 34%, 1 |
+| brigantine | 38%, 2 · 45%, 1 | 46%, 1 · 47%, 0 | 39%, 1 · 31%, 2 |
 
-These are lower than before the four newer rumors (51–63% home): the bot
-follows every rumor it hears, and the Northwest Passage, which is never so,
-is where 17 of the pinnace's 70 lost voyages on its own stake ended, in the
-ice and on the long way back. Ignoring rumors (`--no-rumors`) it comes home
-45–61%. Not tuned toward a band yet; the table before was:
-
-| ship | the Crown | gentlemen adventurers | your own stake |
-| --- | --- | --- | --- |
-| pinnace | 57% home, mean score 256 | 59%, 283 | 58%, 243 |
-| sloop | 59%, 152 | 58%, 141 | 52%, 167 |
-| brigantine | 63%, 201 | 61%, 126 | 51%, 162 |
-
-Truck and the peoples' goodwill lift every ship a few points; the pinnace
-most, since fresh food is what it lacks (44% on its own stake without truck,
-58% with). To hold the line the brigantine's purse came down to 10, the
-backers' money became purely a share of the ship's purse (the Crown half,
-the gentlemen four fifths), and the Crown's stores from Deptford a spare and
-a barrel. The backed brigantine is still a few points over the rest; the
-next seed range (100–199) gives the Crown's pinnace, sloop and brigantine
-50%, 59% and 58%, so some of it is the dice. Jewels: about one voyage home in two brings one, the brigantine
-more. With a chronicler, on its own stake, he came home alive about a
-quarter of the time (26, 26 and 24 of 100), worth 42, 47 and 70 to the
-score when he did; mean scores rose to 190, 158 and 207.
-
-Before backers, on its own stake, it did as follows.
-
-Over 40 voyages a ship:
-
-| ship | home | on day | with | like Drake's / Cavendish's / Fenton's | rumors heard | detours sailed (true / false) |
-| --- | --- | --- | --- | --- | --- | --- |
-| pinnace | 16 (40%) | 633 | 148 gold, 15 hands | 2 / 4 / 10 | 24 | 20 (13 / 7) |
-| sloop | 21 (53%) | 571 | 117 gold, 22 hands | 0 / 7 / 14 | 24 | 12 (8 / 4) |
-| brigantine | 22 (55%) | 603 | 177 gold, 31 hands | 1 / 8 / 13 | 29 | 25 (12 / 13) |
-
-What ends the rest is almost always too few hands: scurvy on the long
-crossings above all, then hunger, the way's events and fights. The bot
-seldom gets the good of a rumored prize: it met one 3 times in 120
-voyages, since the galleon and the carracks are mostly heard of from
-prisoners and it takes few prizes, and it comes to them with its hull worn
-down. A person who
-forages at every shore, hires hands where they can, careens before a
-detour and keeps a sound hull for the prizes will do better.
+Two levers hold it there, after the playtest's fixes (water by night, the
+Pacific trades) and a bot that follows rumors with judgement had made it
+57–86%: a ship needs a third of her complement to work her (it was 8 hands
+for any ship, so a brigantine sailed home with a pinnace's crew), and the
+scurvy kills at 0.0003 a hand a day past six weeks. What ends the rest is
+almost always too few hands, on the long legs: the Pacific, and Java to the
+Cape. See `docs/playtest-1.md` for voyages played by hand.
 
 ## running it
 
@@ -529,7 +497,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 195 tests
+npm test                     # the rules and the voyage, 203 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)

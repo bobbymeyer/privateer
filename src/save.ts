@@ -11,7 +11,7 @@ import type { WorldState } from './world/world.ts';
 import { muster } from './world/hands.ts';
 import { startingStanding } from './world/peoples.ts';
 
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
 
 /** From each version to the next, since the voyage was simplified (12): a run in progress shouldn't be lost to an update. */
 const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, unknown>> = {
@@ -29,6 +29,8 @@ const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, 
   17: (w) => ({ ...w, peoples: startingStanding(), memory: {}, truck: 0, company: 0, french: false }),
   // 18 → 19: the Queen's arms set up, none yet.
   18: (w) => ({ ...w, arms: [] }),
+  // 19 → 20: when each kind of event last asked.
+  19: (w) => ({ ...w, asked: {} }),
 };
 
 export const SAVE_KEY = 'privateer:run';

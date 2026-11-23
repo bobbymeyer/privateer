@@ -18,13 +18,13 @@
   import { read } from '../world/reading.ts';
   import { HAND_WORTH, LIKE_TITLES, score } from '../world/score.ts';
   import {
-    CHANDLER, ISLANDERS_COST, SPICE_WORTH, TRUCK_AT, TRUCK_ROOM, barter, barterHere, BARTER_DAYS, shoreDays, takeHere, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade, WOOD_WORTH, buyWood, woodHere, woodRoom,
+    CHANDLER, ISLANDERS_COST, SPICE_WORTH, TRUCK_AT, TRUCK_ROOM, barter, barterHere, BARTER_DAYS, shoreDays, takeHere, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, minHands, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade, WOOD_WORTH, buyWood, woodHere, woodRoom,
   } from '../world/stores.ts';
   import { PRIZES, followed } from '../world/rumors.ts';
   import { JEWELS, favourOf, setAside, toHerTaste } from '../world/jewels.ts';
   import { BACKERS, BACKER_KEYS, type Backer, courtRisk, grievanceWord, infamyFor, lawfulness, restitutionFor } from '../world/reckoning.ts';
   import { CHRONICLER_COST, advance, createSea, createWorld, dateOf, newLines, type Sea, type WorldState, waiting } from '../world/world.ts';
-  import { ROLE, type Grave, called, gravesOf, placeOf, visitGraves } from '../world/hands.ts';
+  import { ROLE, type Grave, called, gravesOf, howDied, lossWords, placeOf, visitGraves } from '../world/hands.ts';
   import { FIX_WORDS, type Warning, warningKey, warnings } from '../world/warnings.ts';
   import { EPITAPH_LENGTH, loadGraves, saveGraves, withEpitaph, withGraves } from '../graves.ts';
   import { forget, load, store } from '../save.ts';
@@ -384,7 +384,7 @@
     mq.addEventListener?.('change', (e) => (phone = e.matches));
   }
   /** The last things that happened, newest first. */
-  const recent = $derived(now()?.log.slice(-6).reverse() ?? []);
+  const recent = $derived(now()?.log.slice(-4).reverse() ?? []);
   /** What won't last the leg ahead, said beside the casks and the chandler while you can still put it right. */
   const short = $derived(sea && now() && here ? warnings(sea, now()!) : []);
   const pct = (v: number, m: number) => `${Math.max(0, Math.min(100, (v / Math.max(1, m)) * 100))}%`;
@@ -397,25 +397,62 @@
 {:else}
   <main>
     {#snippet gauges(w: WorldState)}
+        <!-- What you act on every day. -->
         <div class="gauges">
-          <div class:low={w.crew < complement(w) / 2}><span class="label">hands</span><span class="bar"><span style="width: {pct(w.crew, complement(w))}"></span></span>{w.crew} of {complement(w)}</div>
+          <div class:low={w.crew < complement(w) / 2} title="{minHands(w)} needed to work her"><span class="label">hands</span><span class="bar"><span style="width: {pct(w.crew, complement(w))}"></span></span>{w.crew} of {complement(w)}</div>
           <div class:low={days.food <= 10}><span class="label">food</span><span class="bar"><span style="width: {pct(w.stores.food, capacity(w).food)}"></span></span>{days.food} days</div>
           <div class:low={days.water <= 10}><span class="label">water</span><span class="bar"><span style="width: {pct(w.stores.water, capacity(w).water)}"></span></span>{days.water} days</div>
-          <div class:low={scurvy(w) !== 'none'}><span class="label">fresh food</span>{w.fresh} days ago{scurvy(w) === 'killing' ? ': the scurvy is killing' : scurvy(w) === 'coming' ? `: scurvy at ${SCURVY_DAYS}` : ''}</div>
           <div class:low={w.hull <= w.maxHull / 3}><span class="label">hull</span><span class="bar"><span style="width: {pct(w.hull, w.maxHull)}"></span></span>{w.hull} of {w.maxHull}</div>
-          <div class:low={w.stores.spares === 0}><span class="label">spares</span>{w.stores.spares}</div>
-          <div class:low={w.stores.powder === 0}><span class="label">powder</span>{w.stores.powder}</div>
           <div><span class="label">gold</span>{w.gold}</div>
+        </div>
+    {/snippet}
+    {#snippet matters(w: WorldState)}
+        <!-- What only matters now and then: said when it does. -->
+        {@const cargo = [w.spice && `${w.spice} ${w.spice === 1 ? 'ton' : 'tons'} of spice`, w.wood && `${w.wood} of brazilwood`, w.jewels.length && `${w.jewels.length} ${w.jewels.length === 1 ? 'jewel' : 'jewels'}`].filter(Boolean)}
+        {@const notes = [
+          scurvy(w) === 'killing' ? `${w.fresh} days without fresh food: the scurvy is killing` : scurvy(w) === 'coming' ? `${w.fresh} days without fresh food: the scurvy at ${SCURVY_DAYS}` : '',
+          w.crew < minHands(w) + 6 ? `${w.crew} hands, and she needs ${minHands(w)} to work her` : '',
+          w.stores.spares === 0 ? 'no spares: nothing to fother a leak or careen her with' : '',
+          w.stores.powder === 0 ? 'no powder: the guns are silent' : '',
+        ].filter(Boolean)}
+        {#each notes as n (n)}<p class="warn matters">{n}</p>{/each}
+        {#if cargo.length || w.infamy > 0 || w.grievance > 0 || w.company > w.turn}
+          <p class="faint matters">
+            {[
+              cargo.length ? `aboard: ${cargo.join(', ')}` : '',
+              w.infamy > 0 ? `your name: ${lawfulness(w)}` : '',
+              w.grievance > 0 ? `Spain's grievance: ${grievanceWord(w)}` : '',
+              w.company > w.turn ? `in company with the Rochellers, ${w.company - w.turn} days` : '',
+            ].filter(Boolean).join(' · ')}
+          </p>
+        {/if}
+    {/snippet}
+    {#snippet more(w: WorldState)}
+        <!-- Everything else, behind "more". -->
+        <div class="gauges more-gauges">
+          <div><span class="label">fresh food</span>{w.fresh} days ago</div>
+          <div><span class="label">spares</span>{w.stores.spares}</div>
+          <div><span class="label">powder</span>{w.stores.powder}</div>
+          <div><span class="label">truck</span>{w.truck} {w.truck === 1 ? 'chest' : 'chests'}</div>
           {#if w.spice}<div><span class="label">spice</span>{w.spice} {w.spice === 1 ? 'ton' : 'tons'}, {w.spice * SPICE_WORTH} at home</div>{/if}
           {#if w.wood}<div><span class="label">brazilwood</span>{w.wood} {w.wood === 1 ? 'ton' : 'tons'}, {w.wood * WOOD_WORTH} at home</div>{/if}
           {#if w.jewels.length}<div title={w.jewels.map((j) => j.name).join('; ')}><span class="label">jewels</span>{w.jewels.length}, {w.jewels.reduce((t, j) => t + j.value, 0)} to a goldsmith</div>{/if}
           <div><span class="label">backed by</span>{BACKERS[w.backer].name}</div>
           <div class:low={w.infamy > 0}><span class="label">your name</span>{lawfulness(w)}</div>
           <div><span class="label">Spain's grievance</span>{grievanceWord(w)}</div>
-          {#if w.truck}<div><span class="label">truck</span>{w.truck} {w.truck === 1 ? 'chest' : 'chests'}</div>{/if}
           {#if w.french}<div><span class="label">commission</span>a French one too</div>{/if}
-          {#if w.company > w.turn}<div><span class="label">in company</span>the Rochellers, {w.company - w.turn} days</div>{/if}
         </div>
+        <ul class="plain of-note">
+          {#each w.hands as h (h.name)}
+            <li class:gone={h.dead || h.ran || h.fate}>
+              <strong>{h.name}</strong>, {ROLE[h.role].title}{h.freed ? ', freed from the Spaniards' : ''}{h.dead ? `: ${howDied(h.dead.cause)}, ${h.dead.place}, ${dateOf(h.dead.turn)}` : h.ran ? ': ran' : h.fate ? ': sent to the galleys' : ''}
+              {#if !h.dead && !h.ran && !h.fate}<span class="faint">{ROLE[h.role].does}.</span>{/if}
+            </li>
+          {/each}
+        </ul>
+        {#if followed(w).length}
+          <p class="faint">you've heard of: {followed(w).map((k) => `${landmark(k).name}, from ${landmark(k).detour!.from.map((f) => landmark(f).name).join(' or ')}`).join('; ')}.</p>
+        {/if}
     {/snippet}
     <header>
       <h1>privateer</h1>
@@ -439,29 +476,21 @@
           {#if making && making !== world.voyage.at} · bound for {making === HOME_LANDMARK ? 'home' : landmark(making).name}, {daysTo(sea, world, making)} days{/if}
         </p>
         {#if phone}
-          <details class="fold">
-            <summary>
-              <span class:low={world.crew < complement(world) / 2}>{world.crew} hands</span> ·
-              <span class:low={days.food <= 10}>food {days.food}d</span> ·
-              <span class:low={days.water <= 10}>water {days.water}d</span> ·
-              <span class:low={world.hull <= world.maxHull / 3}>hull {world.hull}/{world.maxHull}</span>
-              <span class="faint"> · more</span>
-            </summary>
-            {@render gauges(world)}
-          </details>
+          <p class="fold-line">
+            <span class:low={world.crew < complement(world) / 2}>{world.crew} hands</span> ·
+            <span class:low={days.food <= 10}>food {days.food}d</span> ·
+            <span class:low={days.water <= 10}>water {days.water}d</span> ·
+            <span class:low={world.hull <= world.maxHull / 3}>hull {world.hull}/{world.maxHull}</span> ·
+            <span>{world.gold} gold</span>
+          </p>
         {:else}
           {@render gauges(world)}
         {/if}
-        <details class="of-note">
-          <summary>hands of note: {world.hands.filter((h) => !h.dead && !h.ran && !h.fate).length} of {world.hands.length} aboard</summary>
-          <ul class="plain">
-            {#each world.hands as h (h.name)}
-              <li class:gone={h.dead || h.ran || h.fate}>
-                <strong>{h.name}</strong>, {ROLE[h.role].title}{h.freed ? ', freed from the Spaniards' : ''}{h.dead ? `: dead of ${h.dead.cause}, ${h.dead.place}, ${dateOf(h.dead.turn)}` : h.ran ? ': ran' : h.fate ? ': sent to the galleys' : ''}
-                {#if !h.dead && !h.ran && !h.fate}<span class="faint">{ROLE[h.role].does}.</span>{/if}
-              </li>
-            {/each}
-          </ul>
+        {@render matters(world)}
+        <details class="more">
+          <summary>more: stores, cargo, your name, the hands of note ({world.hands.filter((h) => !h.dead && !h.ran && !h.fate).length} of {world.hands.length} aboard)</summary>
+          {#if phone}{@render gauges(world)}{/if}
+          {@render more(world)}
         </details>
         <div class="settings">
           <div class="row" role="group" aria-label="rations">
@@ -489,10 +518,11 @@
             <div class="row">
               {#each shore as work (work)}
                 <button disabled={sailing} onclick={() => attempt(() => ashore(sea!, world!, work, advance))}>
-                  {work === 'water' ? 'fill the casks' : work === 'forage' ? 'forage and fish' : 'careen her'} ({shoreDays(world, work)} {shoreDays(world, work) === 1 ? 'day' : 'days'})
+                  {work === 'water' ? 'fill the casks' : work === 'night' ? 'water by night from the river' : work === 'forage' ? 'forage and fish' : 'careen her'} ({shoreDays(world, work)} {shoreDays(world, work) === 1 ? 'day' : 'days'})
                 </button>
               {/each}
             </div>
+            {#if shore.includes('night')}<p class="faint">the boats in to the river after dark: three times in ten they're seen from the town, and word goes ahead of you.</p>{/if}
           {/if}
           {#if claim}
             {@const paid = armsPaidWith(world)}
@@ -557,7 +587,7 @@
             {#each legsFrom(world.voyage, followed(world)).filter((k) => k !== HOME_LANDMARK) as k (k)}<li><em>{landmark(k).name}{landmark(k).detour ? ', by rumor' : ''}.</em> <span class="faint">{landmark(k).text}</span></li>{/each}
           </ul>
         {/if}
-        {#if followed(world).length}
+        {#if atFork && followed(world).length}
           <p class="faint">you've heard of: {followed(world).map((k) => `${landmark(k).name}, from ${landmark(k).detour!.from.map((f) => landmark(f).name).join(' or ')}`).join('; ')}.</p>
         {/if}
         <ul class="plain log">
@@ -608,35 +638,35 @@
           <h2>how to play</h2>
           <dl>
             <dt>the voyage</dt>
-            <dd>Continue on and the ship sails the lanes a day at a time to the next landmark on the chart, stopping when something happens. Where the way divides, you choose: the Strait or the Horn, across the Pacific or back the way you came, the Moluccas or Manila. You can turn for home whenever you like.</dd>
-            <dt>stores</dt>
-            <dd>Every day the hands eat and drink a ration each, water faster in the tropics. Short rations stretch both; starvation kills slowly. Six weeks without fresh food and the scurvy starts to kill. Too few hands and she can't be sailed.</dd>
+            <dd>Continue on and the ship sails to the next landmark, a day at a time, stopping when something happens. Where the way divides, you choose. You can turn for home whenever you like.</dd>
+            <dt>keep them alive</dt>
+            <dd>The hands eat and drink every day, water faster in the tropics. Six weeks without fresh food and the scurvy starts to kill; fewer than a third of her hands and she can't be sailed. Before you leave a landmark the master tells you if the stores won't last: short rations stretch them.</dd>
             <dt>at a landmark</dt>
-            <dd>Fill the casks, forage and fish, careen her (spares mend her faster), buy from a chandler, trade with islanders, or raid a Spanish town, once. Where nobody holds the land, set up the Queen’s arms for fame at home. Each takes days.</dd>
-            <dt>pace</dt>
-            <dd>Easy loses a day in three and spares the hull; cracking on gains one and wears it.</dd>
-            <dt>the way's events</dt>
-            <dd>Storms, fever, foul water, weevils, a leak, a wreck, canoes, a reef, the hands wanting Spanish gold, fire in the bread room, a storm on the eve of a raid, a feast ashore, hands in the lock-up, your papers searched, shining ore: each asks you how to meet it, and says what it costs.</dd>
-            <dt>a sail</dt>
-            <dd>Privateers and corsairs off Spain and Barbary come at you; merchants off Brazil, Peru and in the East are yours to take or let pass. Off Cape San Francisco, the treasure ship, unless your raids on the coast have warned her.</dd>
-            <dt>how to fight</dt>
-            <dd>
-              Cards, yours and hers. <em>The range</em> is far, close or grappled: long guns reach far, a broadside is heavy close, boarders only go across grappled, and a card does only what works at the range as it stands. Sail cards close the range or open it; three stretches of open water and a ship is away.
-              <em>Her next card</em> is face up beside your hand, and she plays it after yours.
-              <em>Three are dealt</em>: keep two, which play in the order you pick them; the third goes under your deck.
-              <em>The chain</em>: sail, then shot, then board, each in order, and each hits harder than the last.
-              <em>What it costs</em>: a barrel of powder for three shots, hands for every point of hull lost; with no powder the guns are silent. Beat her down and she strikes, and her hold fills yours.
-              Your first fight explains itself as it goes, and at the Canaries there's a fishing boat to practise on.
-            </dd>
-            <dt>whose money</dt>
-            <dd>The Crown, gentlemen adventurers, or your own stake: more money to fit out with, for a share of what you bring home.</dd>
-            <dt>privateer or pirate</dt>
-            <dd>Spain's and Portugal's ships and towns are fair game, but Spain keeps count. A French, Hanseatic or Dutch merchant is a friend's: richer than she looks, and taking her is piracy.</dd>
-            <dt>home</dt>
-            <dd>Your backers take their shares. Then the reckoning: show yourself at court for the fame, at a risk of being disowned to please Spain; lie low; or give the Queen a gift.</dd>
-            <dt>the score</dt>
-            <dd>Treasure home, two for every hand alive, up to twenty for the ship, times what your ship counts for: a voyage like Drake's, Cavendish's or Fenton's, or Oxenham's, lost.</dd>
+            <dd>Fill the casks, forage, careen her, buy from a chandler, trade with the people of the coast, or raid a Spanish town. Each takes days.</dd>
+            <dt>a fight</dt>
+            <dd>Three cards are dealt: keep two, played in the order you pick them. Each works only at some ranges: long guns far, a broadside close, boarders grappled. Sail, then shot, then board, in that order, and each hits harder. Your first fight explains itself as it goes, and there's a fishing boat to practise on at the Canaries.</dd>
           </dl>
+          <details class="more-play">
+            <summary>more about the voyage</summary>
+            <dl>
+              <dt>pace</dt>
+              <dd>Easy loses a day in three and spares the hull; cracking on gains one and wears it.</dd>
+              <dt>the way's events</dt>
+              <dd>Storms, fever, foul water, a leak, a wreck, canoes, a reef and more: each asks you how to meet it, and says what it costs.</dd>
+              <dt>a sail</dt>
+              <dd>Privateers and corsairs off Spain and Barbary come at you; merchants are yours to take or let pass. Off Cape San Francisco, the treasure ship, unless your raids on the coast have warned her.</dd>
+              <dt>rumors</dt>
+              <dd>Prisoners, islanders and chandlers tell you of places off the way. Some are true. Who told you is a guide to which.</dd>
+              <dt>whose money</dt>
+              <dd>The Crown, gentlemen adventurers, or your own stake: more money to fit out with, for a share of what you bring home.</dd>
+              <dt>privateer or pirate</dt>
+              <dd>Spain's and Portugal's ships and towns are fair game, but Spain keeps count. A French, Hanseatic or Dutch merchant is a friend's: taking her is piracy.</dd>
+              <dt>home</dt>
+              <dd>Your backers take their shares. Then the reckoning: show yourself at court for the fame, at a risk of being disowned to please Spain; lie low; or give the Queen a gift.</dd>
+              <dt>the score</dt>
+              <dd>Treasure home, two for every hand alive, up to twenty for the ship, times what your ship counts for: a voyage like Drake's, Cavendish's or Fenton's, or Oxenham's, lost.</dd>
+            </dl>
+          </details>
           <p class="faint">The voyage saves as you go. The seed in the address sails the same voyage again.</p>
           <button onclick={() => (intro = false)}>close</button>
         </div>
@@ -787,7 +817,7 @@
           <p class="faint">the way you sailed: {world.voyage.visited.map((k) => landmark(k).name).join(' · ')}</p>
           {#if world.arms.length}<p class="faint">the Queen’s arms set up at: {world.arms.map((k) => landmark(k).name).join(' · ')}</p>{/if}
           {#if Object.keys(world.losses).length}
-            <p class="faint">hands lost on the voyage: {Object.entries(world.losses).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k === 'ran' ? 'ran' : k === 'killed in the fight' ? 'killed fighting' : `to ${k}`}`).join(' · ')}</p>
+            <p class="faint">hands lost on the voyage: {Object.entries(world.losses).sort((a, b) => b[1] - a[1]).map(([k, n]) => lossWords(k, n)).join(' · ')}</p>
           {/if}
           {#if world.hands.some((h) => h.dead && h.dead.cause !== 'went down with the ship')}
             <h3>the dead</h3>
@@ -795,7 +825,7 @@
               {#each world.hands.filter((h) => h.dead && h.dead.cause !== 'went down with the ship').sort((a, b) => a.dead!.turn - b.dead!.turn) as h (h.name)}
                 {@const g = buried.find((x) => x.id.endsWith(`:${h.role}:${h.dead!.turn}`))}
                 <li>
-                  <strong>{called(h)}</strong>, dead of {h.dead!.cause}, {h.dead!.place}, {dateOf(h.dead!.turn)}.
+                  <strong>{called(h)}</strong>, {howDied(h.dead!.cause)}, {h.dead!.place}, {dateOf(h.dead!.turn)}.
                   {#if g}
                     <label><span class="faint">on his board:</span> <input maxlength={EPITAPH_LENGTH} value={g.epitaph} onchange={(e) => epitaph(g.id, (e.currentTarget as HTMLInputElement).value)} /></label>
                   {/if}
@@ -861,13 +891,13 @@
   .intro dl { margin: 1rem 0; }
   .intro dt { margin-top: 0.75rem; }
   .intro dd { margin: 0.2rem 0 0; }
+  .more-play summary { cursor: pointer; color: var(--faint); margin-top: 0.5rem; }
   .ships { gap: 1rem; margin-top: 0.5rem; }
   .ships li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
   .choices { flex-direction: row; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.75rem; }
   .choices li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; flex: 1 1 12rem; max-width: 18rem; }
   .warn { color: var(--theirs); margin: 0.3rem 0; }
   .of-note { margin: 0.4rem 0; font-size: 0.9rem; }
-  .of-note summary { cursor: pointer; color: var(--faint); }
   .of-note li { margin: 0.2rem 0; }
   .of-note .gone, .of-note .gone strong { color: var(--faint); text-decoration: line-through; }
   .of-note .faint { display: block; }
@@ -883,9 +913,12 @@
   .logbook .num { text-align: right; font-variant-numeric: tabular-nums; }
   .logbook .lost { color: var(--theirs); }
   .share { width: 100%; font: inherit; font-size: 0.9rem; border: 1px solid var(--rule); padding: 0.4rem; }
-  .fold summary { cursor: pointer; }
-  .fold summary .low { color: var(--theirs); }
-  .fold .gauges { margin-top: 0.5rem; }
+  .fold-line { margin: 0; }
+  .fold-line .low { color: var(--theirs); }
+  .more { font-size: 0.9rem; }
+  .more summary { cursor: pointer; color: var(--faint); }
+  .more .gauges { margin: 0.5rem 0; }
+  .matters { margin: 0; font-size: 0.95rem; }
   .docked { flex-basis: 100%; font-size: 0.9rem; }
   /* A touch screen has no space bar to press. */
   @media (pointer: coarse) {

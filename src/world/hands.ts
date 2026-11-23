@@ -122,6 +122,28 @@ export function causeOf(entries: LogEntry[]): { cause: string; left: boolean; no
   return { cause: 'the sea', left: false };
 }
 
+/**
+ * How a man died, said as a sentence says it: "dead of thirst", but "lost
+ * over the side", "killed in the fight", not "dead of lost over the side".
+ */
+export function howDied(cause: string): string {
+  if (cause === 'lost over the side' || cause === 'went down with the ship') return cause;
+  if (cause === 'killed in the fight') return 'killed in the fight';
+  if (cause === 'the gentleman') return 'beheaded';
+  if (cause === 'arrows') return 'killed by arrows';
+  return `dead of ${cause || 'the sea'}`;
+}
+
+/** The voyage's dead by cause, as a line: "18 to thirst · 2 lost over the side · 1 killed fighting". */
+export function lossWords(cause: string, n: number): string {
+  if (cause === 'ran') return `${n} ran`;
+  if (cause === 'killed in the fight') return `${n} killed fighting`;
+  if (cause === 'lost over the side') return `${n} lost over the side`;
+  if (cause === 'the gentleman') return `${n} beheaded`;
+  if (cause === 'arrows') return `${n} to arrows`;
+  return `${n} to ${cause}`;
+}
+
 /** How much likelier than any other hand each role is to be among the dead, by what killed them. */
 function exposure(role: Role, cause: string): number {
   if (role === 'gunner' && cause === 'killed in the fight') return 2;
@@ -158,7 +180,7 @@ export function mourn(sea: Sea, before: WorldState, after: WorldState): WorldSta
       said.push({ turn: after.turn, text: `${called(h)}, gone with them` });
       return { ...h, ran: true };
     }
-    said.push({ turn: after.turn, text: `${called(h)}, dead of ${cause === 'killed in the fight' ? 'his wounds' : cause}${h.role === 'chronicler' ? ', and his account of the voyage dead with him' : ''}`, stop: true });
+    said.push({ turn: after.turn, text: `${called(h)}, ${cause === 'killed in the fight' ? 'dead of his wounds' : howDied(cause)}${h.role === 'chronicler' ? ', and his account of the voyage dead with him' : ''}`, stop: true });
     return { ...h, dead: { turn: after.turn, node: after.player, place, cause } };
   });
   const as = left ? 'ran' : cause;
@@ -227,7 +249,7 @@ export function visitGraves(sea: Sea, s: WorldState, graves: Grave[]): WorldStat
   if (!found.length) return s;
   const lines: LogEntry[] = found.map((g) => {
     const where = g.title === 'lost with her hands' ? `where ${g.name} was lost, ${g.place}` : atSea(g.place) ? 'the sea where a man was buried' : `a grave on the shore at ${g.place}`;
-    return { turn: s.turn, text: `${where}: ${g.name}, ${g.title}, ${g.date}, of ${g.cause}. “${g.epitaph}”` };
+    return { turn: s.turn, text: `${where}: ${g.name}, ${g.title}, ${g.date}, ${howDied(g.cause)}. “${g.epitaph}”` };
   });
   return { ...s, seen: [...s.seen, ...found.map((g) => `grave:${g.id}`)], log: [...s.log, ...lines] };
 }
