@@ -235,6 +235,11 @@ export function arriving(s: WorldState, key: string): WorldState {
   }
   // One asking thing at a time: whichever comes first of the rest.
   const put = (dilemma: NonNullable<WorldState['dilemma']>, text: string) => (w = w.dilemma ? w : said({ ...w, dilemma }, text, true));
+  // The Canaries, the first time: a fishing boat to practise the fight on.
+  if (key === 'canaries' && !w.seen.includes('practice')) {
+    put({ kind: 'practice' }, 'a fishing boat in the roads, and not a gun aboard her');
+    w = { ...w, seen: [...w.seen, 'practice'] };
+  }
   if (FEASTING.includes(key) && roll(r) < FEAST_CHANCE) put({ kind: 'feast', at: key }, 'an invitation to feast ashore');
   if (JAILING.includes(key) && roll(r) < JAILED_CHANCE) put({ kind: 'jailed', at: key }, 'some of the hands in the lock-up after a brawl ashore');
   // Hands ashore among a people who aren't hostile yet: sometimes they make them so.

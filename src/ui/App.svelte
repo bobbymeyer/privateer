@@ -32,7 +32,9 @@
   import { loadPeoples, savePeoples } from '../peoples.ts';
   import { shareText } from '../share.ts';
   import { type Entry, best, dailySeed, entryFor, isWin, loadLog, raised, saveLog, scoreOf, today, withEntry } from '../logbook.ts';
-  import { ambient, bell, coin, gun, knell, setSound, soundOn, storm } from './sound.ts';
+  import { ambient, bell, coin, gun, knell, pipe, setSound, soundOn, storm, toll } from './sound.ts';
+  import { ARMS_DAYS, armsHere, armsPaidWith, plantArms } from '../world/arms.ts';
+  import { allTaught, loadTaught } from '../lessons.ts';
   import Fight from './Fight.svelte';
   import RouteChart from './RouteChart.svelte';
 
@@ -171,8 +173,21 @@
   let lastDilemma: string | null = null;
   $effect(() => {
     const k = world?.dilemma?.kind ?? null;
-    if (k === 'storm' && lastDilemma !== 'storm') storm();
+    // A storm roars; the reckoning at home rings three bells; anything else that asks, the boatswain's pipe.
+    if (k && k !== lastDilemma) {
+      if (k === 'storm') storm();
+      else if (k === 'reckoning') bell(3);
+      else pipe();
+    }
     lastDilemma = k;
+  });
+  // A hand of note dead: one slow stroke.
+  let lastDead = -1;
+  $effect(() => {
+    const dead = world ? world.hands.filter((h) => h.dead).length : 0;
+    // Not on loading a voyage with its dead already counted: only as it happens.
+    if (lastDead >= 0 && dead > lastDead && world && !world.sunk) toll();
+    lastDead = dead;
   });
 
   // --- Continuing on -----------------------------------------------------------
@@ -262,11 +277,16 @@
   let title = $state('');
   let nation: Nation = $state('spain');
   let isRaid = $state(false);
+  /** The practice fight, and whether this fight teaches: practice always does, and a real one until the hints have all been read. */
+  let practising = $state(false);
+  let teaching = $state(false);
 
   $effect(() => {
     if (world?.encounter && !shown) {
       const m = world.encounter;
       shown = m.fight;
+      practising = !!m.practice;
+      teaching = practising || !allTaught(loadTaught());
       isRaid = m.raid !== null;
       nation = m.nation;
       const flag = adjective(m.nation);
@@ -305,6 +325,8 @@
   const now = (): WorldState | null => world;
   const here = $derived(sea && now() ? landmarkHere(sea, now()!) : null);
   const shore = $derived(sea && now() ? shoreHere(sea, now()!) : []);
+  /** A place nobody holds, where the Queen's arms could be set up. */
+  const claim = $derived(sea && now() ? armsHere(sea, now()!) : null);
   const market = $derived(sea && now() ? marketHere(sea, now()!) : null);
   const town = $derived(sea && now() ? raidHere(sea, now()!) : null);
   const spice = $derived(sea && now() ? spiceHere(sea, now()!) : null);
@@ -472,6 +494,11 @@
               {/each}
             </div>
           {/if}
+          {#if claim}
+            {@const paid = armsPaidWith(world)}
+            <p class="faint">nobody holds this land: set up a post with a brass plate bearing the Queen’s arms, and claim it for her, as Drake did at Nova Albion. fame at home, and an answer to Spain.</p>
+            <div class="row"><button disabled={sailing || !paid} onclick={() => attempt(() => plantArms(sea!, world!, advance))}>set up the Queen’s arms ({ARMS_DAYS} day, {paid === 'truck' ? 'a chest of truck' : 'a bundle of the spares'}){paid ? '' : ': nothing to make the post of'}</button></div>
+          {/if}
           {#if market === 'chandler'}
             <p class="faint">the chandler{world.voyage.at === 'plymouth' ? '' : ', half as dear again as Plymouth'}. food bought here is fresh.</p>
             <div class="row">
@@ -585,15 +612,22 @@
             <dt>stores</dt>
             <dd>Every day the hands eat and drink a ration each, water faster in the tropics. Short rations stretch both; starvation kills slowly. Six weeks without fresh food and the scurvy starts to kill. Too few hands and she can't be sailed.</dd>
             <dt>at a landmark</dt>
-            <dd>Fill the casks, forage and fish, careen her (spares mend her faster), buy from a chandler, trade with islanders, or raid a Spanish town, once. Each takes days.</dd>
+            <dd>Fill the casks, forage and fish, careen her (spares mend her faster), buy from a chandler, trade with islanders, or raid a Spanish town, once. Where nobody holds the land, set up the Queen’s arms for fame at home. Each takes days.</dd>
             <dt>pace</dt>
             <dd>Easy loses a day in three and spares the hull; cracking on gains one and wears it.</dd>
             <dt>the way's events</dt>
             <dd>Storms, fever, foul water, weevils, a leak, a wreck, canoes, a reef, the hands wanting Spanish gold, fire in the bread room, a storm on the eve of a raid, a feast ashore, hands in the lock-up, your papers searched, shining ore: each asks you how to meet it, and says what it costs.</dd>
             <dt>a sail</dt>
             <dd>Privateers and corsairs off Spain and Barbary come at you; merchants off Brazil, Peru and in the East are yours to take or let pass. Off Cape San Francisco, the treasure ship, unless your raids on the coast have warned her.</dd>
-            <dt>a fight</dt>
-            <dd>Cards. Three are dealt: keep two, which play in the order you pick them; the third goes to the bottom. Sail, then shot, then board, each in order, and they hit harder. A fight spends powder and costs hands; with no powder the guns are silent. A prize's hold fills yours.</dd>
+            <dt>how to fight</dt>
+            <dd>
+              Cards, yours and hers. <em>The range</em> is far, close or grappled: long guns reach far, a broadside is heavy close, boarders only go across grappled, and a card does only what works at the range as it stands. Sail cards close the range or open it; three stretches of open water and a ship is away.
+              <em>Her next card</em> is face up beside your hand, and she plays it after yours.
+              <em>Three are dealt</em>: keep two, which play in the order you pick them; the third goes under your deck.
+              <em>The chain</em>: sail, then shot, then board, each in order, and each hits harder than the last.
+              <em>What it costs</em>: a barrel of powder for three shots, hands for every point of hull lost; with no powder the guns are silent. Beat her down and she strikes, and her hold fills yours.
+              Your first fight explains itself as it goes, and at the Canaries there's a fishing boat to practise on.
+            </dd>
             <dt>whose money</dt>
             <dd>The Crown, gentlemen adventurers, or your own stake: more money to fit out with, for a share of what you bring home.</dd>
             <dt>privateer or pirate</dt>
@@ -655,7 +689,7 @@
     {:else if world && shown}
       <div class="overlay">
         <div class="sheet wide">
-          <Fight fight={shown} {lastRound} {reckoning} {title} {isRaid} {nation} {onact} {oncontinue} />
+          <Fight fight={shown} {lastRound} {reckoning} {title} {isRaid} {nation} {onact} {oncontinue} teach={teaching} practice={practising} />
         </div>
       </div>
     {:else if world?.hail}
@@ -751,6 +785,7 @@
             {world.tally.fights} {world.tally.fights === 1 ? 'fight' : 'fights'} · {world.tally.taken} taken · {world.tally.sacks} {world.tally.sacks === 1 ? 'town' : 'towns'} sacked{world.tally.best ? ` · best prize: ${world.tally.best.what}, ${world.tally.best.payout}` : ''}
           </p>
           <p class="faint">the way you sailed: {world.voyage.visited.map((k) => landmark(k).name).join(' · ')}</p>
+          {#if world.arms.length}<p class="faint">the Queen’s arms set up at: {world.arms.map((k) => landmark(k).name).join(' · ')}</p>{/if}
           {#if Object.keys(world.losses).length}
             <p class="faint">hands lost on the voyage: {Object.entries(world.losses).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k === 'ran' ? 'ran' : k === 'killed in the fight' ? 'killed fighting' : `to ${k}`}`).join(' · ')}</p>
           {/if}

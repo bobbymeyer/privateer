@@ -24,7 +24,7 @@ import { landmark } from './landmarks.ts';
 import type { Nation } from './ports.ts';
 import { type Roller, pick, roll } from './random.ts';
 import { recordFight, tallied, whatOf } from './record.ts';
-import { fightCost, landmarkHere, prizeStores } from './stores.ts';
+import { capacity, fightCost, landmarkHere, prizeStores } from './stores.ts';
 import { plateExtra } from './treasure.ts';
 import { GOA_EXTRA, PRIZES, type Prize, hearFromPrisoners } from './rumors.ts';
 import type { Sea, WorldState } from './world.ts';
@@ -45,6 +45,8 @@ export interface Meeting {
   plate: boolean;
   /** A prize at the end of a rumor: the Manila galleon, the Great Ship, the carrack from Goa. */
   prize?: Prize;
+  /** Practice on a fishing boat at the Canaries: nothing it costs counts. See `practise`. */
+  practice?: true;
 }
 
 /** A sail in sight, waiting on your choice: attack, or let her pass. */
@@ -156,11 +158,38 @@ function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, force
   const r: Roller = { rng: s.rng };
   const seed = Math.floor(roll(r) * 2 ** 31);
   // No powder, no guns: the shot cards stay in the locker. Nor have men landed without the ship.
-  const deck = s.stores.powder > 0 && !noGuns ? deckOf(s.ship) : deckOf(s.ship).filter((c) => cardType(c) !== 'shot');
+  // Practice is dry firing: the guns are run out, and no powder spent.
+  const deck = (s.stores.powder > 0 || who.practice) && !noGuns ? deckOf(s.ship) : deckOf(s.ship).filter((c) => cardType(c) !== 'shot');
   // She came at you: she's bearing down from far. You fired first: within hail.
   const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deck, extra, forced ? FAR : CLOSE);
-  const log = s.stores.powder > 0 ? s.log : [...s.log, { turn: s.turn, text: 'no powder aboard: the guns are silent, and it is sails and boarders' }];
+  const log = s.stores.powder > 0 || who.practice ? s.log : [...s.log, { turn: s.turn, text: 'no powder aboard: the guns are silent, and it is sails and boarders' }];
   return { ...s, rng: r.rng, hail: null, log, encounter: { ...who, fight, forced } };
+}
+
+/**
+ * Practice on a fishing boat off the Canaries, the first time you raise
+ * them: she has no guns, and run down or run off, nothing it costs you
+ * counts — no powder, no hull, no hands. The first fight, taught as it goes.
+ */
+export function practise(s: WorldState): WorldState {
+  return startFight({ ...s, dilemma: null }, { kind: 'fishing', nation: 'spain', raid: null, plate: false, practice: true }, false);
+}
+
+/** What practice comes to: a line, and a basket of fish if she struck. */
+function practised(s: WorldState, m: Meeting): WorldState {
+  const f = m.fight;
+  const struck = f.outcome === 'destroyed';
+  const text = struck
+    ? 'she strikes, her crew laughing, and you let her go with her catch, all but a basket of fish: practice, and the gun crews the better for it'
+    : 'she gets away under all the sail she has, and the hands jeer her: practice all the same';
+  const food = struck ? Math.min(capacity(s).food, s.stores.food + s.crew * 2) : s.stores.food;
+  return {
+    ...s,
+    stores: { ...s.stores, food: Math.max(s.stores.food, food) },
+    encounter: null,
+    reckoning: { kind: m.kind, nation: m.nation, outcome: f.outcome!, payout: 0, raid: null, said: [text] },
+    log: [...s.log, { turn: s.turn, text }],
+  };
 }
 
 /** Attack the sail in sight. A friend's merchant: that's piracy, whatever comes of it. */
@@ -232,6 +261,7 @@ export function fight(sea: Sea, s: WorldState, action: Action): WorldState {
 }
 
 function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
+  if (m.practice) return practised(s, m);
   const f = m.fight;
   const outcome = f.outcome!;
   const r: Roller = { rng: s.rng };

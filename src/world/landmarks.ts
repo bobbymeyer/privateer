@@ -173,6 +173,26 @@ export const LANDMARKS: Landmark[] = [
     detour: { from: ['sierra-leone', 'brazil-home'] },
     text: 'Where the carracks from Goa make their landfall before Lisbon, low in the water with the whole year’s trade of the Indies. The Madre de Deus was taken here, in time.',
   },
+  {
+    key: 'arica', name: 'off Arica', kind: 'sea', at: [-70.6, -18.6], next: ['callao'], offers: {},
+    detour: { from: ['valparaiso'] },
+    text: 'The port of Potosí’s silver, where the barks load for Callao. The Spanish say the gold of the Temple of the Sun at Cuzco still goes down this way, a little at a time.',
+  },
+  {
+    key: 'bahama-channel', name: 'the Bahama Channel', kind: 'strait', at: [-79.7, 25.6], next: ['plymouth-home'], offers: {},
+    detour: { from: ['brazil-home', 'sierra-leone'] },
+    text: 'The narrow water between Florida and the Bahama banks, where the plate fleets from Havana must run north to catch the westerlies home: every galleon of the Indies, in one channel, with its escort.',
+  },
+  {
+    key: 'river-may', name: 'the River May', kind: 'anchorage', at: [-81.4, 30.4], next: ['plymouth-home'], offers: {},
+    detour: { from: ['brazil-home', 'sierra-leone', 'bahama-channel'] },
+    text: 'Where Ribault set up his pillar in 1562 and Laudonnière built Fort Caroline for the Huguenots, a refuge in Florida, and a port to fall on the plate fleets from.',
+  },
+  {
+    key: 'northwest', name: 'the Northwest Passage', kind: 'strait', at: [-63.5, 61.0], next: ['plymouth-home'], offers: {},
+    detour: { from: ['sierra-leone', 'brazil-home', 'azores'] },
+    text: 'The way to Cathay north of America that Gilbert wrote of in 1576 and Frobisher went looking for three summers running: a short road home to the silks of China, if it is there.',
+  },
   // --- Landfalls a storm drives you to ---------------------------------------------
   {
     key: 'bermuda', name: 'Bermuda, the Isle of Devils', kind: 'island', at: [-64.8, 32.3], next: [], offers: { shore: ['water', 'forage', 'careen'] },

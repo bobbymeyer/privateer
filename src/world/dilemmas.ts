@@ -12,7 +12,7 @@ import { DISCONTENT_LOST } from './happenings.ts';
 import { landmark } from './landmarks.ts';
 import { DETOURS, SOURCES, type Source, heed } from './rumors.ts';
 import { driven } from './landfalls.ts';
-import { patrol, raidFight } from './meet.ts';
+import { patrol, practise, raidFight } from './meet.ts';
 import { followed } from './rumors.ts';
 import { pardonOf, SEIZED, courtRisk, fameFor, giftGold, outlawed, pleasure, reckon, restitutionFor } from './reckoning.ts';
 import { favourOf, proofOfService, saleValue } from './jewels.ts';
@@ -63,6 +63,8 @@ export type Dilemma =
   | { kind: 'papers'; at: string | null }
   /** Shining ore on a beach: load it, or leave it. */
   | { kind: 'ore' }
+  /** A fishing boat off the Canaries, the first time: practice the fight on her, or let her be. See `practise` in meet.ts. */
+  | { kind: 'practice' }
   /** A Portuguese settlement on the coast of Brazil, not yet sworn to Philip: treat with it, or keep clear. See brazil.ts. */
   | { kind: 'settlement' }
   /** A Norman ship loading brazilwood at Guanabara: trade for news, buy her brazilwood, or let her be. */
@@ -178,6 +180,8 @@ export function describe(d: Dilemma): { title: string; text: string } {
       return { title: 'hands in the lock-up', text: `a quarrel over a woman, or a cup, or nothing at all, and some of your hands are in the governor's lock-up at ${landmark(d.at).name}. he names a price.` };
     case 'papers':
       return { title: 'your papers searched', text: d.at ? `the officers of ${landmark(d.at).name} come aboard to search your papers, as they search every stranger's, and they mean to have your charts.` : 'a Spanish patrol in your wake, and her captain wants your papers and your charts, or he will have them anyway.' };
+    case 'practice':
+      return { title: 'a fishing boat', text: 'a fishing boat out of Lanzarote, her crew hauling nets, and not a gun aboard her. the gun crews have never fired a shot in anger: run her down for practice, and learn how a fight goes before one matters.' };
     case 'ore':
       return { title: 'shining ore', text: 'black rock on the beach shot through with glittering yellow. the hands swear it is gold, as Frobisher’s men swore of theirs in 1578.' };
     case 'settlement':
@@ -299,6 +303,11 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
         { key: 'refuse', label: 'refuse', stakes: d.at ? `you sail out under their guns: ${range(EVE_HULL)} hull, and the market here shut to you` : 'she will fight for them' },
       ];
     }
+    case 'practice':
+      return [
+        { key: 'practise', label: 'practise on her', stakes: 'a fight that costs nothing: no powder, no hull, no hands, and the fight explained as it goes' },
+        { key: 'leave', label: 'let her be', stakes: 'learn it when it matters' },
+      ];
     case 'ore':
       return [
         { key: 'load', label: 'load it', stakes: `a day's work, and ${ORE_ROOM} tons of the hold that could carry spice` },
@@ -369,6 +378,7 @@ function decide(sea: Sea, s: WorldState, key: string): WorldState {
   if (!c) throw new Error(`no choice ${key}`);
   if (c.barred) throw new Error(c.barred);
   if (d.kind === 'rumor') return heed(s, key === 'follow');
+  if (d.kind === 'practice' && key === 'practise') return practise(s);
   if (d.kind === 'eve') return goIn(s, d.town, key as 'press' | 'stand' | 'land');
   if (d.kind === 'papers' && key === 'refuse' && !d.at) return patrol({ ...s, dilemma: null, log: [...s.log, { turn: s.turn, text: 'you refuse the patrol your papers' }] });
   if (d.kind === 'reckoning') {
@@ -643,6 +653,9 @@ function decide(sea: Sea, s: WorldState, key: string): WorldState {
     case 'ore:load':
       w = { ...w, calm: Math.max(w.calm, w.turn + 1), seen: [...w.seen, 'ore'] };
       log(`${ORE_ROOM} tons of the shining ore loaded, and the hands already spending it`);
+      break;
+    case 'practice:leave':
+      log('you let the fishing boat be');
       break;
     case 'ore:leave':
       log('you leave the ore on the beach');

@@ -151,6 +151,12 @@ going, and a false one is the days spent for nothing.
 | the Banda islands | the Sultan's pilot at Ternate | Ternate (9) | 25 to Java | nutmeg as a gift, half your spice room |
 | Goa | gossip at Bantam, Portuguese prisoners in the East | Java (46) | 80 to the Cape | a fortress to raid: +4 walls over a fortified port, 300 more in it |
 | the carrack from Goa, off the Azores | gossip at Bantam, a castaway at the Cape, prisoners off Brazil | Sierra Leone (35), Brazil (51) | 23 to Plymouth | the year's carrack: +6 hull, 400 more, taken whole |
+| the temple gold of Cuzco, off Arica | Spanish prisoners off Chile | Valparaíso | on to Callao | one time in seven, whoever tells it: a bark aground, 40 gold and two emeralds |
+| the plate fleet, in the Bahama Channel | Spanish prisoners on the Pacific coast and homeward | Brazil homeward, Sierra Leone | on to Plymouth | the plate fleet and her escort: +12 hull, 450 more, taken whole, the richest and hardest of all |
+| the French on the River May | a castaway at Sierra Leone, Huguenots | Brazil homeward, Sierra Leone, the Bahama Channel | on to Plymouth | never: Spanish San Mateo since 1565, and two days standing off |
+| the Northwest Passage | castaways at the Cape and off Brazil, Huguenots | Sierra Leone, Brazil homeward, the Azores | on to Plymouth | never: ice and fog, three to five days lost |
+
+Some things everybody says and none is so: those rumors carry their own odds, whoever tells them.
 
 How the prizes go, on a sound hull, by the fight bot over 300 fights:
 
@@ -161,6 +167,15 @@ How the prizes go, on a sound hull, by the fight bot over 300 fights:
 | the Great Ship | 13% | 34% | 71% |
 | the carrack from Goa | 6% | 24% | 64% |
 | Goa | 0% | 1% | 26% |
+| the plate fleet | 0% | 0% | 9% |
+
+**The Queen's arms** (`src/world/arms.ts`). Where nobody holds the land —
+San Julián, Nova Albion, the Isles of Solomon, and Bermuda or Mauritius if a
+storm puts you there — set up a post with a brass plate bearing her arms,
+for a day and a bundle of the spares or a chest of truck, once a place, as
+Drake did at Nova Albion and Ribault in Florida. At home each place adds 15
+to the fame at court or with a gift and takes 0.05 off the risk of being
+disowned; the end screen lists them.
 
 **Privateer or pirate.** Spain's and Portugal's ships and towns are fair
 game, one crown since 1580. A French, Hanseatic or Dutch merchant isn't:
@@ -414,6 +429,13 @@ A fight is two ships, two decks, and the range between them
 Card text is written from the effects (`cardText` in `src/cards.ts`), so a
 card can't say other than it does.
 
+**Taught as it goes** (`src/lessons.ts`). A player's first fight shows a
+hint at a time in place — the range, her card face up, two of three, the
+chain, what it costs — each gone once understood, or all at once with "no
+more hints", and the browser remembers. The first time you raise the
+Canaries a fishing boat with no guns is in the roads: practise on her, and
+the fight is taught from the start and nothing it costs counts.
+
 ## balance
 
 `npm run voyage` sails whole voyages with a captain bot (`cli/voyage.ts`):
@@ -442,7 +464,23 @@ It sets the dead commander's ring aside for the Queen and sells the other
 jewels unless it means to give a gift; treats with a Portuguese settlement;
 buys brazilwood at Guanabara, or the Normans', with what's over a margin.
 
+It practises on the fishing boat at the Canaries, and sets up the Queen's
+arms where nobody holds the land when it has a bundle of the spares to
+spare (never the truck, which is fresh food).
+
 Over 100 voyages a ship and a backer, mean score counting the lost as 0:
+
+| ship | the Crown | gentlemen adventurers | your own stake |
+| --- | --- | --- | --- |
+| pinnace | 36% home, mean score 136 | 39%, 177 | 30%, 134 |
+| sloop | 40%, 104 | 37%, 96 | 39%, 123 |
+| brigantine | 47%, 132 | 48%, 86 | 58%, 174 |
+
+These are lower than before the four newer rumors (51–63% home): the bot
+follows every rumor it hears, and the Northwest Passage, which is never so,
+is where 17 of the pinnace's 70 lost voyages on its own stake ended, in the
+ice and on the long way back. Ignoring rumors (`--no-rumors`) it comes home
+45–61%. Not tuned toward a band yet; the table before was:
 
 | ship | the Crown | gentlemen adventurers | your own stake |
 | --- | --- | --- | --- |
@@ -491,7 +529,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 175 tests
+npm test                     # the rules and the voyage, 195 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
@@ -511,6 +549,7 @@ src/
   save.ts        saving a voyage to the browser
   logbook.ts     the logbook of finished voyages, and today's voyage
   graves.ts      the graves of voyages before, kept in the browser
+  lessons.ts     the fight's hints, and which have been read, kept in the browser
   peoples.ts     what the last English ship left on each coast, kept in the browser
   share.ts       the voyage in a few lines, to copy from the end screen
   ui/            Svelte: App, RouteChart, Fight, CardView, Gauge, Flag; sound.ts
@@ -540,6 +579,8 @@ src/
     treasure.ts  the treasure ship off Cape San Francisco, asleep or warned
     rumors.ts    rumors heard, the detours they open, and what's at the end of them
     landfalls.ts storms that drive you onto an island
+    arms.ts      the Queen's arms set up where nobody holds the land
+    labels.ts    where the chart's names go, so none falls on another
     reckoning.ts whose money you sail on, privateer or pirate, and the reckoning at home
     reading.ts   what you can tell of a ship before you engage her
     record.ts    the voyage's tally, and the last fight told

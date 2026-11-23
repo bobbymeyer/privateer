@@ -53,7 +53,7 @@ export function whatOf(kind: TargetKind, nation: Nation, place: string | null, p
   if (place) return `the raid on ${place}`;
   if (plate) return 'the treasure ship from Callao';
   const flag = adjective(nation);
-  return `${article(flag)} ${flag} ${kind === 'treasure-ship' ? 'carrack' : kind}`;
+  return `${article(flag)} ${flag} ${kind === 'treasure-ship' ? 'carrack' : kind === 'fishing' ? 'fishing boat' : kind}`;
 }
 
 /** The fight just ended, as a record: how it went, and its last rounds told. */

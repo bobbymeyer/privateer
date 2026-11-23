@@ -63,7 +63,7 @@ test('prisoners talk of what lies ahead, never of a detour already behind you', 
   let talked = 0;
   for (let rng = 0; rng < 40; rng++) {
     const s = hearFromPrisoners({ ...at('callao', ['plymouth', 'valparaiso']), rng }, 'spain');
-    if (s.dilemma?.kind === 'rumor') (talked++, assert.ok(['cabo-san-lucas', 'solomons'].includes(s.dilemma.key)));
+    if (s.dilemma?.kind === 'rumor') (talked++, assert.ok(['cabo-san-lucas', 'solomons', 'bahama-channel'].includes(s.dilemma.key), s.dilemma.key));
   }
   assert.ok(talked > 5);
   const past = at('java', ['plymouth', 'guatulco', 'ladrones', 'ternate']);
@@ -152,4 +152,71 @@ test('a save from before rumors comes forward', () => {
   const saved = decode(JSON.stringify({ ...JSON.parse(encode(1, old as WorldState)), version: 13 }))!;
   assert.deepEqual(saved.world.rumors, []);
   assert.equal(saved.world.landfall, null);
+});
+
+// --- The four from the book's century: the plate fleet, the River May, Cuzco, the passage ------------------
+
+/** Arriving at a detour you meant to follow, from where it branches. */
+function arrive(from: string, visited: string[], key: string, truth: boolean, over: Partial<WorldState> = {}): WorldState {
+  const s = knowing(at(from, visited, over), key, truth);
+  return raise(sea, { ...makeFor(s, key), player: map.landmarks[key] });
+}
+
+test('the four new detours are sailable from where they branch, and rejoin', () => {
+  for (const k of ['arica', 'bahama-channel', 'river-may', 'northwest']) {
+    const l = landmark(k);
+    for (const f of l.detour!.from) assert.ok(map.distTo(map.landmarks[k])[map.landmarks[f]] < FAR, `${f} → ${k}`);
+    for (const n of l.next) assert.ok(map.distTo(map.landmarks[n])[map.landmarks[k]] < FAR, `${k} → ${n}`);
+  }
+});
+
+test('the River May and the Northwest Passage are never so, whoever tells it', () => {
+  for (let rng = 0; rng < 60; rng++) {
+    const may = hearAt({ ...at('sierra-leone', ['plymouth', 'cape']), rng }, 'sierra-leone', true);
+    if (may.dilemma?.kind === 'rumor' && may.dilemma.key === 'river-may') assert.equal(may.dilemma.truth, false);
+    const nw = hearAt({ ...at('cape', ['plymouth', 'java']), rng }, 'cape', true);
+    if (nw.dilemma?.kind === 'rumor' && nw.dilemma.key === 'northwest') assert.equal(nw.dilemma.truth, false);
+  }
+  assert.equal(DETOURS['river-may'].truth, 0);
+  assert.equal(DETOURS.northwest.truth, 0);
+});
+
+test('the River May: Spanish San Mateo, and two days standing off; the passage: ice and fog', () => {
+  const may = arrive('sierra-leone', ['plymouth', 'cape'], 'river-may', false);
+  assert.ok(may.log.some((l) => /San Mateo/.test(l.text)));
+  assert.ok(may.calm > may.turn);
+  const nw = arrive('sierra-leone', ['plymouth', 'cape'], 'northwest', false);
+  assert.ok(nw.log.some((l) => /no passage/.test(l.text)));
+  assert.ok(nw.calm >= nw.turn + 3);
+  assert.deepEqual(legs(nw.voyage, followed(nw)), [HOME_LANDMARK], 'and home from there');
+});
+
+test('Cuzco: almost never so; when it is, gold and two emeralds', () => {
+  let told = 0;
+  let true_ = 0;
+  for (let rng = 0; rng < 600; rng++) {
+    const p = hearFromPrisoners({ ...at('valparaiso', ['plymouth', 'mocha']), rng }, 'spain', 1);
+    if (p.dilemma?.kind === 'rumor' && p.dilemma.key === 'arica') (told++, p.dilemma.truth && true_++);
+  }
+  assert.ok(told > 30, `${told}`);
+  assert.ok(true_ / told < 0.3, `${true_} of ${told}`);
+  const lie = arrive('valparaiso', ['plymouth', 'mocha'], 'arica', false);
+  assert.ok(lie.log.some((l) => /stripped the temple/.test(l.text)));
+  const so = arrive('valparaiso', ['plymouth', 'mocha'], 'arica', true, { gold: 10 });
+  assert.equal(so.gold, 10 + 40);
+  assert.equal(so.jewels.filter((j) => j.kind === 'emerald').length, 2);
+  assert.deepEqual(legs(so.voyage, followed(so)).filter((k) => k !== HOME_LANDMARK), ['callao']);
+});
+
+test('the plate fleet in the Bahama Channel: the richest prize, and the hardest; false, a picked wreck', () => {
+  const so = arrive('brazil-home', ['plymouth', 'strait-east'], 'bahama-channel', true);
+  assert.equal(so.hail?.prize, 'flota');
+  const f = attack(so).encounter!.fight;
+  assert.equal(f.target.hull, TARGETS['treasure-ship'].hull + PRIZES.flota.extra.hull!);
+  assert.ok(PRIZES.flota.extra.cargo! > PRIZES.carrack.extra.cargo!, 'richer than the carrack');
+  assert.ok(PRIZES.flota.extra.hull! > PRIZES.carrack.extra.hull!, 'and harder');
+  assert.ok(!f.target.fixed, 'she can run, and so can you');
+  const lie = arrive('brazil-home', ['plymouth', 'strait-east'], 'bahama-channel', false);
+  assert.equal(lie.hail, null);
+  assert.ok(lie.log.some((l) => /went through a month ago/.test(l.text)));
 });

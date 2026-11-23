@@ -228,3 +228,41 @@ export function knell(): void {
     o.stop(t + 4.1);
   }
 }
+
+/** The boatswain's pipe: two notes, rising. Something asks your choice — an event, a rumor, a sail. */
+export function pipe(): void {
+  const b = begin();
+  if (!b) return;
+  const [c, t] = b;
+  for (const [f0, f1, at] of [[1250, 1500, 0], [1500, 1900, 0.18]] as const) {
+    const o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t + at);
+    o.frequency.linearRampToValueAtTime(f1, t + at + 0.14);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t + at);
+    g.gain.exponentialRampToValueAtTime(0.07, t + at + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.2);
+    o.connect(g).connect(master!);
+    o.start(t + at);
+    o.stop(t + at + 0.22);
+  }
+}
+
+/** A single slow stroke, lower than the watch bell: a hand of note dead. */
+export function toll(): void {
+  const b = begin();
+  if (!b) return;
+  const [c, t] = b;
+  for (const [f, a] of [[330, 0.16], [495, 0.05], [831, 0.03]] as const) {
+    const o = c.createOscillator();
+    o.frequency.value = f;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(a, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+    o.connect(g).connect(master!);
+    o.start(t);
+    o.stop(t + 2.7);
+  }
+}
