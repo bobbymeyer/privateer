@@ -46,7 +46,7 @@ export const TROPIC_THIRST = 1.5;
 /** Days without fresh food before scurvy kills. */
 export const SCURVY_DAYS = 42;
 /** Hands dead of scurvy a day, per hand, per day past SCURVY_DAYS. */
-export const SCURVY_RATE = 0.0003;
+export const SCURVY_RATE = 0.00035;
 /** And of thirst, and of hunger, a day, per hand, when it's run out. */
 export const THIRST_RATE = 0.08;
 export const HUNGER_RATE = 0.03;

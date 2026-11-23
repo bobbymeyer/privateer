@@ -189,12 +189,21 @@ test('a friend’s merchant never calls up the quieter lookout', () => {
   assert.equal(worthStopping({ ...w, hull: 2 }, { kind: 'treasure-ship', nation: 'spain', plate: 'asleep' }), true, 'the treasure ship always');
 });
 
-test('sails are seen less often in waters where you have been seen', () => {
+test('merchants are seen less often in waters where you have been seen; privateers come all the same', () => {
   const w = { ...createWorld(sea, 1), lookout: 'every' as const };
   assert.ok(sightChance({ ...w, sightings: { 'the East': 4 } }, 'the East') < sightChance(w, 'the East') / 2);
   assert.equal(sightChance(w, 'the East'), SIGHT_CHANCE);
   const s = sailSighted(sea, { ...w, player: node(110, 0), rng: [...Array(3000).keys()].find((rng) => sailSighted(sea, { ...w, player: node(110, 0), rng }).hail)! });
   assert.equal(s.sightings['the East'], 1);
+  // Off Spain, well known there: merchants keep away, privateers and corsairs don't.
+  const known = { ...w, player: node(-12, 38), sightings: { 'off Spain and the Barbary coast': 20 } };
+  let fights = 0, merchants = 0;
+  for (let rng = 0; rng < 4000; rng++) {
+    const t = sailSighted(sea, { ...known, rng });
+    if (t.encounter) fights++;
+    if (t.hail) merchants++;
+  }
+  assert.ok(fights > merchants * 3, `${fights} fights, ${merchants} merchants`);
 });
 
 test('the odds told before you attack: hopeless on a broken hull, and the master says so', () => {

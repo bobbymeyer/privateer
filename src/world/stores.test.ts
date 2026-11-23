@@ -196,7 +196,7 @@ test('careening scrapes and caulks without spares, and mends more with them', as
   const { lyingAt } = await import('./testing.ts');
   const { advance } = await import('./world.ts');
   const base = lyingAt(sea, fresh({ hull: 4, maxHull: 14, stores: { food: 1e6, water: 1e6, spares: 0, powder: 0 } }), 'san-julian');
-  const bare = ashore(sea, { ...base, hands: base.hands.map((h) => (h.role === 'carpenter' ? { ...h, dead: { cause: 'test', day: 0, at: '' } } : h)) }, 'careen', advance);
+  const bare = ashore(sea, { ...base, hands: base.hands.map((h) => (h.role === 'carpenter' ? { ...h, dead: { turn: 0, node: 0, place: '', cause: 'test' } } : h)) }, 'careen', advance);
   assert.equal(bare.hull, 4 + CAREEN_FREE);
   const spared = ashore(sea, { ...base, stores: { ...base.stores, spares: 3 } }, 'careen', advance);
   assert.ok(spared.hull > bare.hull + 2);

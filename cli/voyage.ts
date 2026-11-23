@@ -35,6 +35,7 @@
  * - keeps company with Huguenot privateers, and takes their French commission
  *   only with --french.
  *
+ *   --hull: what took her hull, by cause; --every-sail: the lookout calls you up for every sail
  *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--every-rumor] [--chronicler] [--french] [--trace]
  */
 
@@ -44,9 +45,9 @@ import { continueOn } from '../src/world/course.ts';
 import { choices, choose } from '../src/world/dilemmas.ts';
 import { choices as legsOf, daysTo, howHome, makeFor } from '../src/world/journey.ts';
 import { HOME_LANDMARK, landmark } from '../src/world/landmarks.ts';
-import { attack, fight, letPass, raid, raidHere } from '../src/world/meet.ts';
+import { attack, fight, letPass, raid, raidHere, oddsOf } from '../src/world/meet.ts';
 import { score } from '../src/world/score.ts';
-import { TRUCK_AT, barter, barterHere, ashore, buy, CHANDLER, daysOf, landmarkHere, marketHere, price, room, shoreHere, trade, type Ware, buySpice, buyWood, spiceHere, spiceRoom, woodHere, woodRoom } from '../src/world/stores.ts';
+import { TRUCK_AT, barter, barterHere, ashore, buy, CHANDLER, daysOf, landmarkHere, marketHere, price, room, shoreHere, trade, type Ware, buySpice, buyWood, spiceHere, spiceRoom, woodHere, woodRoom, mend, yardHere, YARD_COST } from '../src/world/stores.ts';
 import { coastAwake, PACIFIC_TOWNS } from '../src/world/treasure.ts';
 import { followed } from '../src/world/rumors.ts';
 import { BACKER_KEYS, type Backer, courtRisk, outlawed, pardonOf } from '../src/world/reckoning.ts';
@@ -185,7 +186,8 @@ function answer(w: WorldState): WorldState {
       w = choose(sea, w, want);
     } else if (w.hail) {
       // The treasure ship asleep, or a rumored prize come all this way for: worth it on a hull still a quarter sound. Anything else wants more.
-      const worth = (!w.hail.neutral || PIRATE) && w.hull >= w.maxHull * (w.hail.plate === 'asleep' ? 0.4 : w.hail.prize ? 0.25 : 0.6);
+      // Never at odds the master calls hopeless.
+      const worth = (!w.hail.neutral || PIRATE) && oddsOf(w, w.hail) !== 'hopeless' && w.hull >= w.maxHull * (w.hail.plate === 'asleep' ? 0.4 : w.hail.prize ? 0.25 : 0.6);
       w = worth ? attack(w) : letPass(w);
     } else if (w.encounter) {
       const f = w.encounter.fight;
@@ -212,6 +214,8 @@ function atLandmark(w: WorldState): WorldState {
   if (!w.sunk && shore.includes('forage') && (w.fresh > 15 || daysOf(w).food < 150)) w = answer(ashore(sea, w, 'forage', advance));
   if (!w.sunk && shore.includes('forage') && daysOf(w).food < 100) w = answer(ashore(sea, w, 'forage', advance));
   for (let i = 0; i < 3 && !w.sunk && shore.includes('careen') && w.hull < w.maxHull - 2; i++) w = answer(ashore(sea, w, 'careen', advance));
+  // The yard, where a chandler deals with you abroad, from what's over a margin of the purse.
+  while (!w.sunk && yardHere(sea, w) && w.hull < w.maxHull && w.gold - YARD_COST >= 30) w = mend(sea, w);
   // The Queen's arms, where nobody holds the land, when there's a bundle of the spares to spare: never the truck, which is fresh food.
   if (!w.sunk && !waiting(w) && armsHere(sea, w) && w.stores.spares > 2) w = answer(plantArms(sea, w, advance));
   const town = raidHere(sea, w);
@@ -257,6 +261,7 @@ interface Result {
 
 function sail(ship: string, seed: number, backer: Backer): Result {
   let w = createWorld(sea, seed, ship, backer, CHRONICLER);
+  if (flag('every-sail')) w = { ...w, lookout: 'every' };
   let lastAt = '';
   let stops = 0;
   while (!w.sunk && !w.won && w.turn < DAYS) {
@@ -324,7 +329,7 @@ for (const ship of SHIP === 'all' ? SHIPS : [SHIP]) for (const backer of (BACKER
   for (const k of Object.keys(PRIZE_FOUGHT)) delete PRIZE_FOUGHT[k];
   for (const k of Object.keys(DEAD)) delete DEAD[k];
   NOTED.dead = NOTED.ran = 0;
-  console.log('  HULLBY', JSON.stringify(HULLBY));
+  if (flag('hull')) console.log('  hull lost to', JSON.stringify(HULLBY));
   for (const k of Object.keys(HULLBY)) delete HULLBY[k];
   void howHome;
   void coastAwake;

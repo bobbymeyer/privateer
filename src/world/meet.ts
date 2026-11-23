@@ -86,8 +86,14 @@ export const SIGHT_CHANCE = 1 / 25;
  */
 export type Lookout = 'every' | 'worth';
 
-/** In waters where you've been seen, the next sail is less likely: word goes round, and they keep their distance. */
-export const sightChance = (s: WorldState, waters: string) => SIGHT_CHANCE / (1 + (s.sightings[waters] ?? 0) / 2);
+/**
+ * In waters where you've been seen, a harmless sail is less likely: word
+ * goes round, and merchants keep their distance. Privateers and corsairs are
+ * hunting you, and come as often as ever.
+ */
+export const keepsAway = (s: WorldState, waters: string) => 1 - 1 / (1 + (s.sightings[waters] ?? 0) / 2);
+/** The chance a harmless sail is seen in these waters today. */
+export const sightChance = (s: WorldState, waters: string) => SIGHT_CHANCE * (1 - keepsAway(s, waters));
 
 /** How a fight with the sail in sight looks, her hull and guns against yours as you are: told before you choose. */
 export type Odds = 'fair' | 'hard' | 'hopeless';
@@ -170,10 +176,12 @@ export function sailSighted(sea: Sea, s: WorldState): WorldState {
   const r: Roller = { rng: s.rng };
   const waters = watersAt(sea, s);
   if (!waters) return { ...s, rng: r.rng };
-  if (roll(r) >= sightChance(s, waters.name)) return { ...s, rng: r.rng };
+  if (roll(r) >= SIGHT_CHANCE) return { ...s, rng: r.rng };
   const total = waters.sails.reduce((t, x) => t + x.weight, 0);
   let x = roll(r) * total;
   const sail = waters.sails.find((y) => (x -= y.weight) < 0) ?? pick(r, waters.sails);
+  // A merchant who's heard of you keeps her distance; a privateer comes all the same.
+  if (!hostile(sail.kind) && !sail.huguenot && roll(r) < keepsAway(s, waters.name)) return { ...s, rng: r.rng };
   const w: WorldState = { ...s, rng: r.rng, sightings: { ...s.sightings, [waters.name]: (s.sightings[waters.name] ?? 0) + 1 } };
   const what = whatOf(sail.kind, sail.nation, null);
   // The boy, while he lives, is the one who sees her first.
