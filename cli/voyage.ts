@@ -13,8 +13,10 @@
  * - meets a storm by riding it out on a sound hull, fever by nursing, foul
  *   water and weevils by heaving them over while there's plenty.
  *
- * - follows every rumor, and takes the detour where it branches, unless
- *   --no-rumors; attacks a rumored prize on a sound hull;
+ * - follows a rumor with a captain's judgement (not the tales everyone
+ *   knows, not a prize too strong for her, not far on a prisoner's word), or
+ *   every one with --every-rumor, or none with --no-rumors; attacks a rumored
+ *   prize on a sound hull;
  * - lies at an island a storm drives her to as at any landmark.
  *
  * - sails on whose money --backer says (crown, gentlemen, own, or all of them in turn);
@@ -33,7 +35,7 @@
  * - keeps company with Huguenot privateers, and takes their French commission
  *   only with --french.
  *
- *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--chronicler] [--french] [--trace]
+ *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--every-rumor] [--chronicler] [--french] [--trace]
  */
 
 import { threatened } from '../src/rules.ts';
@@ -66,6 +68,27 @@ const RAID = flag('raid');
 const WAKE = flag('wake');
 const TRACE = flag('trace');
 const RUMORS = !flag('no-rumors');
+/** Follow every rumor, as the bot once did, rather than with a captain's judgement. */
+const EVERY_RUMOR = flag('every-rumor');
+/** What a captain would know is dubious: the passage to Cathay, the French in Florida, the Inca's gold. */
+const DUBIOUS = ['northwest', 'river-may', 'arica'];
+/** Prizes too strong for a ship: the galleon for a pinnace; the Great Ship, the carrack, the plate fleet and Goa for all but a brigantine. */
+const TOO_STRONG: Record<string, string[]> = {
+  pinnace: ['cabo-san-lucas', 'macau', 'azores', 'bahama-channel', 'goa'],
+  sloop: ['macau', 'azores', 'bahama-channel', 'goa'],
+  brigantine: ['bahama-channel', 'goa'],
+};
+/**
+ * A captain's judgement on a rumor: not what everyone knows to be a tale, not
+ * a prize the ship can't take, and not on a prisoner's word for a long way
+ * out of it; friendly islands and spice are worth a look on anyone's word.
+ */
+function worthFollowing(w: WorldState, key: string, source: string): boolean {
+  if (DUBIOUS.includes(key)) return false;
+  if ((TOO_STRONG[w.ship] ?? []).includes(key)) return false;
+  if (['solomons', 'banda'].includes(key)) return true;
+  return source !== 'prisoner' || w.hull >= w.maxHull * 0.7;
+}
 const PIRATE = flag('pirate');
 const BACKER = arg('backer', 'own');
 const CHRONICLER = flag('chronicler');
@@ -138,7 +161,7 @@ function answer(w: WorldState): WorldState {
         : w.dilemma.kind === 'reef' ? (w.spice > 0 && w.hull > 6 ? 'wait' : 'lighten')
         : w.dilemma.kind === 'gentleman' ? 'try'
         : w.dilemma.kind === 'deserters' ? 'watch'
-        : w.dilemma.kind === 'rumor' ? (RUMORS ? 'follow' : 'ignore')
+        : w.dilemma.kind === 'rumor' ? (RUMORS && (EVERY_RUMOR || worthFollowing(w, w.dilemma.key, w.dilemma.source)) ? 'follow' : 'ignore')
         : w.dilemma.kind === 'gold-mutiny' ? 'firm'
         : w.dilemma.kind === 'stores-fire' ? (open.includes('fight') ? 'fight' : 'shut')
         : w.dilemma.kind === 'eve' ? (w.hull >= w.maxHull * 0.8 ? 'press' : 'stand')

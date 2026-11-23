@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { continueOn } from './course.ts';
 import { choose } from './dilemmas.ts';
 import {
-  CHANDLER, EAT, ISLANDERS_COST, MIN_HANDS, SCURVY_DAYS, ashore, buy, capacity, daysOf, fightCost, foldDeaths, marketHere, price, prizeStores, provisionDay, scurvy, shoreHere, startCrew, trade,
+  CHANDLER, EAT, ISLANDERS_COST, MIN_HANDS, SCURVY_DAYS, minHands, ashore, buy, capacity, daysOf, fightCost, foldDeaths, marketHere, price, prizeStores, provisionDay, scurvy, shoreHere, startCrew, trade,
 } from './stores.ts';
 import { lyingAt } from './testing.ts';
 import { advance, createSea, createWorld, type WorldState } from './world.ts';
@@ -49,7 +49,7 @@ test('the water gone, the hands die of thirst, and too few hands lose the ship',
     w = provisionDay(sea, { ...w, turn: ++days }, r);
   }
   assert.ok(w.sunk, 'lost at last');
-  assert.ok(w.crew < MIN_HANDS);
+  assert.ok(w.crew < minHands(w));
   assert.ok(days < 60, `${days} days without water`);
   assert.ok(w.log.some((l) => /thirst/.test(l.text)));
 });
@@ -182,4 +182,11 @@ test('water by night at a Spanish town fills the casks, and is sometimes seen', 
   }
   assert.ok(seen > 30 && seen < 90, `seen ${seen} of 199`);
   assert.ok(!shoreHere(sea, lyingAt(sea, createWorld(sea, 1), 'canaries')).includes('night'));
+});
+
+test('a bigger ship wants more hands to work her: a third of her complement', () => {
+  assert.equal(minHands({ ship: 'pinnace' }), 10);
+  assert.equal(minHands({ ship: 'sloop' }), 15);
+  assert.equal(minHands({ ship: 'brigantine' }), 24);
+  assert.ok(minHands({ ship: 'pinnace' }) >= MIN_HANDS);
 });

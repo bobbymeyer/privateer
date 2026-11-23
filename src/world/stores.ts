@@ -46,7 +46,7 @@ export const TROPIC_THIRST = 1.5;
 /** Days without fresh food before scurvy kills. */
 export const SCURVY_DAYS = 42;
 /** Hands dead of scurvy a day, per hand, per day past SCURVY_DAYS. */
-export const SCURVY_RATE = 0.0001;
+export const SCURVY_RATE = 0.0003;
 /** And of thirst, and of hunger, a day, per hand, when it's run out. */
 export const THIRST_RATE = 0.08;
 export const HUNGER_RATE = 0.03;
@@ -54,6 +54,10 @@ export const HUNGER_RATE = 0.03;
 export const STARVING_HUNGER = 0.05;
 /** Fewer hands than this and she can't be sailed: the run is over. */
 export const MIN_HANDS = 8;
+/** And a bigger ship wants more to work her: a third of her complement, at the least, to man the sails and the pumps. */
+export const WORKING_SHARE = 1 / 3;
+/** The fewest hands that can work her: a pinnace's handful, a brigantine's watch. */
+export const minHands = (s: { ship: string }) => Math.max(MIN_HANDS, Math.ceil(complement(s) * WORKING_SHARE));
 /** Days at sea between a point of hull lost to weed and worm, by pace. */
 export const WEAR_DAYS: Record<Pace, number> = { easy: 60, steady: 40, hard: 25 };
 
@@ -120,7 +124,7 @@ export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
     // Down to half her complement: worth stopping for, whatever else is said.
     if (w.crew + dead >= half && crew < half) log('half her hands gone: the ship sails short-handed now', true);
   }
-  if (w.crew < MIN_HANDS) {
+  if (w.crew < minHands(w)) {
     log('too few hands left to work her: the ship is lost', true);
     return { ...w, sunk: true };
   }
