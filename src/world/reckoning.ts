@@ -31,6 +31,7 @@
 import { SHIP_CLASSES } from '../outfit.ts';
 import type { WorldState } from './world.ts';
 import { favourOf, proofOfService, sellJewels, toHerTaste } from './jewels.ts';
+import { ARMS_COURT, armsFame } from './arms.ts';
 
 export type Backer = 'crown' | 'gentlemen' | 'own';
 
@@ -104,7 +105,8 @@ export function sharesDue(s: WorldState): { queen: number; gentlemen: number } {
  */
 export function courtRisk(s: WorldState): number {
   if (proofOfService(s)) return 0;
-  const raw = Math.min(0.9, s.grievance / 1200 + s.infamy * 0.12 + (s.french ? FRENCH_COURT : 0));
+  // Each place claimed for the Queen answers Spain a little: the land is hers who first holds it.
+  const raw = Math.max(0, Math.min(0.9, s.grievance / 1200 + s.infamy * 0.12 + (s.french ? FRENCH_COURT : 0)) - (s.arms?.length ?? 0) * ARMS_COURT);
   const jewels = Math.max(0, 1 - favourOf(s) / JEWEL_FAVOUR);
   return Math.round(100 * raw * (s.backer === 'crown' ? 0.4 : 1) * jewels) / 100;
 }
@@ -198,7 +200,7 @@ export function reckon(s: WorldState, choice: 'court' | 'low' | 'gift', roll: ()
     w = said({ ...w, gold: w.gold - gift, infamy: Math.max(0, w.infamy - pardonOf(w)), settled }, gift ? `a gift for the Queen from the treasure, ${gift}, and she receives you` : 'the jewels are gift enough, and she receives you');
     if (outlawed(w)) w = pirate();
     else {
-      const fame = fameFor(w.gold) + pleased;
+      const fame = fameFor(w.gold) + pleased + armsFame(w);
       w = said({ ...w, verdict: 'gift', fame }, 'received at court under the Queen’s favour: Spain’s ambassador is told the matter is closed', true);
     }
   } else if (choice === 'court') {
@@ -210,7 +212,7 @@ export function reckon(s: WorldState, choice: 'court' | 'low' | 'gift', roll: ()
       settled.restitution = back;
       w = said({ ...w, gold: w.gold - back, verdict: 'disowned', fame: 0, settled }, `disowned at court to please Spain: ${back} handed back as restitution`, true);
     } else {
-      const fame = fameFor(w.gold) + pleased;
+      const fame = fameFor(w.gold) + pleased + armsFame(w);
       w = said({ ...w, verdict: 'court', fame }, 'shown at court: the Queen’s countenance shows great joy, whatever she tells the ambassador', true);
     }
   } else {

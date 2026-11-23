@@ -64,6 +64,8 @@ export interface WorldState {
   reckoning: Reckoning | null;
   /** The Spanish towns you've raided, by landmark: each once. A raid on the coast of Chile and Peru warns the treasure ship. */
   raided: string[];
+  /** The places you've set up the Queen's arms, by landmark: see arms.ts. */
+  arms: string[];
   /** Tons of spice in the hold, cloves or pepper, to sell on the quay at home. */
   spice: number;
   /** Tons of brazilwood in the hold, for the red dye, to sell at home. */
@@ -176,6 +178,7 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     encounter: null,
     reckoning: null,
     raided: [],
+    arms: [],
     spice: 0,
     wood: 0,
     jewels: [],

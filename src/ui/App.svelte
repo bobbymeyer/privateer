@@ -33,6 +33,7 @@
   import { shareText } from '../share.ts';
   import { type Entry, best, dailySeed, entryFor, isWin, loadLog, raised, saveLog, scoreOf, today, withEntry } from '../logbook.ts';
   import { ambient, bell, coin, gun, knell, pipe, setSound, soundOn, storm, toll } from './sound.ts';
+  import { ARMS_DAYS, armsHere, armsPaidWith, plantArms } from '../world/arms.ts';
   import { allTaught, loadTaught } from '../lessons.ts';
   import Fight from './Fight.svelte';
   import RouteChart from './RouteChart.svelte';
@@ -324,6 +325,8 @@
   const now = (): WorldState | null => world;
   const here = $derived(sea && now() ? landmarkHere(sea, now()!) : null);
   const shore = $derived(sea && now() ? shoreHere(sea, now()!) : []);
+  /** A place nobody holds, where the Queen's arms could be set up. */
+  const claim = $derived(sea && now() ? armsHere(sea, now()!) : null);
   const market = $derived(sea && now() ? marketHere(sea, now()!) : null);
   const town = $derived(sea && now() ? raidHere(sea, now()!) : null);
   const spice = $derived(sea && now() ? spiceHere(sea, now()!) : null);
@@ -491,6 +494,11 @@
               {/each}
             </div>
           {/if}
+          {#if claim}
+            {@const paid = armsPaidWith(world)}
+            <p class="faint">nobody holds this land: set up a post with a brass plate bearing the Queen’s arms, and claim it for her, as Drake did at Nova Albion. fame at home, and an answer to Spain.</p>
+            <div class="row"><button disabled={sailing || !paid} onclick={() => attempt(() => plantArms(sea!, world!, advance))}>set up the Queen’s arms ({ARMS_DAYS} day, {paid === 'truck' ? 'a chest of truck' : 'a bundle of the spares'}){paid ? '' : ': nothing to make the post of'}</button></div>
+          {/if}
           {#if market === 'chandler'}
             <p class="faint">the chandler{world.voyage.at === 'plymouth' ? '' : ', half as dear again as Plymouth'}. food bought here is fresh.</p>
             <div class="row">
@@ -604,7 +612,7 @@
             <dt>stores</dt>
             <dd>Every day the hands eat and drink a ration each, water faster in the tropics. Short rations stretch both; starvation kills slowly. Six weeks without fresh food and the scurvy starts to kill. Too few hands and she can't be sailed.</dd>
             <dt>at a landmark</dt>
-            <dd>Fill the casks, forage and fish, careen her (spares mend her faster), buy from a chandler, trade with islanders, or raid a Spanish town, once. Each takes days.</dd>
+            <dd>Fill the casks, forage and fish, careen her (spares mend her faster), buy from a chandler, trade with islanders, or raid a Spanish town, once. Where nobody holds the land, set up the Queen’s arms for fame at home. Each takes days.</dd>
             <dt>pace</dt>
             <dd>Easy loses a day in three and spares the hull; cracking on gains one and wears it.</dd>
             <dt>the way's events</dt>
@@ -777,6 +785,7 @@
             {world.tally.fights} {world.tally.fights === 1 ? 'fight' : 'fights'} · {world.tally.taken} taken · {world.tally.sacks} {world.tally.sacks === 1 ? 'town' : 'towns'} sacked{world.tally.best ? ` · best prize: ${world.tally.best.what}, ${world.tally.best.payout}` : ''}
           </p>
           <p class="faint">the way you sailed: {world.voyage.visited.map((k) => landmark(k).name).join(' · ')}</p>
+          {#if world.arms.length}<p class="faint">the Queen’s arms set up at: {world.arms.map((k) => landmark(k).name).join(' · ')}</p>{/if}
           {#if Object.keys(world.losses).length}
             <p class="faint">hands lost on the voyage: {Object.entries(world.losses).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k === 'ran' ? 'ran' : k === 'killed in the fight' ? 'killed fighting' : `to ${k}`}`).join(' · ')}</p>
           {/if}

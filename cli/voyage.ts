@@ -28,6 +28,8 @@
  * - takes a chronicler with --chronicler;
  * - buys a little truck at Plymouth and deals fairly with the peoples of the
  *   coasts: barters truck for fresh food, punishes the hands' misconduct;
+ * - practises on the fishing boat at the Canaries, and sets up the Queen's
+ *   arms where nobody holds the land when it has a bundle to spare;
  * - keeps company with Huguenot privateers, and takes their French commission
  *   only with --french.
  *
@@ -48,8 +50,9 @@ import { followed } from '../src/world/rumors.ts';
 import { BACKER_KEYS, type Backer, courtRisk, outlawed, pardonOf } from '../src/world/reckoning.ts';
 import { LANDFALL_WATERS } from '../src/world/landfalls.ts';
 const LANDFALL_KEYS = Object.keys(LANDFALL_WATERS);
-import { advance, createSea, createWorld, type WorldState } from '../src/world/world.ts';
+import { advance, createSea, createWorld, waiting, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
+import { armsHere, plantArms } from '../src/world/arms.ts';
 
 const flag = (name: string) => process.argv.includes(`--${name}`);
 const arg = (name: string, fallback: string) => {
@@ -183,6 +186,8 @@ function atLandmark(w: WorldState): WorldState {
   if (!w.sunk && shore.includes('forage') && (w.fresh > 15 || daysOf(w).food < 150)) w = answer(ashore(sea, w, 'forage', advance));
   if (!w.sunk && shore.includes('forage') && daysOf(w).food < 100) w = answer(ashore(sea, w, 'forage', advance));
   for (let i = 0; i < 3 && !w.sunk && shore.includes('careen') && w.hull < w.maxHull - 2; i++) w = answer(ashore(sea, w, 'careen', advance));
+  // The Queen's arms, where nobody holds the land, when there's a bundle to spare or a chest of truck.
+  if (!w.sunk && !waiting(w) && armsHere(sea, w) && (w.stores.spares > 2 || w.truck > 0)) w = answer(plantArms(sea, w, advance));
   const town = raidHere(sea, w);
   // The coast of Chile and Peru left asleep for the treasure ship, unless told to wake it.
   const sleeping = !WAKE && PACIFIC_TOWNS.includes(town?.key ?? '') && !w.voyage.visited.includes('cacafuego');
@@ -217,6 +222,8 @@ interface Result {
   followedTrue: number;
   followedFalse: number;
   landfalls: number;
+  /** Places the Queen's arms were set up. */
+  arms: number;
 }
 
 function sail(ship: string, seed: number, backer: Backer): Result {
@@ -252,7 +259,7 @@ function sail(ship: string, seed: number, backer: Backer): Result {
   NOTED.ran += w.hands.filter((h) => h.ran).length;
   if (TRACE) console.log(seed, ship, w.won ? 'HOME' : why, 'day', w.turn, 'gold', w.gold, 'crew', w.crew, took ? 'took her' : '', w.voyage.visited.join('>'));
   const heard = w.rumors.filter((r) => r.followed && w.voyage.visited.includes(r.key));
-  return { ship, score: score(w).total, verdict: w.verdict ?? '', won: w.won, day: w.turn, like: score(w).like, at: w.voyage.at, why, gold: w.gold, crew: w.crew, took, followedTrue: heard.filter((r) => r.truth).length, followedFalse: heard.filter((r) => !r.truth).length, heard: w.rumors.length, landfalls: w.seen.filter((k) => LANDFALL_KEYS.includes(k)).length };
+  return { ship, score: score(w).total, verdict: w.verdict ?? '', won: w.won, day: w.turn, like: score(w).like, at: w.voyage.at, why, gold: w.gold, crew: w.crew, took, followedTrue: heard.filter((r) => r.truth).length, followedFalse: heard.filter((r) => !r.truth).length, heard: w.rumors.length, landfalls: w.seen.filter((k) => LANDFALL_KEYS.includes(k)).length, arms: w.arms.length };
 }
 
 const count = <T>(xs: T[], key: (x: T) => string) => JSON.stringify(xs.reduce((t, x) => ((t[key(x)] = (t[key(x)] ?? 0) + 1), t), {} as Record<string, number>));
@@ -269,7 +276,7 @@ for (const ship of SHIP === 'all' ? SHIPS : [SHIP]) for (const backer of (BACKER
   console.log('  lost', count(lost, (r) => r.why), '· last landmark', count(lost, (r) => r.at));
   console.log('  lost to', JSON.stringify(DEAD), `· hands of note dead ${NOTED.dead}, ran ${NOTED.ran}`);
   const sum = (f: (r: Result) => number) => results.reduce((t, r) => t + f(r), 0);
-  console.log(`  rumors heard ${sum((r) => r.heard)}, detours sailed ${sum((r) => r.followedTrue + r.followedFalse)} (${sum((r) => r.followedTrue)} true, ${sum((r) => r.followedFalse)} false) · rumored prizes ${JSON.stringify(PRIZE_FOUGHT)}, paying ${mean(PRIZE_PAY.filter((x) => x > 0))} when they paid · storm landfalls ${sum((r) => r.landfalls)}`);
+  console.log(`  rumors heard ${sum((r) => r.heard)}, detours sailed ${sum((r) => r.followedTrue + r.followedFalse)} (${sum((r) => r.followedTrue)} true, ${sum((r) => r.followedFalse)} false) · rumored prizes ${JSON.stringify(PRIZE_FOUGHT)}, paying ${mean(PRIZE_PAY.filter((x) => x > 0))} when they paid · storm landfalls ${sum((r) => r.landfalls)} · the Queen's arms set up ${sum((r) => r.arms)}`);
   console.log(`  jewels home ${JEWELS_HOME.reduce((a, b) => a + b, 0)} on ${JEWELS_HOME.length} voyages${CHRONICLER ? ` · the chronicler home ${CHRONICLE.home}, dead ${CHRONICLE.dead}, his account worth ${CHRONICLE.home ? Math.round(CHRONICLE.sum / CHRONICLE.home) : 0}` : ''}`);
   JEWELS_HOME.length = 0;
   CHRONICLE.home = CHRONICLE.dead = CHRONICLE.sum = 0;
