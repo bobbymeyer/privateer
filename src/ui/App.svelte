@@ -18,11 +18,12 @@
   import { read } from '../world/reading.ts';
   import { HAND_WORTH, LIKE_TITLES, score } from '../world/score.ts';
   import {
-    CHANDLER, ISLANDERS_COST, SPICE_WORTH, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade,
+    CHANDLER, ISLANDERS_COST, SPICE_WORTH, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade, WOOD_WORTH, buyWood, woodHere, woodRoom,
   } from '../world/stores.ts';
   import { PRIZES, followed } from '../world/rumors.ts';
+  import { JEWELS, favourOf, setAside, toHerTaste } from '../world/jewels.ts';
   import { BACKERS, BACKER_KEYS, type Backer, courtRisk, grievanceWord, infamyFor, lawfulness, restitutionFor } from '../world/reckoning.ts';
-  import { advance, createSea, createWorld, dateOf, newLines, type Sea, type WorldState, waiting } from '../world/world.ts';
+  import { CHRONICLER_COST, advance, createSea, createWorld, dateOf, newLines, type Sea, type WorldState, waiting } from '../world/world.ts';
   import { ROLE, type Grave, called, gravesOf, placeOf, visitGraves } from '../world/hands.ts';
   import { FIX_WORDS, type Warning, warningKey, warnings } from '../world/warnings.ts';
   import { EPITAPH_LENGTH, loadGraves, saveGraves, withEpitaph, withGraves } from '../graves.ts';
@@ -52,6 +53,8 @@
   /** Choosing a ship, then whose money: a new run waits on both. */
   let choosing = $state(!resuming);
   let chosenShip: string | null = $state(null);
+  /** A chronicler aboard: chosen with your backer, at Plymouth. */
+  let takeChronicler = $state(false);
   setTimeout(() => {
     sea = createSea();
     if (resuming) world = resuming.world;
@@ -59,7 +62,7 @@
 
   function begin(ship: string, backer: Backer) {
     if (!sea) return;
-    world = createWorld(sea, seed, ship, backer);
+    world = createWorld(sea, seed, ship, backer, takeChronicler);
     buried = [];
     sailAnywayOn = '';
     choosing = false;
@@ -300,6 +303,7 @@
   const market = $derived(sea && now() ? marketHere(sea, now()!) : null);
   const town = $derived(sea && now() ? raidHere(sea, now()!) : null);
   const spice = $derived(sea && now() ? spiceHere(sea, now()!) : null);
+  const wood = $derived(sea && now() ? woodHere(sea, now()!) : null);
   /** At a fork with nothing chosen: the way divides, and you choose. */
   const atFork = $derived.by(() => {
     const w = now();
@@ -362,17 +366,19 @@
           <div class:low={world.stores.powder === 0}><span class="label">powder</span>{world.stores.powder}</div>
           <div><span class="label">gold</span>{world.gold}</div>
           {#if world.spice}<div><span class="label">spice</span>{world.spice} {world.spice === 1 ? 'ton' : 'tons'}, {world.spice * SPICE_WORTH} at home</div>{/if}
+          {#if world.wood}<div><span class="label">brazilwood</span>{world.wood} {world.wood === 1 ? 'ton' : 'tons'}, {world.wood * WOOD_WORTH} at home</div>{/if}
+          {#if world.jewels.length}<div title={world.jewels.map((j) => j.name).join('; ')}><span class="label">jewels</span>{world.jewels.length}, {world.jewels.reduce((t, j) => t + j.value, 0)} to a goldsmith</div>{/if}
           <div><span class="label">backed by</span>{BACKERS[world.backer].name}</div>
           <div class:low={world.infamy > 0}><span class="label">your name</span>{lawfulness(world)}</div>
           <div><span class="label">Spain's grievance</span>{grievanceWord(world)}</div>
         </div>
         <details class="of-note">
-          <summary>hands of note: {world.hands.filter((h) => !h.dead && !h.ran).length} of {world.hands.length} aboard</summary>
+          <summary>hands of note: {world.hands.filter((h) => !h.dead && !h.ran && !h.fate).length} of {world.hands.length} aboard</summary>
           <ul class="plain">
-            {#each world.hands as h (h.role)}
-              <li class:gone={h.dead || h.ran}>
-                <strong>{h.name}</strong>, {ROLE[h.role].title}{h.dead ? `: dead of ${h.dead.cause}, ${h.dead.place}, ${dateOf(h.dead.turn)}` : h.ran ? ': ran' : ''}
-                {#if !h.dead && !h.ran}<span class="faint">{ROLE[h.role].does}.</span>{/if}
+            {#each world.hands as h (h.name)}
+              <li class:gone={h.dead || h.ran || h.fate}>
+                <strong>{h.name}</strong>, {ROLE[h.role].title}{h.freed ? ', freed from the Spaniards' : ''}{h.dead ? `: dead of ${h.dead.cause}, ${h.dead.place}, ${dateOf(h.dead.turn)}` : h.ran ? ': ran' : h.fate ? ': sent to the galleys' : ''}
+                {#if !h.dead && !h.ran && !h.fate}<span class="faint">{ROLE[h.role].does}.</span>{/if}
               </li>
             {/each}
           </ul>
@@ -419,6 +425,10 @@
           {#if spice}
             <p class="faint">{spice.name}, by the ton, sold on the quay at Plymouth for {SPICE_WORTH}. room for {spiceRoom(world)} tons.</p>
             <div class="row"><button disabled={sailing || world.gold < spice.cost || world.spice >= spiceRoom(world)} onclick={() => attempt(() => buySpice(sea!, world!))}>a ton of {spice.name} ({spice.cost}), {world.spice} aboard</button></div>
+          {/if}
+          {#if wood}
+            <p class="faint">brazilwood, cut by the Tupinambá for trade goods, for the red dye: sold at home for {WOOD_WORTH} a ton. room for {woodRoom(world) - world.wood} more, beside the spice.</p>
+            <div class="row"><button disabled={sailing || world.gold < wood.cost || world.wood >= woodRoom(world)} onclick={() => attempt(() => buyWood(sea!, world!))}>a ton of brazilwood ({wood.cost}), {world.wood} aboard</button></div>
           {/if}
           {#if town}
             <div class="row"><button disabled={sailing} onclick={() => attempt(() => raid(sea!, world!))}>raid {here.name}, once</button></div>
@@ -485,6 +495,7 @@
                 </li>
               {/each}
             </ul>
+            <label class="chronicler"><input type="checkbox" bind:checked={takeChronicler} /> take a chronicler: a gentleman-poet who does no seamanship, costs {CHRONICLER_COST} gold and a berth, and if he comes home alive his account of the voyage adds to your fame</label>
             <div class="row"><button onclick={() => (chosenShip = null)}>another ship</button></div>
           {/if}
         </div>
@@ -602,6 +613,17 @@
         <div class="sheet">
           <h2>{told.title}</h2>
           <p>{told.text}</p>
+          {#if d.kind === 'reckoning' && world.jewels.length}
+            <p>the jewels in your cabin: sell them to a goldsmith, or set them aside for the Queen, who loves a jewel above anything{favourOf(world) ? `. set aside, they count ${favourOf(world)} toward a gift` : ''}.</p>
+            <ul class="plain jewels">
+              {#each world.jewels as j, i (i)}
+                <li>
+                  <label><input type="checkbox" checked={!!j.forQueen} onchange={(e) => (world = setAside(world!, i, (e.currentTarget as HTMLInputElement).checked))} /> {j.name}</label>
+                  <span class="faint">{j.value} to a goldsmith{toHerTaste(j) ? `; to her taste: ${JEWELS[j.kind as Exclude<typeof j.kind, 'commander'>].taste}` : ''}{j.kind === 'commander' ? '; proof of your service, and court is safe' : ''}</span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
           {#if d.kind === 'reckoning'}
             <p class="faint">
               in the strongroom: {world.gold}{world.settled.queen ? ` · the Queen's third paid: ${world.settled.queen}` : ''}{world.settled.gentlemen ? ` · the gentlemen paid: ${world.settled.gentlemen}` : ''}
@@ -631,6 +653,10 @@
                 <tr><td>{world.crew} hands home, {HAND_WORTH} each</td><td class="num">{sc.hands}</td></tr>
                 <tr><td>the ship, {world.hull} hull of {world.maxHull}</td><td class="num">{sc.ship}</td></tr>
                 <tr><td>fame at court{world.verdict === 'disowned' ? ': disowned' : world.verdict === 'low' ? ': you lay low' : world.verdict === 'pirate' ? ': named a pirate' : ''}</td><td class="num">{sc.fame}</td></tr>
+                {#if world.hands.some((h) => h.role === 'chronicler')}
+                  {@const him = world.hands.find((h) => h.role === 'chronicler')!}
+                  <tr><td>{sc.chronicle ? `his account of the voyage, by ${him.name}` : him.dead ? `his account of the voyage died with ${him.name}` : `${him.name}'s account, forbidden printing`}</td><td class="num">{sc.chronicle}</td></tr>
+                {/if}
                 <tr><td>a {SHIP_CLASSES[world.ship].name}, ×{sc.multiplier}</td><td class="num"></td></tr>
                 <tr class="total"><td>the score</td><td class="num">{sc.total}</td></tr>
               </tbody>
@@ -656,7 +682,7 @@
           {#if world.hands.some((h) => h.dead && h.dead.cause !== 'went down with the ship')}
             <h3>the dead</h3>
             <ul class="plain dead">
-              {#each world.hands.filter((h) => h.dead && h.dead.cause !== 'went down with the ship').sort((a, b) => a.dead!.turn - b.dead!.turn) as h (h.role)}
+              {#each world.hands.filter((h) => h.dead && h.dead.cause !== 'went down with the ship').sort((a, b) => a.dead!.turn - b.dead!.turn) as h (h.name)}
                 {@const g = buried.find((x) => x.id.endsWith(`:${h.role}:${h.dead!.turn}`))}
                 <li>
                   <strong>{called(h)}</strong>, dead of {h.dead!.cause}, {h.dead!.place}, {dateOf(h.dead!.turn)}.
@@ -680,6 +706,8 @@
 {/if}
 
 <style>
+  .chronicler { display: block; margin: 0.6rem 0; }
+  .jewels li { margin: 0.2rem 0; }
   main { max-width: 72rem; margin: 0 auto; padding: 1.25rem 16px 2rem; display: flex; flex-direction: column; gap: 1rem; }
   header { display: flex; flex-direction: column; gap: 0.25rem; }
   h1 { margin: 0; font-size: 1.8rem; font-weight: 400; letter-spacing: -0.025em; }

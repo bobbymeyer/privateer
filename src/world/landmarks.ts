@@ -45,6 +45,8 @@ export interface Offers {
   raid?: 'town' | 'fortress';
   /** Spice to buy by the ton, and what a ton costs here: it sells at home for SPICE_WORTH. See stores.ts. */
   spice?: { name: string; cost: number };
+  /** Brazilwood to buy by the ton from the Tupinambá who cut it, for the red dye: it sells at home for WOOD_WORTH. */
+  wood?: { cost: number };
 }
 
 export const LANDMARKS: Landmark[] = [
@@ -57,12 +59,16 @@ export const LANDMARKS: Landmark[] = [
     text: 'Spanish islands, and the last of Europe. Water and fruit in a quiet bay away from the towns; fishing boats to take for their fish, or to leave be.',
   },
   {
-    key: 'cape-verde', name: 'the Cape Verde islands', kind: 'anchorage', at: [-23.4, 15.4], next: ['brazil'], offers: { shore: ['water', 'forage'] },
+    key: 'cape-verde', name: 'the Cape Verde islands', kind: 'anchorage', at: [-23.4, 15.4], next: ['brazil', 'guanabara'], offers: { shore: ['water', 'forage'] },
     text: 'Portuguese, and so the King of Spain’s since this year. Drake took a Portuguese ship here, and her pilot, who knew the coast of Brazil, and watered at Brava before the long crossing.',
   },
   {
     key: 'brazil', name: 'the coast of Brazil', kind: 'anchorage', at: [-48.5, -27.5], next: ['plate'], offers: { shore: ['water', 'forage', 'careen'] },
     text: 'Landfall after the long crossing. Water, wood, and fresh food ashore, if the Portuguese settlements are kept clear of.',
+  },
+  {
+    key: 'guanabara', name: 'the bay of Guanabara', kind: 'anchorage', at: [-43.1, -23.05], next: ['plate'], offers: { shore: ['water', 'forage', 'careen'], wood: { cost: 3 } },
+    text: 'Where Villegagnon planted France Antarctique in 1555, six hundred French and Swiss, and lost it to quarrels over the Eucharist and then to the Portuguese in 1560. The ruins of his fort on the island, the Tupinambá who cut brazilwood for the French, and Norman ships that still come for it. The Portuguese town is across the bay.',
   },
   {
     key: 'plate', name: 'the River Plate', kind: 'anchorage', at: [-56.2, -35.4], next: ['san-julian'], offers: { shore: ['water', 'forage'] },

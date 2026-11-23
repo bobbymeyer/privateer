@@ -14,7 +14,11 @@ import { DETOURS, SOURCES, type Source, heed } from './rumors.ts';
 import { driven } from './landfalls.ts';
 import { patrol, raidFight } from './meet.ts';
 import { followed } from './rumors.ts';
-import { GIFT_PARDON, SEIZED, courtRisk, fameFor, giftFor, outlawed, reckon, restitutionFor } from './reckoning.ts';
+import { GIFT_PARDON, SEIZED, courtRisk, fameFor, giftGold, outlawed, pleasure, reckon, restitutionFor } from './reckoning.ts';
+import { favourOf, proofOfService, saleValue } from './jewels.ts';
+import { NORMAN_WOOD_COST, SETTLEMENT_COST, SETTLEMENT_DAYS, SETTLEMENT_DEALS } from './brazil.ts';
+import { WOOD_WORTH, woodRoom } from './stores.ts';
+import { tellOf } from './rumors.ts';
 import type { Sea, WorldState } from './world.ts';
 import { FEVER_NURSE, FEVER_NURSE_DAYS, FEVER_PRESS, FLUX, FOUL_LOST, WEEVIL_LOST, WEEVIL_SICK, feverDeaths, fluxDeaths } from './weather.ts';
 import { alive, mourn } from './hands.ts';
@@ -57,7 +61,11 @@ export type Dilemma =
   /** Your papers searched: hand over the charts, bribe, or refuse. `at` a landmark, or by a patrol at sea. */
   | { kind: 'papers'; at: string | null }
   /** Shining ore on a beach: load it, or leave it. */
-  | { kind: 'ore' };
+  | { kind: 'ore' }
+  /** A Portuguese settlement on the coast of Brazil, not yet sworn to Philip: treat with it, or keep clear. See brazil.ts. */
+  | { kind: 'settlement' }
+  /** A Norman ship loading brazilwood at Guanabara: trade for news, buy her brazilwood, or let her be. */
+  | { kind: 'normans' };
 
 export interface Choice {
   key: string;
@@ -160,6 +168,10 @@ export function describe(d: Dilemma): { title: string; text: string } {
       return { title: 'your papers searched', text: d.at ? `the officers of ${landmark(d.at).name} come aboard to search your papers, as they search every stranger's, and they mean to have your charts.` : 'a Spanish patrol in your wake, and her captain wants your papers and your charts, or he will have them anyway.' };
     case 'ore':
       return { title: 'shining ore', text: 'black rock on the beach shot through with glittering yellow. the hands swear it is gold, as Frobisher’s men swore of theirs in 1578.' };
+    case 'settlement':
+      return { title: 'a Portuguese settlement', text: 'a sugar mill and a church on the shore, and the smoke of a town beyond. Portugal took the King of Spain for its king this year, and nobody knows yet whether Brazil will. they may deal with an English ship, or send word south.' };
+    case 'normans':
+      return { title: 'a Norman ship', text: 'a ship of Dieppe in the bay, her boats ferrying brazilwood out from the beach where the Tupinambá stack it, as they did for Villegagnon. her master is glad of an Englishman to talk to.' };
     case 'reckoning':
       return { title: 'the reckoning', text: 'Plymouth, and the voyage is over but for this. your backers have had their shares. now the court will hear of what you did, and so will Spain’s ambassador, who demanded Drake’s head for less.' };
   }
@@ -275,20 +287,40 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
         { key: 'load', label: 'load it', stakes: `a day's work, and ${ORE_ROOM} tons of the hold that could carry spice` },
         { key: 'leave', label: 'leave it', stakes: 'if it is gold, someone else will have it' },
       ];
+    case 'settlement': {
+      return [
+        { key: 'treat', label: 'send a boat to treat', stakes: `${Math.round(SETTLEMENT_DEALS * 100)} in 100 they deal: the casks filled and ${SETTLEMENT_DAYS} days of fresh food for ${SETTLEMENT_COST}; else turned away, and word sent south${s.voyage.visited.includes('cacafuego') ? '' : ' to warn the coast ahead of you'}` },
+        { key: 'clear', label: 'keep clear', stakes: 'nothing gained, and nobody the wiser' },
+      ];
+    }
+    case 'normans': {
+      const room = woodRoom(s) - s.wood;
+      const afford = Math.floor(s.gold / NORMAN_WOOD_COST);
+      const tons = Math.max(0, Math.min(room, afford));
+      return [
+        { key: 'news', label: 'trade news', stakes: 'a cask of English beer for what they know of the Portuguese' },
+        { key: 'buy', label: 'buy her brazilwood', stakes: `${tons} ${tons === 1 ? 'ton' : 'tons'} at ${NORMAN_WOOD_COST} a ton, cheaper than cutting your own; it sells at home for ${WOOD_WORTH}`, ...(tons <= 0 ? { barred: room <= 0 ? 'no room in the hold' : 'not enough in the purse' } : {}) },
+        { key: 'leave', label: 'let her be', stakes: 'a wave, and on your way' },
+      ];
+    }
     case 'reckoning': {
+      const sale = saleValue(s);
+      const pleased = pleasure(s);
       const risk = Math.round(courtRisk(s) * 100);
-      const gift = giftFor(s);
-      const pirateAfterGift = outlawed({ ...s, infamy: Math.max(0, s.infamy - GIFT_PARDON) });
+      const gift = giftGold(s);
+      const ring = proofOfService(s);
+      const pirateAfterGift = outlawed({ ...s, infamy: Math.max(0, s.infamy - GIFT_PARDON - (ring ? 1 : 0)) });
+      const jewels = favourOf(s) ? `; the jewels set aside presented to her${pleased ? `, ${pleased} more fame for her pleasure in them` : ''}` : '';
       return [
         {
           key: 'court', label: 'show yourself at court',
-          stakes: outlawed(s) ? `with your name, and no favour: named a pirate, and ${Math.round(SEIZED * 100)}% of the prize seized` : `${fameFor(s.gold)} fame to the score${risk ? `; ${risk} in 100 you are disowned to please Spain, hand back ${restitutionFor(s)} and have no fame` : ', and nobody to say otherwise'}`,
+          stakes: outlawed({ ...s, infamy: Math.max(0, s.infamy - (ring ? 1 : 0)) }) ? `with your name, and no favour: named a pirate, and ${Math.round(SEIZED * 100)}% of the prize seized` : `${fameFor(s.gold + sale) + pleased} fame to the score${risk ? `; ${risk} in 100 you are disowned to please Spain, hand back ${restitutionFor(s)} and have no fame` : ring ? ', and the dead commander’s ring answers for you' : ', and nobody to say otherwise'}${jewels}`,
         },
-        { key: 'low', label: 'lie low', stakes: outlawed(s) ? `even odds they come for you anyway, and ${Math.round(SEIZED * 100)}% of the prize is seized` : 'safe, and no fame' },
+        { key: 'low', label: 'lie low', stakes: `${s.jewels.length ? 'every jewel sold, ' : ''}${outlawed(s) ? `even odds they come for you anyway, and ${Math.round(SEIZED * 100)}% of the prize is seized` : 'safe, and no fame'}` },
         {
           key: 'gift', label: 'a gift for the Queen',
-          stakes: pirateAfterGift ? `${gift} from the treasure, and even so your name is too black: named a pirate` : `${gift} from the treasure${s.infamy ? `, ${Math.min(s.infamy, GIFT_PARDON)} of the questions forgotten` : ''}, and court is safe: ${fameFor(s.gold - gift)} fame`,
-          ...(s.gold <= 0 ? { barred: 'nothing to give' } : {}),
+          stakes: pirateAfterGift ? `${gift} from the treasure, and even so your name is too black: named a pirate` : `${gift ? `${gift} from the treasure` : 'the jewels are gift enough'}${s.infamy ? `, ${Math.min(s.infamy, GIFT_PARDON + (ring ? 1 : 0))} of the questions forgotten` : ''}, and court is safe: ${fameFor(s.gold + sale - gift) + pleased} fame`,
+          ...(s.gold <= 0 && !favourOf(s) ? { barred: 'nothing to give' } : {}),
         },
       ];
     }
@@ -575,6 +607,33 @@ function decide(sea: Sea, s: WorldState, key: string): WorldState {
       break;
     case 'ore:leave':
       log('you leave the ore on the beach');
+      break;
+    case 'settlement:treat': {
+      if (roll(r) < SETTLEMENT_DEALS) {
+        const cap = capacity(w);
+        const paid = Math.min(w.gold, SETTLEMENT_COST);
+        w = { ...w, gold: w.gold - paid, fresh: 0, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water), food: topUp(w.stores.food, w.crew * SETTLEMENT_DAYS, cap.food) } };
+        log(`they deal: the casks filled and fresh food sent off, for ${paid}, and no questions about whose king is whose`);
+      } else {
+        if (!w.voyage.visited.includes('cacafuego') && !w.seen.includes('coast-alarm')) w = { ...w, seen: [...w.seen, 'coast-alarm'] };
+        log('they turn your boat away with a volley over its head, and a rider goes south with word of an English ship');
+      }
+      break;
+    }
+    case 'settlement:clear':
+      log('you keep clear of the settlement');
+      break;
+    case 'normans:news':
+      log('the Norman master’s news, over English beer');
+      return tellOf({ ...w, rng: r.rng }, 'azores', 'gossip');
+    case 'normans:buy': {
+      const tons = Math.max(0, Math.min(woodRoom(w) - w.wood, Math.floor(w.gold / NORMAN_WOOD_COST)));
+      w = { ...w, wood: w.wood + tons, gold: w.gold - tons * NORMAN_WOOD_COST };
+      log(`${tons} tons of the Normans’ brazilwood swayed aboard, for ${tons * NORMAN_WOOD_COST}`);
+      break;
+    }
+    case 'normans:leave':
+      log('you leave the Normans to their loading');
       break;
   }
   // A storm in the right waters may drive you onto an island: likelier running before it.

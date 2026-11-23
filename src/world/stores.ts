@@ -251,8 +251,25 @@ export function buy(sea: Sea, s: WorldState, ware: Ware): WorldState {
 
 /** What a ton of spice fetches on the quay at Plymouth. Drake brought home six tons of cloves; he threw three more over on a reef. */
 export const SPICE_WORTH = 20;
-/** Tons of spice she can stow: a ton for every five of her complement. */
-export const spiceRoom = (s: WorldState) => Math.max(0, Math.floor(complement(s) / 5) - (s.seen.includes('ore') ? 2 : 0));
+/** Tons of cargo she can stow, spice and brazilwood together: a ton for every five of her complement, less the shining ore if she carries it. */
+export const holdRoom = (s: WorldState) => Math.max(0, Math.floor(complement(s) / 5) - (s.seen.includes('ore') ? 2 : 0));
+/** Tons of spice she can stow, beside the brazilwood. */
+export const spiceRoom = (s: WorldState) => Math.max(0, holdRoom(s) - s.wood);
+/** Tons of brazilwood she can stow, beside the spice. */
+export const woodRoom = (s: WorldState) => Math.max(0, holdRoom(s) - s.spice);
+
+/** What a ton of brazilwood fetches at home, for the red dye: less than spice, and cheaper to come by. */
+export const WOOD_WORTH = 9;
+/** Brazilwood for sale where you're lying, if any. */
+export const woodHere = (sea: Sea, s: WorldState) => landmarkHere(sea, s)?.offers.wood ?? null;
+
+/** Buy a ton of brazilwood from the Tupinambá, for trade goods, to sell at home. */
+export function buyWood(sea: Sea, s: WorldState, cost = woodHere(sea, s)?.cost): WorldState {
+  if (cost == null) throw new Error('there is no brazilwood to be had here');
+  if (s.wood >= woodRoom(s)) throw new Error('no room for more brazilwood');
+  if (s.gold < cost) throw new Error('not enough in the purse');
+  return { ...s, gold: s.gold - cost, wood: s.wood + 1 };
+}
 /** Spice for sale where you're lying, if any. */
 export const spiceHere = (sea: Sea, s: WorldState) => landmarkHere(sea, s)?.offers.spice ?? null;
 

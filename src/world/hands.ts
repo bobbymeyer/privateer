@@ -18,8 +18,10 @@ import { HOME_LANDMARK, landmark } from './landmarks.ts';
 import type { NodeId } from './map.ts';
 import { type Roller, roll } from './random.ts';
 import { type LogEntry, type Sea, type WorldState, newLines } from './world.ts';
+import { taken, talk } from './captives.ts';
 
-export type Role = 'master' | 'gunner' | 'carpenter' | 'surgeon' | 'boatswain' | 'boy';
+export type Role = 'master' | 'gunner' | 'carpenter' | 'surgeon' | 'boatswain' | 'boy' | 'chronicler';
+/** The six every voyage musters. The chronicler is yours to take or not, at Plymouth. */
 export const ROLES: Role[] = ['master', 'gunner', 'carpenter', 'surgeon', 'boatswain', 'boy'];
 
 /** What each is called, and the one thing he does while he lives. */
@@ -30,6 +32,7 @@ export const ROLE: Record<Role, { title: string; does: string }> = {
   surgeon: { title: 'the surgeon', does: 'often saves one of those the fever or the flux would take' },
   boatswain: { title: 'the boatswain', does: 'keeps the hands aboard: fewer desert, and a grievance comes to a head less often' },
   boy: { title: 'the ship’s boy', does: 'nothing, which is the point; he sings out when he sights a sail' },
+  chronicler: { title: 'the chronicler', does: 'nothing aboard; bring him home alive and his account of the voyage adds to your fame' },
 };
 
 export interface Death {
@@ -47,6 +50,10 @@ export interface Named {
   /** When and where and of what; or, if he left the ship alive, `ran`. */
   dead?: Death;
   ran?: boolean;
+  /** Taken with the ship on a Spanish coast, and sent to the galleys for life. See captives.ts. */
+  fate?: 'galleys';
+  /** An Englishman freed from a Spanish prize or a jail, who joined on the way. */
+  freed?: true;
 }
 
 // Names a Devon or Cornish crew of 1580 might answer to.
@@ -73,7 +80,7 @@ export function muster(rng: RngState): Named[] {
 }
 
 /** Whether the hand of note in `role` is aboard and alive. */
-export const alive = (s: { hands: Named[] }, role: Role) => s.hands.some((h) => h.role === role && !h.dead && !h.ran);
+export const alive = (s: { hands: Named[] }, role: Role) => s.hands.some((h) => h.role === role && !h.dead && !h.ran && !h.fate);
 /** His name, with his place: `Thomas Moone, the gunner`. */
 export const called = (h: Named) => `${h.name}, ${ROLE[h.role].title}`;
 export const nameOf = (s: { hands: Named[] }, role: Role) => s.hands.find((h) => h.role === role)?.name ?? '';
@@ -108,9 +115,10 @@ export function causeOf(entries: LogEntry[]): { cause: string; left: boolean; no
   }
   const text = lines.join(' · ');
   if (/killed|went down|sunk/.test(text)) return { cause: 'killed in the fight', left: false };
+  // Men who slipped over the side meant to: deserters, not drowned.
+  if (/slipped|slip away|stay|paid off|went with him|cut off|ashore with|gone in the night|deserted|maroon|left behind/.test(text)) return { cause: '', left: true };
   if (/over the side in the night|lost over the side/.test(text)) return { cause: 'lost over the side', left: false };
   if (/poison/.test(text)) return { cause: 'poison', left: false };
-  if (/slipped|slip away|stay|paid off|went with him|cut off|ashore with|gone in the night|deserted|maroon|left behind/.test(text)) return { cause: '', left: true };
   return { cause: 'the sea', left: false };
 }
 
@@ -140,7 +148,7 @@ export function mourn(sea: Sea, before: WorldState, after: WorldState): WorldSta
   let gone = 0;
   const said: LogEntry[] = [];
   const hands = after.hands.map((h) => {
-    if (h.dead || h.ran) return h;
+    if (h.dead || h.ran || h.fate) return h;
     if (drowned) return { ...h, dead: { turn: after.turn, node: after.player, place, cause: 'went down with the ship' } };
     if (gone >= lost || none) return h;
     const chance = Math.min(1, (lost / Math.max(1, before.crew)) * exposure(h.role, cause));
@@ -150,12 +158,19 @@ export function mourn(sea: Sea, before: WorldState, after: WorldState): WorldSta
       said.push({ turn: after.turn, text: `${called(h)}, gone with them` });
       return { ...h, ran: true };
     }
-    said.push({ turn: after.turn, text: `${called(h)}, dead of ${cause === 'killed in the fight' ? 'his wounds' : cause}`, stop: true });
+    said.push({ turn: after.turn, text: `${called(h)}, dead of ${cause === 'killed in the fight' ? 'his wounds' : cause}${h.role === 'chronicler' ? ', and his account of the voyage dead with him' : ''}`, stop: true });
     return { ...h, dead: { turn: after.turn, node: after.player, place, cause } };
   });
   const as = left ? 'ran' : cause;
   const losses = lost > 0 ? { ...after.losses, [as]: (after.losses[as] ?? 0) + lost } : after.losses;
-  return { ...after, rng: r.rng, hands, losses, log: [...after.log, ...said] };
+  let w: WorldState = { ...after, rng: r.rng, hands, losses, log: [...after.log, ...said] };
+  // Men left alive ashore may be taken, and talk; a ship lost on a Spanish coast, her men taken.
+  if (left && lost > 0 && !none) {
+    const r2: Roller = { rng: w.rng };
+    w = { ...talk(sea, w, r2), rng: r2.rng };
+  }
+  if (after.sunk && !before.sunk && !drowned) w = taken(sea, w);
+  return w;
 }
 
 // --- Graves ----------------------------------------------------------------------

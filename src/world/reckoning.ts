@@ -30,6 +30,7 @@
 
 import { SHIP_CLASSES } from '../outfit.ts';
 import type { WorldState } from './world.ts';
+import { favourOf, proofOfService, sellJewels, toHerTaste } from './jewels.ts';
 
 export type Backer = 'crown' | 'gentlemen' | 'own';
 
@@ -46,14 +47,14 @@ export interface BackerDef {
 export const BACKERS: Record<Backer, BackerDef> = {
   crown: {
     name: 'the Crown',
-    gold: (ship) => Math.round(SHIP_CLASSES[ship].purse * 0.3) + 20,
+    gold: (ship) => Math.round(SHIP_CLASSES[ship].purse * 0.4) + 10,
     spares: 2,
     powder: 2,
     text: 'the Queen puts money in, and stores from the dockyard at Deptford. she takes a third of what you bring home, and wants a clean commission; her favour shields you at court',
   },
   gentlemen: {
     name: 'gentlemen adventurers',
-    gold: (ship) => Math.round(SHIP_CLASSES[ship].purse * 0.5) + 40,
+    gold: (ship) => Math.round(SHIP_CLASSES[ship].purse * 0.6) + 25,
     spares: 0,
     powder: 0,
     text: 'gentlemen of the court put money in, hoping for three to one. at home they take half of what you bring over your own purse, and nothing if you come home poorer; and some of them sail with you',
@@ -96,11 +97,23 @@ export function sharesDue(s: WorldState): { queen: number; gentlemen: number } {
   return { queen: 0, gentlemen: 0 };
 }
 
-/** The chance at court of being disowned: Spain's grievance and your infamy against it, the Queen's favour for you. */
+/**
+ * The chance at court of being disowned: Spain's grievance and your infamy
+ * against it, the Queen's favour for you. Jewels set aside for her lessen
+ * it; the dead commander's ring, proof of service, ends it.
+ */
 export function courtRisk(s: WorldState): number {
+  if (proofOfService(s)) return 0;
   const raw = Math.min(0.9, s.grievance / 1200 + s.infamy * 0.12);
-  return Math.round(100 * raw * (s.backer === 'crown' ? 0.4 : 1)) / 100;
+  const jewels = Math.max(0, 1 - favourOf(s) / JEWEL_FAVOUR);
+  return Math.round(100 * raw * (s.backer === 'crown' ? 0.4 : 1) * jewels) / 100;
 }
+/** Jewels set aside worth this much to her, and court holds no risk at all. */
+export const JEWEL_FAVOUR = 120;
+/** Her pleasure in a jewel: fame for half of what it's worth to her. */
+export const pleasure = (s: WorldState) => Math.round(favourOf(s) / 2);
+/** What the gift costs in gold, once the jewels set aside for her are counted. */
+export const giftGold = (s: WorldState) => Math.max(0, giftFor(s) - favourOf(s));
 /** Great infamy and no favour: the prize seized and you named a pirate. */
 export const outlawed = (s: WorldState) => s.infamy >= PIRATE_INFAMY && s.backer !== 'crown';
 /** Lying low with a name for piracy: this often they come for you anyway. */
@@ -156,7 +169,18 @@ export function comeHome(s: WorldState): WorldState {
 
 /** Your choice at the reckoning, and what comes of it: the voyage is over, and won, however it went. */
 export function reckon(s: WorldState, choice: 'court' | 'low' | 'gift', roll: () => number): WorldState {
-  let w: WorldState = { ...s, dilemma: null };
+  // The jewels not set aside go to a goldsmith first; lying low, the rest go too, for you won't be at court to give them.
+  let w: WorldState = sellJewels({ ...s, dilemma: null });
+  if (choice === 'low') w = sellJewels({ ...w, jewels: w.jewels.map((j) => ({ ...j, forQueen: false })) });
+  const ring = proofOfService(w);
+  const pleased = pleasure(w);
+  const presented = w.jewels.filter((j) => j.forQueen);
+  const present = (x: WorldState): WorldState => {
+    if (!presented.length) return x;
+    const names = presented.map((j) => j.name).join(', ');
+    const lines = [`presented to the Queen: ${names}`, ...(presented.some(toHerTaste) ? ['she was so pleased she wore it at court that night'] : []), ...(ring ? ['the dead commander’s ring, proof of your service, and she says so before Spain’s ambassador'] : [])];
+    return { ...x, jewels: [], infamy: Math.max(0, x.infamy - (ring ? 1 : 0)), log: [...x.log, ...lines.map((text) => ({ turn: x.turn, text }))] };
+  };
   const settled = { ...w.settled };
   const pirate = (): WorldState => {
     const seized = Math.round(w.gold * SEIZED);
@@ -164,22 +188,25 @@ export function reckon(s: WorldState, choice: 'court' | 'low' | 'gift', roll: ()
     return said({ ...w, gold: w.gold - seized, verdict: 'pirate', fame: 0, settled }, `named a pirate: ${seized} of the prize seized by the Admiralty, and the rest of it hidden`, true);
   };
   if (choice === 'gift') {
-    const gift = giftFor(w);
+    const gift = giftGold(w);
     settled.gift = gift;
-    w = said({ ...w, gold: w.gold - gift, infamy: Math.max(0, w.infamy - GIFT_PARDON), settled }, `a gift for the Queen from the treasure, ${gift}, and she receives you`);
+    w = present(w);
+    w = said({ ...w, gold: w.gold - gift, infamy: Math.max(0, w.infamy - GIFT_PARDON), settled }, gift ? `a gift for the Queen from the treasure, ${gift}, and she receives you` : 'the jewels are gift enough, and she receives you');
     if (outlawed(w)) w = pirate();
     else {
-      const fame = fameFor(w.gold);
+      const fame = fameFor(w.gold) + pleased;
       w = said({ ...w, verdict: 'gift', fame }, 'received at court under the Queen’s favour: Spain’s ambassador is told the matter is closed', true);
     }
   } else if (choice === 'court') {
+    const risk = courtRisk(w);
+    w = present(w);
     if (outlawed(w)) w = pirate();
-    else if (roll() < courtRisk(w)) {
+    else if (roll() < risk) {
       const back = restitutionFor(w);
       settled.restitution = back;
       w = said({ ...w, gold: w.gold - back, verdict: 'disowned', fame: 0, settled }, `disowned at court to please Spain: ${back} handed back as restitution`, true);
     } else {
-      const fame = fameFor(w.gold);
+      const fame = fameFor(w.gold) + pleased;
       w = said({ ...w, verdict: 'court', fame }, 'shown at court: the Queen’s countenance shows great joy, whatever she tells the ambassador', true);
     }
   } else {
