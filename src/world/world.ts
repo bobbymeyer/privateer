@@ -66,6 +66,8 @@ export interface WorldState {
   raided: string[];
   /** The places you've set up the Queen's arms, by landmark: see arms.ts. */
   arms: string[];
+  /** The day each kind of event last asked you, so the same one doesn't come round again too soon: see happenings.ts. */
+  asked: Record<string, number>;
   /** Tons of spice in the hold, cloves or pepper, to sell on the quay at home. */
   spice: number;
   /** Tons of brazilwood in the hold, for the red dye, to sell at home. */
@@ -179,6 +181,7 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     reckoning: null,
     raided: [],
     arms: [],
+    asked: {},
     spice: 0,
     wood: 0,
     jewels: [],
@@ -243,6 +246,8 @@ function day(sea: Sea, s: WorldState, to: NodeId): WorldState {
   if (to !== s.player && !sea.map.adj[s.player].includes(to)) throw new Error(`node ${to} is not next to ${s.player}`);
   let next: WorldState = { ...s, turn: s.turn + 1, player: to };
   next = aDay(sea, next);
+  // What asked today, remembered: it won't come round again for a while.
+  if (next.dilemma && !s.dilemma) next = { ...next, asked: { ...next.asked, [next.dilemma.kind]: next.turn } };
   if (next.sunk) return next;
   next = raise(sea, next);
   if (next.won || next.hail) return next;

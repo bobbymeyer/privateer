@@ -10,6 +10,7 @@ import { type Roller, pick, roll } from './random.ts';
 import { capacity, topUp } from './stores.ts';
 import { alive } from './hands.ts';
 import type { Sea, WorldState } from './world.ts';
+import { asksAgain } from './happenings.ts';
 
 /** A rain squall, on a day in the tropics: sails spread to catch it. */
 export const RAIN_CHANCE = 1 / 20;
@@ -78,7 +79,7 @@ export function weatherDay(sea: Sea, s: WorldState, r: Roller): WorldState {
     w = { ...w, fresh: Math.max(0, w.fresh - 10), stores: { ...w.stores, food: topUp(w.stores.food, w.crew * 3, cap.food) } };
     log(pick(r, FISH));
   }
-  if (tropic(sea, w) && roll(r) < FEVER_CHANCE && !w.dilemma) {
+  if (tropic(sea, w) && roll(r) < FEVER_CHANCE && !w.dilemma && asksAgain(w, 'fever')) {
     w = { ...w, dilemma: { kind: 'fever' } };
     log('fever aboard', true);
   }
@@ -86,11 +87,11 @@ export function weatherDay(sea: Sea, s: WorldState, r: Roller): WorldState {
     w = { ...w, crew: w.crew - 1 };
     log('a hand lost over the side in the night');
   }
-  if (!w.dilemma && w.stores.water > 0 && roll(r) < FOUL_CHANCE) {
+  if (!w.dilemma && w.stores.water > 0 && roll(r) < FOUL_CHANCE && asksAgain(w, 'foul')) {
     w = { ...w, dilemma: { kind: 'foul' } };
     log('the water has gone foul in the casks', true);
   }
-  if (!w.dilemma && w.stores.food > 0 && roll(r) < WEEVIL_CHANCE) {
+  if (!w.dilemma && w.stores.food > 0 && roll(r) < WEEVIL_CHANCE && asksAgain(w, 'weevils')) {
     w = { ...w, dilemma: { kind: 'weevils' } };
     log('weevils in the bread', true);
   }

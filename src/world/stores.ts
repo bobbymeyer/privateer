@@ -139,14 +139,19 @@ const FIRST_DEATH: Record<string, string> = {
   hunger: 'men are dying of hunger',
   scurvy: 'the scurvy has begun to kill',
 };
-/** A run of the same dying, a day or two apart, is one line in the log, moved to the end as it grows. */
-export const FOLD_GAP = 2;
+/**
+ * A run of the same dying is one line in the log, moved to the end as it
+ * grows, as long as the deaths come no further apart than this. Thirst and
+ * hunger kill most days; the scurvy a man every few days for weeks, and each
+ * of those is the same sickness, not news to stop the ship for again.
+ */
+export const FOLD_GAP: Record<string, number> = { thirst: 7, hunger: 7, scurvy: 21 };
 
 export function foldDeaths(log: LogEntry[], kind: string, dead: number, turn: number): LogEntry[] {
   for (let i = log.length - 1; i >= 0; i--) {
     const f = log[i].fold;
     if (!f || f.kind !== kind) continue;
-    if (turn - f.to > FOLD_GAP) break;
+    if (turn - f.to > (FOLD_GAP[kind] ?? 7)) break;
     const fold = { kind, dead: f.dead + dead, from: f.from, to: turn };
     const days = fold.to - fold.from + 1;
     const text = `${kind}: ${fold.dead} ${fold.dead === 1 ? 'hand' : 'hands'} dead over ${days} ${days === 1 ? 'day' : 'days'}`;
