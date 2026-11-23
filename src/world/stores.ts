@@ -19,9 +19,10 @@
 import { SHIP_CLASSES } from '../outfit.ts';
 import { type Landmark, type ShoreWork, landmark } from './landmarks.ts';
 import { type Roller, roll } from './random.ts';
-import type { Sea, WorldState } from './world.ts';
+import type { LogEntry, Sea, WorldState } from './world.ts';
 import { landfallHere } from './landfalls.ts';
 import { trueHere } from './rumors.ts';
+import { alive } from './hands.ts';
 
 export interface Stores {
   /** Provisions, in rations: one hand for one day at full ration. */
@@ -109,14 +110,14 @@ export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
     thirst: water <= 0 ? deaths(r, w.crew * THIRST_RATE) : 0,
     hunger: hungry ? deaths(r, w.crew * hungry) : 0,
   };
-  const dead = Math.min(w.crew, lost.scurvy + lost.thirst + lost.hunger);
-  if (dead) {
-    const half = complement(w) / 2;
+  const half = complement(w) / 2;
+  for (const kind of ['thirst', 'hunger', 'scurvy'] as const) {
+    const dead = Math.min(w.crew, lost[kind]);
+    if (!dead) continue;
     const crew = w.crew - dead;
-    const of = [lost.scurvy && 'scurvy', lost.thirst && 'thirst', lost.hunger && 'hunger'].filter(Boolean).join(' and ');
-    w = { ...w, crew };
-    log(`${dead === 1 ? 'a hand' : `${dead} hands`} dead of ${of}`, w.crew + dead >= half && crew < half);
-    if (w.fresh === SCURVY_DAYS + 1 && lost.scurvy) log('the scurvy has begun to kill', true);
+    w = { ...w, crew, log: foldDeaths(w.log, kind, dead, w.turn) };
+    // Down to half her complement: worth stopping for, whatever else is said.
+    if (w.crew + dead >= half && crew < half) log('half her hands gone: the ship sails short-handed now', true);
   }
   if (w.crew < MIN_HANDS) {
     log('too few hands left to work her: the ship is lost', true);
@@ -129,6 +130,28 @@ export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
     log('weed and worm: the hull slower and weaker by a point');
   }
   return w;
+}
+
+/** The first death of a kind stops the ship; after that it's one running line, so many dead over so many days. */
+const FIRST_DEATH: Record<string, string> = {
+  thirst: 'men are dying of thirst',
+  hunger: 'men are dying of hunger',
+  scurvy: 'the scurvy has begun to kill',
+};
+/** A run of the same dying, a day or two apart, is one line in the log, moved to the end as it grows. */
+export const FOLD_GAP = 2;
+
+export function foldDeaths(log: LogEntry[], kind: string, dead: number, turn: number): LogEntry[] {
+  for (let i = log.length - 1; i >= 0; i--) {
+    const f = log[i].fold;
+    if (!f || f.kind !== kind) continue;
+    if (turn - f.to > FOLD_GAP) break;
+    const fold = { kind, dead: f.dead + dead, from: f.from, to: turn };
+    const days = fold.to - fold.from + 1;
+    const text = `${kind}: ${fold.dead} ${fold.dead === 1 ? 'hand' : 'hands'} dead over ${days} ${days === 1 ? 'day' : 'days'}`;
+    return [...log.slice(0, i), ...log.slice(i + 1), { turn, text, fold }];
+  }
+  return [...log, { turn, text: `${FIRST_DEATH[kind]}: ${dead === 1 ? 'a hand' : `${dead} hands`} dead`, stop: true, fold: { kind, dead, from: turn, to: turn } }];
 }
 
 // --- At a landmark -----------------------------------------------------------
@@ -174,7 +197,8 @@ export function ashore(sea: Sea, s: WorldState, what: ShoreWork, advance: (sea: 
     // Hauled down on a beach, scraped, caulked: two points of hull for each bundle of spares, and one for the scraping.
     const need = Math.ceil((w.maxHull - w.hull) / 2);
     const used = Math.min(need, w.stores.spares);
-    w = { ...w, hull: Math.min(w.maxHull, w.hull + used * 2 + 1), stores: { ...w.stores, spares: w.stores.spares - used } };
+    // The carpenter, while he lives, mends a point more.
+    w = { ...w, hull: Math.min(w.maxHull, w.hull + used * 2 + 1 + (alive(w, 'carpenter') ? 1 : 0)), stores: { ...w.stores, spares: w.stores.spares - used } };
     log(`careened: weed scraped, seams caulked${used ? `, ${used} of the spares used` : ''}`);
   }
   w = { ...w, rng: r.rng };
@@ -264,7 +288,8 @@ export const KILLED_PER_HULL = 0.015;
 
 /** What a fight cost in powder and hands: shots fired, hull lost. Returns the state and what it said. */
 export function fightCost(s: WorldState, shots: number, hullLost: number, r: Roller): WorldState {
-  const powder = Math.min(s.stores.powder, Math.ceil(shots / SHOTS_PER_BARREL));
+  // The gunner, while he lives, makes a barrel serve a shot more.
+  const powder = Math.min(s.stores.powder, Math.ceil(shots / (SHOTS_PER_BARREL + (alive(s, 'gunner') ? 1 : 0))));
   const dead = Math.min(s.crew, deaths(r, Math.max(0, hullLost) * s.crew * KILLED_PER_HULL));
   const said = [powder && `${powder} ${powder === 1 ? 'barrel' : 'barrels'} of powder`, dead && `${dead === 1 ? 'a hand' : `${dead} hands`} killed`].filter(Boolean).join(', ');
   const w = { ...s, crew: s.crew - dead, stores: { ...s.stores, powder: s.stores.powder - powder } };

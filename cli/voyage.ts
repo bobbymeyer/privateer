@@ -62,6 +62,7 @@ const PRIZE_FOUGHT: Record<string, number> = {};
 /** A voyage that hasn't ended in this many days is called off. */
 const DAYS = 1500;
 const DEAD: Record<string, number> = {};
+const NOTED = { dead: 0, ran: 0 };
 
 const sea = createSea();
 const fightBot = (outgunned: boolean) => lookahead({ hull: 0.6, damage: 0.4, fled: outgunned ? 100 : 0 });
@@ -206,10 +207,10 @@ function sail(ship: string, seed: number, backer: Backer): Result {
   }
   const why = w.won ? '' : w.sunk ? (w.log.some((l) => l.text.includes('too few hands')) ? 'too few hands' : 'in a fight') : 'out of time';
   const took = w.log.some((l) => /^\d+ gold into the strongroom/.test(l.text) && w.tally.best?.what === 'the treasure ship from Callao');
-  for (const l of w.log) {
-    const m = /^(a hand|\d+ hands) (?:dead of ([a-z ]+)|killed|lost over)/.exec(l.text) ?? /(a hand|\d+ hands) (dead of it|killed|sickened)/.exec(l.text);
-    if (m) { const n = m[1] === 'a hand' ? 1 : Number(m[1].split(' ')[0]); const k = (m[2] ?? 'fights/events').replace(/ and .*/, ''); DEAD[k] = (DEAD[k] ?? 0) + n; }
-  }
+  // The voyage keeps its own count of the dead, by what took them; and of the hands of note.
+  for (const [k, n] of Object.entries(w.losses)) DEAD[k] = (DEAD[k] ?? 0) + n;
+  NOTED.dead += w.hands.filter((h) => h.dead).length;
+  NOTED.ran += w.hands.filter((h) => h.ran).length;
   if (TRACE) console.log(seed, ship, w.won ? 'HOME' : why, 'day', w.turn, 'gold', w.gold, 'crew', w.crew, took ? 'took her' : '', w.voyage.visited.join('>'));
   const heard = w.rumors.filter((r) => r.followed && w.voyage.visited.includes(r.key));
   return { ship, score: score(w).total, verdict: w.verdict ?? '', won: w.won, day: w.turn, like: score(w).like, at: w.voyage.at, why, gold: w.gold, crew: w.crew, took, followedTrue: heard.filter((r) => r.truth).length, followedFalse: heard.filter((r) => !r.truth).length, heard: w.rumors.length, landfalls: w.seen.filter((k) => LANDFALL_KEYS.includes(k)).length };
@@ -227,12 +228,13 @@ for (const ship of SHIP === 'all' ? SHIPS : [SHIP]) for (const backer of (BACKER
   console.log(`${ship}, ${backer}: home ${won.length} of ${RUNS} (${Math.round((100 * won.length) / RUNS)}%), on day ${mean(won.map((r) => r.day))}, with ${mean(won.map((r) => r.gold))} gold and ${mean(won.map((r) => r.crew))} hands · mean score ${mean(results.map((r) => r.score))}`);
   console.log('  like', count(won, (r) => r.like), '· at court', count(won, (r) => r.verdict), '· took the treasure ship', results.filter((r) => r.took).length);
   console.log('  lost', count(lost, (r) => r.why), '· last landmark', count(lost, (r) => r.at));
-  console.log('  dead of', JSON.stringify(DEAD));
+  console.log('  lost to', JSON.stringify(DEAD), `· hands of note dead ${NOTED.dead}, ran ${NOTED.ran}`);
   const sum = (f: (r: Result) => number) => results.reduce((t, r) => t + f(r), 0);
   console.log(`  rumors heard ${sum((r) => r.heard)}, detours sailed ${sum((r) => r.followedTrue + r.followedFalse)} (${sum((r) => r.followedTrue)} true, ${sum((r) => r.followedFalse)} false) · rumored prizes ${JSON.stringify(PRIZE_FOUGHT)}, paying ${mean(PRIZE_PAY.filter((x) => x > 0))} when they paid · storm landfalls ${sum((r) => r.landfalls)}`);
   PRIZE_PAY.length = 0;
   for (const k of Object.keys(PRIZE_FOUGHT)) delete PRIZE_FOUGHT[k];
   for (const k of Object.keys(DEAD)) delete DEAD[k];
+  NOTED.dead = NOTED.ran = 0;
   void howHome;
   void coastAwake;
 }

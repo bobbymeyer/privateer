@@ -11,8 +11,9 @@
   import { DETOUR_KEYS, followed } from '../world/rumors.ts';
   import type { Sea, WorldState } from '../world/world.ts';
   import { SHIP } from './woodcut.ts';
+  import type { Grave } from '../world/hands.ts';
 
-  let { sea, world }: { sea: Sea; world: WorldState } = $props();
+  let { sea, world, graves = [] }: { sea: Sea; world: WorldState; graves?: Grave[] } = $props();
 
   // The world from 180°W to 180°E, and from the Arctic to below the Horn.
   const [W, E, N, S] = [-180, 180, 72, -60];
@@ -126,6 +127,14 @@
       <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * (next ? 4.5 : 3)} fill={been ? 'var(--ink)' : 'var(--paper)'} stroke="var(--ink)" stroke-width="1.2" vector-effect="non-scaling-stroke" />
       {#if been || next || width > 700}
         <text x={X(n.lon) + px * 6} y={Y(n.lat) + px * 4} font-size={px * 11} font-style="italic" fill="var(--ink)" fill-opacity={been || next ? 1 : 0.6}>{l.name}</text>
+      {/if}
+    {/each}
+
+    <!-- Graves from voyages before: a small cross where each lies. -->
+    {#each graves as g (g.id)}
+      {@const n = sea.map.nodes[g.node]}
+      {#if n}
+        <path d="M{X(n.lon)},{Y(n.lat) - px * 4}V{Y(n.lat) + px * 4}M{X(n.lon) - px * 2.5},{Y(n.lat) - px * 1.5}H{X(n.lon) + px * 2.5}" stroke="var(--sepia)" stroke-width="1.2" vector-effect="non-scaling-stroke"><title>{g.name}, {g.title}, {g.date}</title></path>
       {/if}
     {/each}
 

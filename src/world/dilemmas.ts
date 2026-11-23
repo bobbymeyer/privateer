@@ -17,6 +17,7 @@ import { followed } from './rumors.ts';
 import { GIFT_PARDON, SEIZED, courtRisk, fameFor, giftFor, outlawed, reckon, restitutionFor } from './reckoning.ts';
 import type { Sea, WorldState } from './world.ts';
 import { FEVER_NURSE, FEVER_NURSE_DAYS, FEVER_PRESS, FLUX, FOUL_LOST, WEEVIL_LOST, WEEVIL_SICK, feverDeaths, fluxDeaths } from './weather.ts';
+import { alive, mourn } from './hands.ts';
 
 export type Dilemma =
   /** A storm: ride it out, run before it, or lighten ship. */
@@ -296,6 +297,10 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
 
 /** Make the choice. Throws if there's nothing to choose, or the choice is barred. */
 export function choose(sea: Sea, s: WorldState, key: string): WorldState {
+  return mourn(sea, s, decide(sea, s, key));
+}
+
+function decide(sea: Sea, s: WorldState, key: string): WorldState {
   const d = s.dilemma;
   if (!d) throw new Error('there is nothing to choose');
   const c = choices(s, d).find((x) => x.key === key);
@@ -458,7 +463,8 @@ export function choose(sea: Sea, s: WorldState, key: string): WorldState {
       log('you let it be, and the grumbling goes on below');
       break;
     case 'deserters:go': {
-      const lost = Math.min(w.crew, between(DESERTERS));
+      // The boatswain, while he lives, talks one of them round.
+      const lost = Math.min(w.crew, Math.max(1, between(DESERTERS) - (alive(w, 'boatswain') ? 1 : 0)));
       w = { ...w, crew: w.crew - lost };
       log(`${hands(lost)} paid off to stay in the islands`);
       break;
@@ -466,7 +472,7 @@ export function choose(sea: Sea, s: WorldState, key: string): WorldState {
     case 'deserters:watch': {
       w = { ...w, calm: Math.max(w.calm, w.turn + 1) };
       if (roll(r) < 1 / 3) {
-        const lost = Math.min(w.crew, between(SLIP_AWAY));
+        const lost = Math.min(w.crew, Math.max(1, between(SLIP_AWAY) - (alive(w, 'boatswain') ? 1 : 0)));
         w = { ...w, crew: w.crew - lost };
         log(`the watch doubled, and still ${hands(lost)} slipped over the side in the night`);
       } else log('the watch doubled, and every hand aboard when she sails');

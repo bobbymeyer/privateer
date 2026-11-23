@@ -14,6 +14,7 @@
 import { type Roller, pick, roll } from './random.ts';
 import { capacity, topUp } from './stores.ts';
 import type { Sea, WorldState } from './world.ts';
+import { alive, nameOf } from './hands.ts';
 
 type Where = (sea: Sea, s: WorldState) => boolean;
 const at = (sea: Sea, s: WorldState) => sea.map.nodes[s.player];
@@ -116,12 +117,16 @@ export const HAPPENINGS: Happening[] = [
   },
   {
     key: 'fog', chance: 1 / 25, where: highLatitudes,
-    happen: (s) => said(lose(s, 1), 'fog, thick as wool: hove to, sounding, and a day lost'),
+    // The master, while he lives, feels his way through it, sounding, one time in two.
+    happen: (s, r) =>
+      alive(s, 'master') && roll(r) < 0.5
+        ? said(s, `fog, thick as wool, and ${nameOf(s, 'master')} feels his way through it, sounding`)
+        : said(lose(s, 1), 'fog, thick as wool: hove to, sounding, and a day lost'),
   },
   {
     key: 'horse-latitudes', chance: 1 / 30, where: horseLatitudes,
     happen: (s, r) => {
-      const days = 1 + Math.floor(roll(r) * 3);
+      const days = Math.max(1, 1 + Math.floor(roll(r) * 3) - (alive(s, 'master') ? 1 : 0));
       return said(lose(s, days), `becalmed in the horse latitudes, ${days} ${days === 1 ? 'day' : 'days'} with the sails slatting`);
     },
   },
@@ -214,7 +219,8 @@ export function arriving(s: WorldState, key: string): WorldState {
   if (w.seen.includes('discontent')) {
     w = { ...w, seen: w.seen.filter((x) => x !== 'discontent') };
     // A gentleman who put money in has friends aboard who did too: it always comes to a head.
-    if (roll(r) < (w.backer === 'gentlemen' ? 1 : DISCONTENT_CHANCE)) {
+    // The gentlemen's friends always bring it to a head; the boatswain, while he lives, keeps it down half the time.
+    if (roll(r) < (w.backer === 'gentlemen' ? 1 : DISCONTENT_CHANCE) * (alive(w, 'boatswain') ? 0.5 : 1)) {
       const lost = Math.min(w.crew, DISCONTENT_LOST[0] + Math.floor(roll(r) * (DISCONTENT_LOST[1] - DISCONTENT_LOST[0] + 1)));
       w = said({ ...w, crew: w.crew - lost }, `the gentleman's friends slipped away in the night: ${lost} hands gone`, true);
     } else w = said(w, 'the grumbling has died down, for now');

@@ -176,7 +176,41 @@ set against the voyages of the time.
 | Fenton's | home, poorer than you left, or with little to show |
 | Oxenham's | lost |
 
-The voyage saves as you go (`src/save.ts`, version 12; a run from before
+**The hands of note** (`src/world/hands.ts`). Six of the crew have names,
+mustered from the voyage's seed from a Devon and Cornish list, and each
+does one small thing while he lives:
+
+| hand | while he lives |
+| --- | --- |
+| the master | warns you before a leg the stores won't see out; a calm or the horse latitudes a day shorter; fog, one time in two, no day lost |
+| the gunner | a barrel of powder serves four shots, not three |
+| the carpenter | careening mends a point more |
+| the surgeon | one time in two, the fever or the flux takes one fewer |
+| the boatswain | one fewer of the hands who'd stay in the islands; a grievance comes to a head half as often |
+| the ship's boy | nothing; he sings out when he sights a sail |
+
+They're counted among the hands. When hands die, each named one goes with
+a chance of his share of the dead (twice that for the gunner in a fight, the
+surgeon in a fever, the boy over the side), and the log says who and of
+what. The end screen lists them, and the voyage's dead by cause.
+
+**Graves** (`src/graves.ts`). When a voyage ends, its dead are written in
+the browser where they fell, with an epitaph you can change on the end
+screen, and the ship too if she was lost. A later voyage passing within a
+day of the place finds them in the log, once, and the chart marks them with
+a cross. Nothing leaves the browser.
+
+**Before you sail** (`src/world/warnings.ts`). At a landmark, if the food
+or water at the rations you've set won't last the next leg and seven days
+over (water reckoned faster for the share of the leg in the tropics), the
+master says so: once a departure, with the way to put it right there, or
+sail anyway. It shows beside the casks and the chandler too.
+
+**The dying, folded.** The first death of thirst, hunger or scurvy stops
+the ship; after that it's one running line, *thirst: 14 hands dead over 9
+days*, moved to the end of the log as it grows.
+
+The voyage saves as you go (`src/save.ts`, version 16; a run from before
 the simplification is dropped). Every voyage that ends goes in the
 logbook, with its score. *Today's voyage* is the same seed for everyone
 that day.
@@ -313,6 +347,12 @@ Over 40 voyages a ship and a backer, mean score counting the lost as 0:
 | sloop | 55%, 131 | 48%, 102 | 45%, 94 |
 | brigantine | 50%, 123 | 55%, 87 | 53%, 142 |
 
+With the hands of note, over 100 voyages a ship on its own stake: the
+pinnace home 44%, the sloop 53%, the brigantine 62%, against 45%, 50% and
+54% with them all dead from the start. The carpenter's and surgeon's help
+was cut back to keep it so; at first the six together put a voyage home
+fifteen in a hundred more often.
+
 Before backers, on its own stake, it did as follows.
 
 Over 40 voyages a ship:
@@ -342,7 +382,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 134 tests
+npm test                     # the rules and the voyage, 146 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
@@ -361,6 +401,7 @@ src/
   outfit.ts      the three ships you can choose, and the deck each fights with
   save.ts        saving a voyage to the browser
   logbook.ts     the logbook of finished voyages, and today's voyage
+  graves.ts      the graves of voyages before, kept in the browser
   ui/            Svelte: App, RouteChart, Fight, CardView, Gauge, Flag; sound.ts
   world/
     data/        world.json and coast.json, from Natural Earth
@@ -376,6 +417,8 @@ src/
     events.ts    a day: storms, the weather, the stores
     weather.ts   rain, fish, calms, williwaws, fever, foul water, weevils
     happenings.ts the rest of what happens on the way, by region, and on arriving
+    hands.ts     the hands of note, who of them died and of what, and the graves they leave
+    warnings.ts  the master's warning before a leg the stores won't see out
     dilemmas.ts  events that ask you something, and what each choice stakes
     stores.ts    hands, food, water, spares, powder; the shore; the market; a fight's cost and a prize's hold
     meet.ts      a sail sighted by the waters, attacking, raiding a town, settling a fight
