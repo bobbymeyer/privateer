@@ -21,7 +21,6 @@
 
 import { landmark } from './landmarks.ts';
 import { type Named, ROLE, type Role, called } from './hands.ts';
-import { watersAt } from './meet.ts';
 import { type Roller, pick, roll } from './random.ts';
 import { complement } from './stores.ts';
 import type { Sea, WorldState } from './world.ts';
@@ -51,11 +50,18 @@ export function talk(sea: Sea, s: WorldState, r: Roller): WorldState {
   return say({ ...s, grievance: s.grievance + TALK_GRIEVANCE }, `the men left at ${where} are taken by the Spanish, and they talk: Spain's ambassador will have their story`);
 }
 
-/** Whether the ship is on a coast Spain or Portugal holds: at one of their landmarks, or in waters their ships sail. */
+/** How near a coast Spain or Portugal holds a ship must be lost for her men to be taken: a few days' sail. */
+export const COAST_DAYS = 6;
+
+/**
+ * Whether the ship is on a coast Spain or Portugal holds: at one of their
+ * landmarks, or within a few days' sail of one. Lost in the middle of the
+ * Pacific, nobody comes for her men.
+ */
 export function spanishCoast(sea: Sea, s: WorldState): boolean {
   const here = at(sea, s);
   if (here) return IBERIAN.includes(here);
-  return !!watersAt(sea, s)?.sails.some((x) => !x.neutral && (x.nation === 'spain' || x.nation === 'portugal'));
+  return IBERIAN.some((k) => sea.map.landmarks[k] !== undefined && sea.map.distTo(sea.map.landmarks[k])[s.player] <= COAST_DAYS);
 }
 
 /** Where the taken are tried: Lima for the South Sea, Goa for the East, Seville for the rest. */

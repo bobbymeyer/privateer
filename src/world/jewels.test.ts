@@ -231,3 +231,13 @@ test('a save from before jewels and brazilwood comes forward', () => {
   assert.deepEqual(saved.world.jewels, []);
   assert.equal(saved.world.wood, 0);
 });
+
+test('lost in the open Pacific, nobody comes for her men; lost off Callao, they are taken', async () => {
+  const { spanishCoast } = await import('./captives.ts');
+  const sea2 = createSea();
+  const w = createWorld(sea2, 1);
+  const midPacific = sea2.map.nodes.filter((n) => !n.port && sea2.map.adj[n.id].length).sort((a, b) => Math.hypot(a.lon + 150, a.lat - 12) - Math.hypot(b.lon + 150, b.lat - 12))[0].id;
+  assert.ok(!spanishCoast(sea2, { ...w, player: midPacific, voyage: { at: 'guatulco', bound: 'ladrones', visited: ['plymouth', 'guatulco'] } }));
+  const offCallao = sea2.map.adj[sea2.map.landmarks.callao][0];
+  assert.ok(spanishCoast(sea2, { ...w, player: offCallao, voyage: { at: 'callao', bound: 'cacafuego', visited: ['plymouth', 'callao'] } }));
+});
