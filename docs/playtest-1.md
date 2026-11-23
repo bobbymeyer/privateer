@@ -83,3 +83,31 @@ the world takes about 650 days.
    "hull 9 to your 1", but nothing else marks it as hopeless.
 
 Screenshots of these voyages are in the session's scratchpad (`pt-*.png`).
+
+## playtest 2: the balance findings
+
+After hulls could be kept, the yards, the ship's worth in the score, the
+quieter lookout, the odds told, the brigantine's purse, and the fork that
+sets a course without sailing. Three voyages sailed through the real
+screen by a scripted captain with simple sense (fit out with water, food,
+spares and truck; careen when worn; let merchants pass; attack only the
+treasure ship and rumored prizes; bear away and brace when it goes badly).
+
+| ship, backer | how it went | hull along the way | sails |
+| --- | --- | --- | --- |
+| pinnace, the Crown | Plymouth to Cape San Francisco by the Strait; the treasure ship warned, and "she outguns you: a hard fight", with the master's word; let her go | 12, 12, 12, 11, 10, 10, 12, 11, 11, 10, 9 of 12 | 5 seen, 4 stops |
+| brigantine, the Crown | lost at San Julián on day 152, too few hands | 17, 17, 17, 16, 15, 15 of 17 | 1 seen |
+| sloop, the Crown | lost past the Strait on day 208, too few hands | 14, 14, 14, 13, 12, 12, 14 of 14 | 3 seen, 1 let go by, no stops |
+
+The hull is now something you keep: careened at San Julián the sloop came
+off the beach at 14 of 14, where she used to come home at 1. The sails
+are quieter: a handful a voyage, the harmless ones gone by with a line.
+The odds before the treasure ship read plainly, and the master says it.
+The scripted captain lost two of three for want of hands, which is its
+own poor seamanship (it hires nobody and rations badly), not a finding.
+At a fork the course is now chosen without sailing, and on a phone the
+docked bar no longer covers the rations, pace and lookout.
+
+Over 100 voyages a ship and backer (the voyage bot), winners come home at
+52–65% of their hull, where it was 15–26%; the lookout stops the ship two
+to five times a voyage, where it was nine or ten.

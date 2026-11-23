@@ -1,7 +1,7 @@
 /** The score, and the voyage of the time it's like. Run with `npm test`. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { HAND_WORTH, RICH, SHIP_WORTH, score } from './score.ts';
+import { HAND_WORTH, RICH, score, shipWorth } from './score.ts';
 import { SHIP_CLASSES } from '../outfit.ts';
 import { createSea, createWorld, type WorldState } from './world.ts';
 
@@ -20,8 +20,8 @@ test('treasure, hands and the ship, all told', () => {
   const s = score(home({ gold: 300, crew: 20, hull: 6, maxHull: 12 }, ROUND));
   assert.equal(s.treasure, 300);
   assert.equal(s.hands, 20 * HAND_WORTH);
-  assert.equal(s.ship, SHIP_WORTH / 2);
-  assert.equal(s.total, (300 + 20 * HAND_WORTH + SHIP_WORTH / 2) * SHIP_CLASSES.pinnace.multiplier);
+  assert.equal(s.ship, shipWorth('pinnace') / 2);
+  assert.equal(s.total, (300 + 20 * HAND_WORTH + shipWorth('pinnace') / 2) * SHIP_CLASSES.pinnace.multiplier);
 });
 
 test('round the world, rich, most of the crew home: Drake’s', () => {
@@ -48,8 +48,15 @@ test('lost: Oxenham’s, and nothing scored', () => {
 
 test('a smaller ship counts for more: the score times her multiplier', () => {
   const at = (ship: string) => score(home({ ship, gold: 100, crew: 10, hull: 10, maxHull: 10 }, ROUND));
-  const raw = 100 + 10 * HAND_WORTH + SHIP_WORTH;
-  assert.equal(at('pinnace').total, raw * 2);
-  assert.equal(at('sloop').total, raw * 1.5);
-  assert.equal(at('brigantine').total, raw);
+  const raw = (ship: string) => 100 + 10 * HAND_WORTH + shipWorth(ship);
+  assert.equal(at('pinnace').total, raw('pinnace') * 2);
+  assert.equal(at('sloop').total, raw('sloop') * 1.5);
+  assert.equal(at('brigantine').total, raw('brigantine'));
+});
+
+test('the ship is worth her class, by her hull: a sound brigantine more than a sound pinnace', () => {
+  const sound = (ship: string) => score(home({ ship, gold: 100, crew: 10, hull: 10, maxHull: 10 }, ROUND)).ship;
+  assert.equal(sound('pinnace'), shipWorth('pinnace'));
+  assert.ok(sound('brigantine') > sound('sloop') && sound('sloop') > sound('pinnace'));
+  assert.equal(score(home({ ship: 'brigantine', gold: 100, crew: 10, hull: 1, maxHull: 10 }, ROUND)).ship, Math.round(shipWorth('brigantine') / 10));
 });

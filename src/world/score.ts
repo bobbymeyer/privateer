@@ -16,8 +16,8 @@ import type { WorldState } from './world.ts';
 
 /** What each hand home is worth to the score. */
 export const HAND_WORTH = 2;
-/** What a sound ship is worth, all of her; a battered one, her share of it. */
-export const SHIP_WORTH = 20;
+/** What a sound ship is worth, all of her, by her class; a battered one, her share of it. */
+export const shipWorth = (ship: string) => SHIP_CLASSES[ship].value;
 /** Rich: what a voyage needs home to count as one that paid. */
 export const RICH = 200;
 
@@ -68,7 +68,7 @@ export function score(w: WorldState): Score {
   }
   const treasure = w.gold;
   const hands = w.crew * HAND_WORTH;
-  const ship = Math.round((w.hull / w.maxHull) * SHIP_WORTH);
+  const ship = Math.round((w.hull / w.maxHull) * shipWorth(w.ship));
   const fame = w.fame;
   const chronicle = chronicleOf(w);
   const parts = { treasure, hands, ship, fame, chronicle, multiplier: c.multiplier, total: Math.round((treasure + hands + ship + fame + chronicle) * c.multiplier) };

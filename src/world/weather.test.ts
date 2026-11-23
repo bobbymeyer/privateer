@@ -78,3 +78,13 @@ test('over a long voyage the way asks things of you, and costs hands', () => {
   for (const what of ['fever aboard', 'gone foul', 'weevils']) assert.ok(after.log.some((l) => l.text.includes(what)), what);
   assert.ok(after.crew < 1000);
 });
+
+test('no foul water where the casks can be filled afresh', async () => {
+  const { lyingAt } = await import('./testing.ts');
+  const { weatherDay } = await import('./weather.ts');
+  const at = lyingAt(sea, fresh({ crew: 40 }), 'canaries');
+  for (let rng = 0; rng < 2000; rng++) {
+    const r = { rng };
+    assert.notEqual(weatherDay(sea, { ...at, rng }, r).dilemma?.kind, 'foul');
+  }
+});

@@ -13,12 +13,13 @@
   import { choices, choose, describe as describeDilemma } from '../world/dilemmas.ts';
   import { choices as legsFrom, daysTo, makeFor, onward } from '../world/journey.ts';
   import { HOME_LANDMARK, landmark } from '../world/landmarks.ts';
-  import { attack, fight, hailExtra, letPass, raid, raidHere, type Reckoning } from '../world/meet.ts';
+  import { attack, fight, hailExtra, letPass, type Lookout, oddsOf, oddsSaid, raid, raidHere, type Reckoning } from '../world/meet.ts';
   import { adjective, article, type Nation } from '../world/ports.ts';
   import { read } from '../world/reading.ts';
   import { HAND_WORTH, LIKE_TITLES, score } from '../world/score.ts';
   import {
     CHANDLER, ISLANDERS_COST, SPICE_WORTH, TRUCK_AT, TRUCK_ROOM, barter, barterHere, BARTER_DAYS, shoreDays, takeHere, buySpice, spiceHere, spiceRoom, ISLANDERS_DAYS, SCURVY_DAYS, SHORE_DAYS, minHands, type Ware, ashore, startCrew, buy, capacity, complement, daysOf, landmarkHere, marketHere, price, room, scurvy, shoreHere, trade, WOOD_WORTH, buyWood, woodHere, woodRoom,
+    mend, yardHere, YARD_COST,
   } from '../world/stores.ts';
   import { PRIZES, followed } from '../world/rumors.ts';
   import { JEWELS, favourOf, setAside, toHerTaste } from '../world/jewels.ts';
@@ -263,9 +264,13 @@
     else if (canContinue) go();
   }
 
+  /** Choose the leg: the course is set, and you can still water, forage or buy for it before you continue on. */
   function setFor(key: string) {
     attempt(() => makeFor(world!, key));
-    if (!said) go();
+  }
+  /** Think again at the fork, before she sails. */
+  function unset() {
+    if (world) world = { ...world, voyage: { ...world.voyage, bound: null } };
   }
 
   // --- Fighting ----------------------------------------------------------------
@@ -348,6 +353,9 @@
   const days = $derived(now() ? daysOf(now()!) : { food: 0, water: 0 });
   const RATIONS: [WorldState['rations'], string][] = [['full', 'full'], ['short', 'short'], ['starving', 'starvation']];
   const PACES: [WorldState['pace'], string][] = [['easy', 'easy'], ['steady', 'steady'], ['hard', 'crack on']];
+  /** The docked bar's height on a phone, so the page leaves room for it however many rows it wraps to. */
+  let dockHeight = $state(0);
+  const LOOKOUTS: [Lookout, string][] = [['worth', 'what’s worth it'], ['every', 'every sail']];
   const WARES: Ware[] = ['food', 'water', 'hands', 'spares', 'powder'];
   /** What the chandler here sells: truck only at Plymouth, where it's English goods. */
   const waresHere = (w: WorldState): Ware[] => (w.voyage.at === TRUCK_AT ? [...WARES, 'truck'] : WARES);
@@ -395,7 +403,7 @@
 {#if !sea}
   <main><p class="faint">charting the seas…</p></main>
 {:else}
-  <main>
+  <main style={phone ? `padding-bottom: calc(${dockHeight}px + 1.5rem)` : ''}>
     {#snippet gauges(w: WorldState)}
         <!-- What you act on every day. -->
         <div class="gauges">
@@ -501,6 +509,10 @@
             <span class="faint">pace</span>
             {#each PACES as [k, name] (k)}<button aria-pressed={world.pace === k} onclick={() => (world = { ...world!, pace: k })}>{name}</button>{/each}
           </div>
+          <div class="row" role="group" aria-label="the lookout">
+            <span class="faint">lookout</span>
+            {#each LOOKOUTS as [k, name] (k)}<button aria-pressed={world.lookout === k} onclick={() => (world = { ...world!, lookout: k })}>{name}</button>{/each}
+          </div>
         </div>
       </section>
 
@@ -538,6 +550,11 @@
                 </button>
               {/each}
             </div>
+            {#if yardHere(sea, world)}
+              <div class="row">
+                <button disabled={sailing || world.gold < YARD_COST || world.hull >= world.maxHull} onclick={() => attempt(() => mend(sea!, world!))}>the yard: mend a point of hull ({YARD_COST}), {world.hull} of {world.maxHull}</button>
+              </div>
+            {/if}
           {:else if market === 'islanders'}
             <div class="row">
               <button disabled={sailing || world.gold < ISLANDERS_COST} onclick={() => attempt(() => trade(sea!, world!))}>trade with the islanders ({ISLANDERS_COST}): the casks filled, {ISLANDERS_DAYS} days of fresh food</button>
@@ -564,7 +581,7 @@
             <p class="faint">{town.kind === 'fortress' ? 'walled, and its guns are heavy.' : 'an open town: a battery or two, the walls, and the townsfolk.'} {['valparaiso', 'callao'].includes(town.key) && !world.voyage.visited.includes('cacafuego') ? 'word of a raid here would go north ahead of you.' : ''}</p>
           {/if}
         {/if}
-        <div class="row primary" class:dock={phone}>
+        <div class="row primary" class:dock={phone} bind:clientHeight={dockHeight}>
           {#if phone && making && making !== world.voyage.at && !atFork}<span class="faint docked">{making === HOME_LANDMARK ? 'home' : landmark(making).name}, {daysTo(sea, world, making)} days</span>{/if}
           {#if world.voyage.at === HOME_LANDMARK}
             <!-- Home: nothing to sail for; the reckoning and the end screen say the rest. -->
@@ -577,6 +594,9 @@
             <button onclick={() => stop('hove to')}>heave to</button>
           {:else}
             <button class="go" onclick={go} disabled={!canContinue}>continue on</button>
+            {#if here && world.voyage.bound && legsFrom(world.voyage, followed(world)).filter((k) => k !== HOME_LANDMARK).length > 1}
+              <button onclick={unset}>change course</button>
+            {/if}
             {#if world.voyage.at !== 'plymouth' && world.voyage.bound !== HOME_LANDMARK && !landmark(world.voyage.at).next.includes(HOME_LANDMARK)}
               <button onclick={() => setFor(HOME_LANDMARK)} disabled={!canContinue}>turn for home, {daysTo(sea, world, HOME_LANDMARK)} days</button>
             {/if}
@@ -739,6 +759,7 @@
             <p>the treasure ship of the South Sea, with the year's silver from Callao for Panama. {h.plate === 'warned' ? 'word of your raids on the coast has gone ahead of you, and she is ready for you.' : 'she has never seen an enemy in these waters, and takes you for one of her own.'}</p>
           {/if}
           <p class="faint">hull {r.hull} to your {world.hull} · {r.traits.join(' · ')}</p>
+          {#if oddsSaid(world, h)}<p class:warn={oddsOf(world, h) === 'hopeless'}>{oddsSaid(world, h)}</p>{/if}
           <div class="row">
             <button onclick={() => attempt(() => attack(world!))}>attack</button>
             <button onclick={() => attempt(() => letPass(world!))}>let her pass</button>

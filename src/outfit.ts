@@ -28,21 +28,25 @@ export interface ShipClass {
   purse: number;
   /** What the voyage's score is multiplied by. */
   multiplier: number;
+  /** Her hold, against a big ship's for her complement: a pinnace stows less, and must water and forage oftener. */
+  hold: number;
+  /** What she's worth brought home sound, to sell or send out again: the ship's line in the score, by her hull. */
+  value: number;
   /** What she is, in a line. */
   text: string;
 }
 
 export const SHIP_CLASSES: Record<string, ShipClass> = {
   pinnace: {
-    name: 'pinnace', hull: 12, complement: 30, cards: {}, purse: 120, multiplier: 2,
+    name: 'pinnace', hull: 12, complement: 30, cards: {}, purse: 120, multiplier: 2, value: 40, hold: 0.75,
     text: 'small, quick and cheap to keep: money in hand for stores, a light deck, and twice the score',
   },
   sloop: {
-    name: 'sloop', hull: 14, complement: 45, cards: { 'raking-fire': 1 }, purse: 70, multiplier: 1.5,
+    name: 'sloop', hull: 14, complement: 45, cards: { 'raking-fire': 1 }, purse: 70, multiplier: 1.5, value: 60, hold: 1,
     text: 'between the two: a gun more than a pinnace, a bigger hold, half again the score',
   },
   brigantine: {
-    name: 'brigantine', hull: 17, complement: 70, cards: { broadside: 1, 'raking-fire': 1 }, purse: 10, multiplier: 1,
+    name: 'brigantine', hull: 17, complement: 70, cards: { broadside: 1, 'raking-fire': 1 }, purse: 35, multiplier: 1, value: 90, hold: 1,
     text: 'stout, well gunned, a deep hold, and a big crew to feed: little left in the purse, the score as it stands',
   },
 };

@@ -21,11 +21,11 @@ the site serves it from there. The design is in
 purse and the more the voyage counts for; the bigger, the stouter, the
 better gunned and the deeper the hold.
 
-| ship | purse | hull | hands | deck | score |
-| --- | --- | --- | --- | --- | --- |
-| pinnace | 120 | 12 | 20 of 30 | 15 cards | ×2 |
-| sloop | 70 | 14 | 30 of 45 | 16, a raking fire more | ×1.5 |
-| brigantine | 10 | 17 | 47 of 70 | 17, a broadside and a raking fire more | ×1 |
+| ship | purse | hull | hands | deck | score | worth home sound |
+| --- | --- | --- | --- | --- | --- | --- |
+| pinnace | 120 | 12 | 20 of 30 | 15 cards | ×2 | 40 |
+| sloop | 70 | 14 | 30 of 45 | 16, a raking fire more | ×1.5 | 60 |
+| brigantine | 35 | 17 | 47 of 70 | 17, a broadside and a raking fire more | ×1 | 90 |
 
 **Choose whose money you sail on** (`BACKERS` in `src/world/reckoning.ts`).
 Most voyages were paid for privately; the Crown put in ships and money when
@@ -91,7 +91,8 @@ turn for home whenever you like. Space continues on, or heaves to.
 
 **At a landmark**, what it offers (`offers` in `src/world/landmarks.ts`):
 fill the casks (2 days), forage and fish (3), careen her (5); a chandler
-(Plymouth, Ternate, Bantam), or islanders who fill your casks and sell
+(Plymouth, Ternate, Bantam, the last two with a yard that mends a point of
+hull for 4), or islanders who fill your casks and sell
 three weeks of fresh food for 3 (the Ladrones, Table Bay); or a Spanish
 town to raid, once (Valparaíso, Callao, Guatulco, Manila).
 
@@ -242,7 +243,16 @@ depends on the waters (`WATERS` in `src/world/meet.ts`): Spanish and
 Portuguese privateers and Barbary corsairs off Spain and Morocco, who come
 at you; Portuguese merchants off Brazil and Guinea, Spanish ones off Peru,
 Portuguese merchants and carracks in the East, which are yours to attack
-or let pass. Elsewhere the sea is empty.
+or let pass. Elsewhere the sea is empty. Merchants keep their distance in
+waters where you've been seen (each sail seen there makes the next less
+likely); privateers and corsairs, hunting you, come as often as ever.
+
+**The lookout** calls you up, by default, only for what's worth it: what
+comes at you, the Huguenots, the treasure ship and rumored prizes, and a
+Spanish or Portuguese ship you could take as you are. The rest he lets go
+by with a line in the log; "every sail" is there if you want them all.
+Before you attack, the odds are told: a hard fight, or she would likely
+sink you, and the master says so while he lives.
 
 **The treasure ship** (`src/world/treasure.ts`). Raise Cape San Francisco
 and the year's silver from Callao comes alongside, once: 4 hull under a
@@ -256,7 +266,8 @@ with no powder the guns are silent. A prize's hold fills yours; a town's
 storehouses are fresh food.
 
 **The score** (`src/world/score.ts`): treasure home, 2 for every hand
-alive, up to 20 for the ship's condition, times your ship's multiplier,
+alive, the ship's worth by her hull (a sound pinnace 40, sloop 60,
+brigantine 90), times your ship's multiplier,
 set against the voyages of the time.
 
 | a voyage like | means |
@@ -387,9 +398,11 @@ at anchor one day in two. The Horn is the fast way, with the storms: past
   day it goes on, worse on short rations. Foraging, food bought in port, a
   town's storehouses and islanders' fruit reset it; fish and birds put it
   back 10 days.
-- **The hull**: weed and worm take a point every 60 days at an easy pace,
-  40 steady, 25 cracking on. Careening mends 2 a bundle of spares, and 1
-  for the scraping. A storm ridden out takes spares before hull.
+- **The hull**: weed and worm take a point every 90 days at an easy pace,
+  60 steady, 35 cracking on. Careening's scraping and caulking mend 3
+  without spares, and 2 more for each bundle the rest takes; the yards at
+  Ternate and Bantam mend a point for 4 gold. A storm ridden out takes
+  spares before hull. Kept so, she can come home sound, and worth it.
 
 | event | how often | what it does |
 | --- | --- | --- |
@@ -454,14 +467,15 @@ the fight is taught from the start and nothing it costs counts.
 it fits out (hands, water, food, then spares and powder), takes forks at
 random, rations by the leg ahead, waters (by night on the Spanish coast if
 it must), forages and careens where there's a shore, buys and trades where
-it can, attacks merchants and the treasure ship on a sound enough hull,
+it can, mends in the yards, attacks merchants and the treasure ship on a
+sound enough hull and never at odds the master calls hopeless,
 leaves the coast of Peru asleep for the silver, and fights by one-step
 lookahead. It follows a rumor as a captain would: not the Northwest
 Passage, the River May or Cuzco's gold, not a prize too strong for her,
 not far on a prisoner's word (`--every-rumor` follows them all).
 
 ```
-npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--every-rumor] [--chronicler] [--french] [--no-truck] [--trace]
+npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--every-rumor] [--chronicler] [--french] [--no-truck] [--trace] [--hull] [--every-sail]
 ```
 
 It carries three chests of truck, deals fairly with the peoples of the
@@ -470,22 +484,26 @@ merchant unless `--pirate`, and at the reckoning goes to court when the
 risk is under three in ten, gives the Queen a gift when it isn't.
 
 The aim is that a sensible captain comes home 35–55% of the time with any
-ship and backer, and that Drake's voyage is rare but there. Over 100
-voyages each, seeds 0–99 and 100–199 (home %, voyages like Drake's):
+ship and backer, that Drake's voyage is rare but there, and that the ship
+comes home in the state you kept her in. Over 100 voyages each, seeds 0–99
+and 100–199 (home %, voyages like Drake's, hull at home for the voyages
+that got there):
 
 | ship | the Crown | gentlemen adventurers | your own stake |
 | --- | --- | --- | --- |
-| pinnace | 58%, 2 · 49%, 3 | 55%, 1 · 52%, 4 | 56%, 5 · 43%, 5 |
-| sloop | 43%, 2 · 41%, 5 | 48%, 1 · 57%, 1 | 43%, 0 · 34%, 1 |
-| brigantine | 38%, 2 · 45%, 1 | 46%, 1 · 47%, 0 | 39%, 1 · 31%, 2 |
+| pinnace | 44 · 53%, 3 · 3, 58 · 55% | 40 · 48%, 6 · 2, 56 · 57% | 43 · 50%, 3 · 4, 56 · 59% |
+| sloop | 46 · 47%, 2 · 4, 65 · 65% | 54 · 47%, 4 · 2, 59 · 52% | 51 · 37%, 5 · 1, 61 · 60% |
+| brigantine | 52 · 43%, 4 · 5, 57 · 56% | 41 · 50%, 1 · 4, 59 · 58% | 52 · 55%, 2 · 1, 54 · 58% |
 
-Two levers hold it there, after the playtest's fixes (water by night, the
-Pacific trades) and a bot that follows rumors with judgement had made it
-57–86%: a ship needs a third of her complement to work her (it was 8 hands
-for any ship, so a brigantine sailed home with a pinnace's crew), and the
-scurvy kills at 0.0003 a hand a day past six weeks. What ends the rest is
-almost always too few hands, on the long legs: the Pacific, and Java to the
-Cape. See `docs/playtest-1.md` for voyages played by hand.
+What holds it there: a ship needs a third of her complement to work her;
+the scurvy kills at 0.00035 a hand a day past six weeks; a pinnace stows
+three quarters of a bigger ship's hold for her complement. Before hulls
+could be kept every voyage came home at about a fifth of her hull, and the
+lookout stopped her for some nine sails a voyage; now it's 52–65% of her
+hull, and two to five sails. What ends the rest is almost always too few
+hands, on the long legs: the Pacific, and Java to the Cape. See
+`docs/playtest-1.md` for voyages played by hand. `--hull` says what took
+her hull, by cause; `--every-sail` sails with the old lookout.
 
 ## running it
 
@@ -497,7 +515,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 203 tests
+npm test                     # the rules and the voyage, 212 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)

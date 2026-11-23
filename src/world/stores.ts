@@ -46,7 +46,7 @@ export const TROPIC_THIRST = 1.5;
 /** Days without fresh food before scurvy kills. */
 export const SCURVY_DAYS = 42;
 /** Hands dead of scurvy a day, per hand, per day past SCURVY_DAYS. */
-export const SCURVY_RATE = 0.0003;
+export const SCURVY_RATE = 0.00035;
 /** And of thirst, and of hunger, a day, per hand, when it's run out. */
 export const THIRST_RATE = 0.08;
 export const HUNGER_RATE = 0.03;
@@ -59,13 +59,14 @@ export const WORKING_SHARE = 1 / 3;
 /** The fewest hands that can work her: a pinnace's handful, a brigantine's watch. */
 export const minHands = (s: { ship: string }) => Math.max(MIN_HANDS, Math.ceil(complement(s) * WORKING_SHARE));
 /** Days at sea between a point of hull lost to weed and worm, by pace. */
-export const WEAR_DAYS: Record<Pace, number> = { easy: 60, steady: 40, hard: 25 };
+export const WEAR_DAYS: Record<Pace, number> = { easy: 90, steady: 60, hard: 35 };
 
 export const complement = (s: { ship: string }) => SHIP_CLASSES[s.ship].complement;
 /** What she can carry, by her complement: food for 180 days, water for 90, a share of spares and powder. */
 export const capacity = (s: { ship: string }): Stores => {
   const c = complement(s);
-  return { food: c * 180, water: c * 90, spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) };
+  const hold = SHIP_CLASSES[s.ship].hold;
+  return { food: Math.round(c * 180 * hold), water: Math.round(c * 90 * hold), spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) };
 };
 
 /** A new voyage's hands: two thirds of her complement. The rest are to hire. */
@@ -181,6 +182,8 @@ export function landmarkHere(sea: Sea, s: WorldState): Landmark | null {
 export const shoreHere = (sea: Sea, s: WorldState): ShoreWork[] => landmarkHere(sea, s)?.offers.shore ?? [];
 
 /** Days each takes. */
+/** What scraping and caulking her on a beach mends without spares: weed and worm, and the seams. */
+export const CAREEN_FREE = 3;
 export const SHORE_DAYS: Record<ShoreWork, number> = { water: 2, forage: 3, careen: 5, night: 2 };
 /** Watering by night at a Spanish town: this often you're seen, and word goes up the coast. */
 export const NIGHT_SEEN = 0.3;
@@ -224,11 +227,12 @@ export function ashore(sea: Sea, s: WorldState, what: ShoreWork, advance: (sea: 
     log(`foraging: fresh food, ${Math.round(got / Math.max(1, w.crew))} days of it`);
   }
   if (what === 'careen') {
-    // Hauled down on a beach, scraped, caulked: two points of hull for each bundle of spares, and one for the scraping.
-    const need = Math.ceil((w.maxHull - w.hull) / 2);
+    // Hauled down on a beach, scraped, caulked: the scraping and caulking alone are worth CAREEN_FREE, and two
+    // more for each bundle of spares the rest takes; the carpenter, while he lives, mends a point more.
+    const free = CAREEN_FREE + (alive(w, 'carpenter') ? 1 : 0);
+    const need = Math.max(0, Math.ceil((w.maxHull - w.hull - free) / 2));
     const used = Math.min(need, w.stores.spares);
-    // The carpenter, while he lives, mends a point more.
-    w = { ...w, hull: Math.min(w.maxHull, w.hull + used * 2 + 1 + (alive(w, 'carpenter') ? 1 : 0)), stores: { ...w.stores, spares: w.stores.spares - used } };
+    w = { ...w, hull: Math.min(w.maxHull, w.hull + used * 2 + free), stores: { ...w.stores, spares: w.stores.spares - used } };
     log(`careened: weed scraped, seams caulked${used ? `, ${used} of the spares used` : ''}`);
   }
   // Arrows from the trees, if the people of this coast are wary of you, or worse.
@@ -325,6 +329,19 @@ export function buySpice(sea: Sea, s: WorldState): WorldState {
   if (s.spice >= spiceRoom(s)) throw new Error('no room for more spice');
   if (s.gold < spice.cost) throw new Error('not enough in the purse');
   return { ...s, gold: s.gold - spice.cost, spice: s.spice + 1 };
+}
+
+/** A shipwright's yard where a chandler deals with you abroad: a point of hull for this. */
+export const YARD_COST = 4;
+/** Whether there's a yard here: wherever a chandler deals with you, away from Plymouth. */
+export const yardHere = (sea: Sea, s: WorldState) => marketHere(sea, s) === 'chandler' && s.voyage.at !== 'plymouth';
+
+/** A point of hull mended in the yard, for gold: dear beside careening, but quick, and no spares. */
+export function mend(sea: Sea, s: WorldState): WorldState {
+  if (!yardHere(sea, s)) throw new Error('there is no yard here');
+  if (s.hull >= s.maxHull) throw new Error('she is sound');
+  if (s.gold < YARD_COST) throw new Error('not enough in the purse');
+  return { ...s, gold: s.gold - YARD_COST, hull: s.hull + 1 };
 }
 
 /** Trade with islanders: the casks filled, and three weeks of fresh food, for a little gold or a chest of truck. Fair dealing. */

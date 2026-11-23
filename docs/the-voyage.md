@@ -79,7 +79,9 @@ Every day at sea costs:
 - **water**: casks, which go faster in the tropics;
 - **health**: scurvy creeps in after about six weeks without fresh food and
   kills slowly, then quickly; the flux and fever come in hot ports;
-- **the hull**: weed, worm and weather; careening at a landmark mends it;
+- **the hull**: weed, worm and weather; careening at a landmark mends it,
+  and the yards at Ternate and Bantam for gold; she is worth her class
+  brought home sound, so keeping her is part of the score;
 - **canvas and timber**: storms take them, and without spares a storm takes
   the hull instead;
 The crew is a number, two thirds of the ship's complement at the start.
