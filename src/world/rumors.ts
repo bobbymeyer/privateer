@@ -9,7 +9,7 @@
  * never comes, the Great Ship sailed a week before, the Viceroy's fleet in
  * the river at Goa, no islands where the Spaniards said.
  *
- * The six:
+ * The ten:
  *
  * | rumor | heard | the detour | if it's true |
  * | the Manila galleon | Spanish prisoners on the Pacific coast | Cabo San Lucas | the galleon from Manila comes in |
@@ -18,6 +18,10 @@
  * | the Banda islands | the Sultan's pilot at Ternate | where the nutmeg grows | the Sultan's kinsmen give you nutmeg |
  * | Goa | Bantam, Portuguese prisoners in the East | the Viceroy's city | a fortress to raid, the richest of all |
  * | the carrack from Goa | Bantam, a castaway at the Cape, prisoners off Brazil | off the Azores | the year's carrack from the Indies |
+ * | the temple jewels of Cuzco | Spanish prisoners off Chile | off Arica | rarely: gold and emeralds in a bark aground |
+ * | the plate fleet in the Bahama Channel | Spanish prisoners on the Pacific coast or homeward | the Bahama Channel | the plate fleet, rich and guarded |
+ * | the French on the River May | a castaway at Sierra Leone, Huguenots | the River May | never: it fell in 1565 |
+ * | the Northwest Passage | castaways at the Cape and off Brazil, Huguenots | the Northwest Passage | never: ice and fog |
  */
 
 import type { Extra } from '../setup.ts';
@@ -26,6 +30,7 @@ import type { Nation } from './ports.ts';
 import { type Roller, pick, roll } from './random.ts';
 import { capacity, spiceRoom, topUp } from './stores.ts';
 import type { Sea, WorldState } from './world.ts';
+import { JEWELS, type Jewel } from './jewels.ts';
 
 /** Who told you, and how far to trust them. */
 export type Source = 'prisoner' | 'islanders' | 'gossip' | 'castaway' | 'pilot';
@@ -55,6 +60,8 @@ interface Detour {
   prisoners?: { nations: Nation[]; after: string[] };
   /** Arriving, if it was a lie. */
   nothing: string;
+  /** How often it's true, whoever tells it: some things everybody says and none is so. Otherwise the source decides. */
+  truth?: number;
 }
 
 export const DETOURS: Record<string, Detour> = {
@@ -93,6 +100,34 @@ export const DETOURS: Record<string, Detour> = {
     prisoners: { nations: ['portugal'], after: ['brazil-home', 'sierra-leone', 'cape'] },
     nothing: 'the Azores, and no carrack: the galleys of the Azores guard went out to bring her in a week ago',
   },
+  arica: {
+    word: 'the gold of the Temple of the Sun at Cuzco still comes down to Arica, a little at a time, in the barks for Callao, and nobody guards it',
+    heardAt: {},
+    prisoners: { nations: ['spain'], after: ['mocha', 'valparaiso'] },
+    nothing: 'off Arica, and the barks carry silver ingots and wine, nothing from Cuzco: Pizarro’s men stripped the temple fifty years ago',
+    // Everybody in Peru tells it; it is almost never so.
+    truth: 0.15,
+  },
+  'bahama-channel': {
+    word: 'the plate fleet must run the Bahama Channel to come home, every galleon of the Indies in one narrow water',
+    heardAt: {},
+    prisoners: { nations: ['spain'], after: ['callao', 'cacafuego', 'guatulco', 'strait-east', 'brazil-home'] },
+    nothing: 'the Bahama Channel, and the fleet went through a month ago: only a straggler’s wreck on the Florida shoals, picked clean',
+  },
+  'river-may': {
+    word: 'the French still hold the fort on the River May in Florida, and would welcome an English ship',
+    heardAt: { 'sierra-leone': 'castaway' },
+    nothing: 'the River May, and the fort is Spanish San Mateo, as it has been since Menéndez took it in 1565: a guard boat follows you out, and two days are lost standing off',
+    // It fell in 1565. Whoever says otherwise is fifteen years behind.
+    truth: 0,
+  },
+  northwest: {
+    word: 'there is a passage north of America to Cathay, and a ship that found it would be home in half the time',
+    heardAt: { 'brazil-home': 'castaway', cape: 'castaway' },
+    nothing: 'ice in the strait, fog, and a coast of rock running north: no passage, as Frobisher found. the ice turns you back',
+    // Not for three hundred years, and not for a ship of 1580.
+    truth: 0,
+  },
 };
 
 /** On raising a landmark, a rumor this often, if there's one to hear. */
@@ -126,7 +161,7 @@ export function reachable(s: WorldState, key: string): boolean {
 /** A rumor offered: as an event that asks, follow it or not. Its truth is settled now. */
 function offer(s: WorldState, key: string, source: Source, r: Roller): WorldState {
   const told = pick(r, SOURCES[source].told);
-  const truth = roll(r) < SOURCES[source].truth;
+  const truth = roll(r) < (DETOURS[key].truth ?? SOURCES[source].truth);
   return { ...s, dilemma: { kind: 'rumor', key, source, told, truth }, log: [...s.log, { turn: s.turn, text: `a rumor, from ${told}`, stop: true }] };
 }
 
@@ -180,7 +215,7 @@ export function heed(s: WorldState, follow: boolean): WorldState {
 
 // --- The prizes at the end of a rumor --------------------------------------------
 
-export type Prize = 'galleon' | 'great-ship' | 'carrack';
+export type Prize = 'galleon' | 'great-ship' | 'carrack' | 'flota';
 export const PRIZES: Record<Prize, { name: string; nation: Nation; extra: Extra; text: string }> = {
   galleon: {
     name: 'the Manila galleon', nation: 'spain', extra: { hull: 4, cargo: 280, takenWhole: true },
@@ -194,10 +229,19 @@ export const PRIZES: Record<Prize, { name: string; nation: Nation; extra: Extra;
     name: 'the carrack from Goa', nation: 'portugal', extra: { hull: 6, cargo: 400, takenWhole: true },
     text: 'the carrack from Goa, seven decks high, the Indies’ whole year of pepper, cloves, silk, diamonds and calico in her.',
   },
+  flota: {
+    name: 'the plate fleet', nation: 'spain', extra: { hull: 12, cargo: 450, takenWhole: true },
+    text: 'the plate fleet out of Havana, a dozen galleons low with silver and their escort of fighting ships: the richest thing afloat, and the best guarded. a ship that cuts out one galleon and runs is rich; a ship that stays is sunk.',
+  },
 };
 /** Goa: the richest town in the East, and the hardest. */
 export const GOA_EXTRA: Extra = { hull: 4, cargo: 300 };
-const PRIZE_AT: Record<string, Prize> = { 'cabo-san-lucas': 'galleon', macau: 'great-ship', azores: 'carrack' };
+const PRIZE_AT: Record<string, Prize> = { 'cabo-san-lucas': 'galleon', macau: 'great-ship', azores: 'carrack', 'bahama-channel': 'flota' };
+/** The temple's gold off Arica, when it's there: gold, and these jewels. */
+export const ARICA_GOLD = 40;
+/** The Northwest Passage, and the days the ice and fog take; the River May, the days standing off. */
+export const ICE_DAYS = [3, 5] as const;
+export const MAY_DAYS = 2;
 /** The Isles of Solomon: Mendaña's gold, this often, and how much. */
 export const SOLOMON_GOLD = 0.25;
 export const SOLOMON_GOLD_SUM = [15, 45] as const;
@@ -212,7 +256,17 @@ export function arriveDetour(sea: Sea, s: WorldState, key: string): WorldState {
   void sea;
   if (!landmark(key).detour) return s;
   const say = (w: WorldState, text: string): WorldState => ({ ...w, log: [...w.log, { turn: w.turn, text, stop: true }] });
-  if (!trueHere(s, key)) return say(s, DETOURS[key].nothing);
+  if (!trueHere(s, key)) {
+    const r: Roller = { rng: s.rng };
+    const w = say(s, DETOURS[key].nothing);
+    // The ice and the fog in the north; the guard boat on the River May.
+    if (key === 'northwest') {
+      const days = ICE_DAYS[0] + Math.floor(roll(r) * (ICE_DAYS[1] - ICE_DAYS[0] + 1));
+      return { ...w, rng: r.rng, calm: Math.max(w.calm, w.turn + days), log: [...w.log, { turn: w.turn, text: `${days} days in the ice and the fog before she is clear of it` }] };
+    }
+    if (key === 'river-may') return { ...w, calm: Math.max(w.calm, w.turn + MAY_DAYS) };
+    return w;
+  }
   const prize = PRIZE_AT[key];
   if (prize) return say({ ...s, hail: { kind: 'treasure-ship', nation: PRIZES[prize].nation, prize } }, `a sail: ${PRIZES[prize].name}, as they said`);
   const r: Roller = { rng: s.rng };
@@ -230,6 +284,13 @@ export function arriveDetour(sea: Sea, s: WorldState, key: string): WorldState {
     w = say({ ...w, spice: w.spice + gift, fresh: 0, stores: { ...w.stores, food: topUp(w.stores.food, w.crew * 7, cap.food) } }, `the Sultan’s kinsmen come out with nutmeg: ${gift} tons, a gift, and fruit for the crew`);
   }
   if (key === 'goa') w = say(w, 'Goa, and the river empty of galleys: the Viceroy’s fleet is away, as they said');
+  if (key === 'arica') {
+    const temple: Jewel[] = [
+      { kind: 'emerald', name: 'an emerald from the Temple of the Sun at Cuzco', value: JEWELS.emerald.value },
+      { kind: 'emerald', name: 'an emerald the size of a pigeon’s egg, from the temple’s walls', value: JEWELS.emerald.value + 15 },
+    ];
+    w = say({ ...w, gold: w.gold + ARICA_GOLD, jewels: [...w.jewels, ...temple] }, `a bark out of Arica aground on the shoals and her crew fled: in her cabin, gold from the Temple of the Sun at Cuzco, ${ARICA_GOLD}, and two emeralds from its walls`);
+  }
   return { ...w, rng: r.rng };
 }
 
