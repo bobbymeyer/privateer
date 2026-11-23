@@ -212,6 +212,13 @@ export const MERCHANT_CARDS: readonly CardDef[] = [
 ];
 
 
+/** A fishing boat off the Canaries: no guns, nets to haul in, and she runs. Good for practice, and nothing else. */
+export const FISHING_CARDS: readonly CardDef[] = [
+  { key: 'crack-on', name: 'crack on sail', effects: [{ kind: 'flee', amount: 1 }], copies: 4 },
+  { key: 'nets', name: 'haul in the nets', effects: [{ kind: 'mend', amount: 1 }], copies: 2 },
+  { key: 'strike', name: 'strike colours', effects: [{ kind: 'plunder', amount: 2, at: near }], copies: 1 },
+];
+
 /** A lone galleon: great guns that ruin you close, a hold full of silver, and she runs. */
 export const TREASURE_SHIP_CARDS: readonly CardDef[] = [
   { key: 'great-guns', name: 'great guns', effects: [{ kind: 'hurt', amount: 1, at: far }, { kind: 'hurt', amount: 3, at: near }, { kind: 'wound', what: 'leak', at: close }], copies: 3 },

@@ -8,6 +8,8 @@
   import CardView from './CardView.svelte';
   import Gauge from './Gauge.svelte';
   import { fade, fly } from 'svelte/transition';
+  import { untrack } from 'svelte';
+  import { type Lesson, everyLesson, loadTaught, nextLesson, saveTaught, withLesson } from '../lessons.ts';
 
   let {
     fight,
@@ -18,6 +20,8 @@
     nation,
     onact,
     oncontinue,
+    teach = false,
+    practice = false,
   }: {
     fight: EncounterState;
     lastRound: GameEvent[];
@@ -31,7 +35,23 @@
     nation: Nation;
     onact: (a: Action) => void;
     oncontinue: () => void;
+    /** Show the hints, a step at a time: the player's first fight, or practice. */
+    teach?: boolean;
+    /** The practice fight at the Canaries: nothing it costs counts, and the hints start from the beginning. */
+    practice?: boolean;
   } = $props();
+
+  // The hints read: practice teaches from the start; a first real fight goes on from what was read before.
+  let read: Lesson[] = $state(untrack(() => (practice ? [] : loadTaught())));
+  const hint = $derived(teach ? nextLesson(fight, read) : null);
+  function understood(key: Lesson) {
+    read = withLesson(read, key);
+    saveTaught(withLesson(loadTaught(), key));
+  }
+  function enough() {
+    read = everyLesson();
+    saveTaught(everyLesson());
+  }
 
   let picks: number[] = $state([]);
 
@@ -141,10 +161,21 @@
   </p>
   <p class="status">{RANGE_WORDS[fight.range]}{fight.target.fixed ? ' · a town goes nowhere: close is the boats offshore, grappled is the party ashore' : ''}</p>
 
+  {#if hint}
+    <aside class="hint" aria-live="polite">
+      <h3>{hint.title}</h3>
+      <p>{hint.text}</p>
+      <div class="row">
+        <button onclick={() => understood(hint.key)}>understood</button>
+        <button class="quiet" onclick={enough}>no more hints</button>
+      </div>
+    </aside>
+  {/if}
+
   {#if fight.outcome}
     <div class="outcome">
       <h3>{(isRaid ? RAID_OUTCOME_TEXT : OUTCOME_TEXT)[fight.outcome]}</h3>
-      <p>you come away with {fight.payout}</p>
+      {#if practice}<p>practice: nothing it cost you counts</p>{:else}<p>you come away with {fight.payout}</p>{/if}
       {#each reckoning?.said ?? [] as line}<p>{line}</p>{/each}
       <button onclick={oncontinue}>{fight.outcome === 'sunk' ? 'the end' : 'continue'}</button>
     </div>
@@ -226,6 +257,11 @@
   .glossary dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0.5rem 0 0; }
   .glossary dt { color: var(--ink); }
   .glossary dd { margin: 0; }
+  .hint { border: 1.5px dashed var(--ink); padding: 0.75rem 1rem; }
+  .hint h3 { margin-bottom: 0.25rem; }
+  .hint p { color: var(--ink); margin: 0 0 0.5rem; }
+  .hint .row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .hint .quiet { color: var(--faint); border-color: var(--rule); }
   .keys { font-size: 0.8rem; border-top: 1px dashed var(--rule); padding-top: 0.75rem; }
   @media (max-width: 40rem) {
     .table { grid-template-columns: 1fr; }

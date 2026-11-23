@@ -33,6 +33,7 @@
   import { shareText } from '../share.ts';
   import { type Entry, best, dailySeed, entryFor, isWin, loadLog, raised, saveLog, scoreOf, today, withEntry } from '../logbook.ts';
   import { ambient, bell, coin, gun, knell, setSound, soundOn, storm } from './sound.ts';
+  import { allTaught, loadTaught } from '../lessons.ts';
   import Fight from './Fight.svelte';
   import RouteChart from './RouteChart.svelte';
 
@@ -262,11 +263,16 @@
   let title = $state('');
   let nation: Nation = $state('spain');
   let isRaid = $state(false);
+  /** The practice fight, and whether this fight teaches: practice always does, and a real one until the hints have all been read. */
+  let practising = $state(false);
+  let teaching = $state(false);
 
   $effect(() => {
     if (world?.encounter && !shown) {
       const m = world.encounter;
       shown = m.fight;
+      practising = !!m.practice;
+      teaching = practising || !allTaught(loadTaught());
       isRaid = m.raid !== null;
       nation = m.nation;
       const flag = adjective(m.nation);
@@ -592,8 +598,15 @@
             <dd>Storms, fever, foul water, weevils, a leak, a wreck, canoes, a reef, the hands wanting Spanish gold, fire in the bread room, a storm on the eve of a raid, a feast ashore, hands in the lock-up, your papers searched, shining ore: each asks you how to meet it, and says what it costs.</dd>
             <dt>a sail</dt>
             <dd>Privateers and corsairs off Spain and Barbary come at you; merchants off Brazil, Peru and in the East are yours to take or let pass. Off Cape San Francisco, the treasure ship, unless your raids on the coast have warned her.</dd>
-            <dt>a fight</dt>
-            <dd>Cards. Three are dealt: keep two, which play in the order you pick them; the third goes to the bottom. Sail, then shot, then board, each in order, and they hit harder. A fight spends powder and costs hands; with no powder the guns are silent. A prize's hold fills yours.</dd>
+            <dt>how to fight</dt>
+            <dd>
+              Cards, yours and hers. <em>The range</em> is far, close or grappled: long guns reach far, a broadside is heavy close, boarders only go across grappled, and a card does only what works at the range as it stands. Sail cards close the range or open it; three stretches of open water and a ship is away.
+              <em>Her next card</em> is face up beside your hand, and she plays it after yours.
+              <em>Three are dealt</em>: keep two, which play in the order you pick them; the third goes under your deck.
+              <em>The chain</em>: sail, then shot, then board, each in order, and each hits harder than the last.
+              <em>What it costs</em>: a barrel of powder for three shots, hands for every point of hull lost; with no powder the guns are silent. Beat her down and she strikes, and her hold fills yours.
+              Your first fight explains itself as it goes, and at the Canaries there's a fishing boat to practise on.
+            </dd>
             <dt>whose money</dt>
             <dd>The Crown, gentlemen adventurers, or your own stake: more money to fit out with, for a share of what you bring home.</dd>
             <dt>privateer or pirate</dt>
@@ -655,7 +668,7 @@
     {:else if world && shown}
       <div class="overlay">
         <div class="sheet wide">
-          <Fight fight={shown} {lastRound} {reckoning} {title} {isRaid} {nation} {onact} {oncontinue} />
+          <Fight fight={shown} {lastRound} {reckoning} {title} {isRaid} {nation} {onact} {oncontinue} teach={teaching} practice={practising} />
         </div>
       </div>
     {:else if world?.hail}

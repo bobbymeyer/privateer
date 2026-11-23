@@ -143,6 +143,7 @@ function answer(w: WorldState): WorldState {
         : w.dilemma.kind === 'jailed' ? (open.includes('pay') && w.gold > 40 ? 'pay' : 'leave')
         : w.dilemma.kind === 'papers' ? (open.includes('bribe') ? 'bribe' : 'hand')
         : w.dilemma.kind === 'ore' ? 'leave'
+        : w.dilemma.kind === 'practice' ? 'practise'
         : w.dilemma.kind === 'misconduct' ? 'punish'
         : w.dilemma.kind === 'huguenots' ? (FRENCH && open.includes('commission') ? 'commission' : 'company')
         : w.dilemma.kind === 'reckoning' ? (outlawed(w) ? (open.includes('gift') && !outlawed({ ...w, infamy: w.infamy - pardonOf(w) }) ? 'gift' : 'low') : courtRisk(w) < 0.3 ? 'court' : w.gold > 100 ? 'gift' : 'low')

@@ -3,7 +3,7 @@
  * hull, what's in its hold, and the price on its head.
  */
 
-import { type Card, type CardDef, FORTRESS_CARDS, MERCHANT_CARDS, PRIVATEER_CARDS, RAID_CARDS, RELIEF, SHIP_CARDS, TOWN_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
+import { type Card, type CardDef, FISHING_CARDS, FORTRESS_CARDS, MERCHANT_CARDS, PRIVATEER_CARDS, RAID_CARDS, RELIEF, SHIP_CARDS, TOWN_CARDS, TREASURE_SHIP_CARDS, buildDeck } from './cards.ts';
 import { type EncounterState, type Reinforcement, createEncounter, type Range, START_RANGE } from './rules.ts';
 
 export interface TargetDef {
@@ -21,7 +21,7 @@ export interface TargetDef {
 }
 
 /** What you can fight: a sail sighted, the treasure ship, or a town on the way — open or fortified. */
-export type TargetKind = 'merchant' | 'privateer' | 'corsair' | 'treasure-ship' | 'town' | 'fortress';
+export type TargetKind = 'merchant' | 'privateer' | 'corsair' | 'treasure-ship' | 'town' | 'fortress' | 'fishing';
 
 /** A raid that runs into its fourth round brings the garrison's relief: a card a round, three in all. */
 export const RELIEF_FROM = 4;
@@ -30,6 +30,8 @@ export const RELIEF_COUNT = 3;
 
 export const TARGETS: Record<TargetKind, TargetDef> = {
   merchant: { name: 'merchant', hull: 11, cargo: 12, bounty: 4, cards: MERCHANT_CARDS },
+  // No guns at all: the practice fight at the Canaries. See `practise` in meet.ts.
+  fishing: { name: 'fishing boat', hull: 5, cargo: 3, bounty: 0, cards: FISHING_CARDS },
   privateer: { name: 'privateer', hull: 11, cargo: 8, bounty: 6, cards: PRIVATEER_CARDS },
   corsair: { name: 'corsair', hull: 11, cargo: 6, bounty: 6, cards: PRIVATEER_CARDS },
   'treasure-ship': { name: 'galleon', hull: 13, cargo: 30, bounty: 6, cards: TREASURE_SHIP_CARDS },
