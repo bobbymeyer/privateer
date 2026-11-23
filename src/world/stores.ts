@@ -177,7 +177,11 @@ export function landmarkHere(sea: Sea, s: WorldState): Landmark | null {
 export const shoreHere = (sea: Sea, s: WorldState): ShoreWork[] => landmarkHere(sea, s)?.offers.shore ?? [];
 
 /** Days each takes. */
-export const SHORE_DAYS: Record<ShoreWork, number> = { water: 2, forage: 3, careen: 5 };
+export const SHORE_DAYS: Record<ShoreWork, number> = { water: 2, forage: 3, careen: 5, night: 2 };
+/** Watering by night at a Spanish town: this often you're seen, and word goes up the coast. */
+export const NIGHT_SEEN = 0.3;
+/** Seen after the treasure ship, it's one more thing for Spain's ambassador. */
+export const NIGHT_GRIEVANCE = 15;
 /** Days the work takes here: a day less with a friendly people's guides. */
 export const shoreDays = (s: WorldState, what: ShoreWork) => Math.max(1, SHORE_DAYS[what] - (friendly(s, peopleHere(s)) ? GUIDED_DAYS : 0));
 
@@ -194,6 +198,19 @@ export function ashore(sea: Sea, s: WorldState, what: ShoreWork, advance: (sea: 
   if (what === 'water') {
     w = { ...w, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water) } };
     log('casks filled');
+  }
+  if (what === 'night') {
+    // The boats in to the river mouth after dark, the casks rolled down and back, as Drake watered on this coast.
+    w = { ...w, stores: { ...w.stores, water: Math.max(w.stores.water, cap.water) } };
+    if (roll(r) < NIGHT_SEEN) {
+      if (!w.voyage.visited.includes('cacafuego')) {
+        w = { ...w, seen: w.seen.includes('coast-alarm') ? w.seen : [...w.seen, 'coast-alarm'] };
+        log('casks filled by night, but the boats were seen from the town: word of you goes up the coast ahead, and the treasure ship will hear of it');
+      } else {
+        w = { ...w, grievance: w.grievance + NIGHT_GRIEVANCE };
+        log('casks filled by night, but the boats were seen: one more thing for Spain to complain of');
+      }
+    } else log('casks filled by night from the river, and nobody the wiser');
   }
   if (what === 'forage') {
     // Fish, fowl, seals, penguins, fruit, roots: a week's worth some days, a month's others. Fresh, whatever it is.

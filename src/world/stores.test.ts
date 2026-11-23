@@ -170,3 +170,16 @@ test('the scurvy a man every few days is one bout, not news to stop for each tim
   log = foldDeaths(log, 'scurvy', 1, 160);
   assert.ok(log.at(-1)!.stop);
 });
+
+test('water by night at a Spanish town fills the casks, and is sometimes seen', () => {
+  const at = lyingAt(sea, { ...createWorld(sea, 1), stores: { food: 1000, water: 10, spares: 0, powder: 0 } }, 'callao');
+  assert.ok(shoreHere(sea, at).includes('night'));
+  let seen = 0;
+  for (let rng = 1; rng < 200; rng++) {
+    const w = ashore(sea, { ...at, rng }, 'night', (_s, x) => x);
+    assert.equal(w.stores.water, capacity(w).water);
+    if (w.seen.includes('coast-alarm')) seen++;
+  }
+  assert.ok(seen > 30 && seen < 90, `seen ${seen} of 199`);
+  assert.ok(!shoreHere(sea, lyingAt(sea, createWorld(sea, 1), 'canaries')).includes('night'));
+});

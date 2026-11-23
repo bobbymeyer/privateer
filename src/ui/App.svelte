@@ -489,10 +489,11 @@
             <div class="row">
               {#each shore as work (work)}
                 <button disabled={sailing} onclick={() => attempt(() => ashore(sea!, world!, work, advance))}>
-                  {work === 'water' ? 'fill the casks' : work === 'forage' ? 'forage and fish' : 'careen her'} ({shoreDays(world, work)} {shoreDays(world, work) === 1 ? 'day' : 'days'})
+                  {work === 'water' ? 'fill the casks' : work === 'night' ? 'water by night from the river' : work === 'forage' ? 'forage and fish' : 'careen her'} ({shoreDays(world, work)} {shoreDays(world, work) === 1 ? 'day' : 'days'})
                 </button>
               {/each}
             </div>
+            {#if shore.includes('night')}<p class="faint">the boats in to the river after dark: three times in ten they're seen from the town, and word goes ahead of you.</p>{/if}
           {/if}
           {#if claim}
             {@const paid = armsPaidWith(world)}

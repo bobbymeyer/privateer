@@ -29,7 +29,7 @@ export interface Warning {
   /** Where to. */
   to: string;
   /** How to put it right here, if you can. */
-  fix: 'buy' | 'fill' | 'forage' | 'trade' | null;
+  fix: 'buy' | 'fill' | 'night' | 'forage' | 'trade' | null;
   /** The master's words, or the plain sum. */
   text: string;
 }
@@ -73,7 +73,7 @@ export function warnings(sea: Sea, s: WorldState): Warning[] {
     return master ? `${master}, the master: “the ${what} ${verdict}. ${sum}.”` : `the ${what} ${verdict.replace('see us', 'last').replace('won’t last', 'won’t last')}: ${sum}.`;
   };
   if (water < leg + MARGIN) {
-    const fix = market === 'chandler' ? 'buy' : shore.includes('water') ? 'fill' : market === 'islanders' ? 'trade' : null;
+    const fix = market === 'chandler' ? 'buy' : shore.includes('water') ? 'fill' : shore.includes('night') ? 'night' : market === 'islanders' ? 'trade' : null;
     out.push({ kind: 'water', have: water, leg, to, fix, text: say('water', water, thirst > 1.05) });
   }
   if (days.food < leg + MARGIN) {
@@ -87,6 +87,7 @@ export function warnings(sea: Sea, s: WorldState): Warning[] {
 export const FIX_WORDS: Record<NonNullable<Warning['fix']>, string> = {
   buy: 'buy it from the chandler',
   fill: 'fill the casks here',
+  night: 'water by night from the river',
   forage: 'forage and fish here',
   trade: 'trade with the islanders',
 };

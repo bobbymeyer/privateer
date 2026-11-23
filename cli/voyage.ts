@@ -183,6 +183,8 @@ function atLandmark(w: WorldState): WorldState {
   if (barterHere(sea, w) && w.truck > 0 && (w.fresh > 10 || daysOf(w).water < 80)) w = barter(sea, w);
   const shore = shoreHere(sea, w);
   if (shore.includes('water') && daysOf(w).water < 80) w = answer(ashore(sea, w, 'water', advance));
+  // On the Spanish coast, water by night when the casks are low: the risk of being seen is better than thirst.
+  if (!w.sunk && !waiting(w) && shore.includes('night') && daysOf(w).water < 60) w = answer(ashore(sea, w, 'night', advance));
   if (!w.sunk && shore.includes('forage') && (w.fresh > 15 || daysOf(w).food < 150)) w = answer(ashore(sea, w, 'forage', advance));
   if (!w.sunk && shore.includes('forage') && daysOf(w).food < 100) w = answer(ashore(sea, w, 'forage', advance));
   for (let i = 0; i < 3 && !w.sunk && shore.includes('careen') && w.hull < w.maxHull - 2; i++) w = answer(ashore(sea, w, 'careen', advance));

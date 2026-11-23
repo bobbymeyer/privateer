@@ -34,7 +34,8 @@ export interface Landmark {
   landfall?: { near: string[] };
 }
 
-export type ShoreWork = 'water' | 'forage' | 'careen';
+/** `night`: water by night from a Spanish town's river, at the risk of being seen. */
+export type ShoreWork = 'water' | 'forage' | 'careen' | 'night';
 
 export interface Offers {
   /** What the crew can do ashore: fill the casks, forage and fish, haul her down and scrape her. */
@@ -91,11 +92,11 @@ export const LANDMARKS: Landmark[] = [
     text: 'The first land up the coast of Chile. The islanders took Drake for a Spaniard, and he lost men to their arrows.',
   },
   {
-    key: 'valparaiso', name: 'Valparaíso', kind: 'port', at: 'Valparaíso', next: ['callao'], offers: { raid: 'town' },
+    key: 'valparaiso', name: 'Valparaíso', kind: 'port', at: 'Valparaíso', next: ['callao'], offers: { shore: ['night'], raid: 'town' },
     text: 'A Spanish port that has never seen an enemy ship. Drake took a ship lying here with gold and Chilean wine.',
   },
   {
-    key: 'callao', name: 'Callao, the port of Lima', kind: 'port', at: 'Callao', next: ['cacafuego'], offers: { raid: 'town' },
+    key: 'callao', name: 'Callao, the port of Lima', kind: 'port', at: 'Callao', next: ['cacafuego'], offers: { shore: ['night'], raid: 'town' },
     text: 'Lima’s port, full of ships with their sails ashore and their silver aboard. Here Drake heard of the treasure ship ahead of him.',
   },
   {
@@ -103,7 +104,7 @@ export const LANDMARKS: Landmark[] = [
     text: 'Where the treasure ship from Callao to Panama is overhauled, if she is. Then the choice: on across the Pacific, or back the way you came while the coast is still asleep.',
   },
   {
-    key: 'guatulco', name: 'Guatulco', kind: 'port', at: 'Guatulco', next: ['nova-albion', 'ladrones'], offers: { raid: 'town' },
+    key: 'guatulco', name: 'Guatulco', kind: 'port', at: 'Guatulco', next: ['nova-albion', 'ladrones'], offers: { shore: ['night'], raid: 'town' },
     text: 'A small port on the coast of New Spain, to water before the Pacific. Then north to find the passage home, or straight across.',
   },
   {
