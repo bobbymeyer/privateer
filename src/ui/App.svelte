@@ -353,6 +353,8 @@
   const days = $derived(now() ? daysOf(now()!) : { food: 0, water: 0 });
   const RATIONS: [WorldState['rations'], string][] = [['full', 'full'], ['short', 'short'], ['starving', 'starvation']];
   const PACES: [WorldState['pace'], string][] = [['easy', 'easy'], ['steady', 'steady'], ['hard', 'crack on']];
+  /** The docked bar's height on a phone, so the page leaves room for it however many rows it wraps to. */
+  let dockHeight = $state(0);
   const LOOKOUTS: [Lookout, string][] = [['worth', 'what’s worth it'], ['every', 'every sail']];
   const WARES: Ware[] = ['food', 'water', 'hands', 'spares', 'powder'];
   /** What the chandler here sells: truck only at Plymouth, where it's English goods. */
@@ -401,7 +403,7 @@
 {#if !sea}
   <main><p class="faint">charting the seas…</p></main>
 {:else}
-  <main>
+  <main style={phone ? `padding-bottom: calc(${dockHeight}px + 1.5rem)` : ''}>
     {#snippet gauges(w: WorldState)}
         <!-- What you act on every day. -->
         <div class="gauges">
@@ -579,7 +581,7 @@
             <p class="faint">{town.kind === 'fortress' ? 'walled, and its guns are heavy.' : 'an open town: a battery or two, the walls, and the townsfolk.'} {['valparaiso', 'callao'].includes(town.key) && !world.voyage.visited.includes('cacafuego') ? 'word of a raid here would go north ahead of you.' : ''}</p>
           {/if}
         {/if}
-        <div class="row primary" class:dock={phone}>
+        <div class="row primary" class:dock={phone} bind:clientHeight={dockHeight}>
           {#if phone && making && making !== world.voyage.at && !atFork}<span class="faint docked">{making === HOME_LANDMARK ? 'home' : landmark(making).name}, {daysTo(sea, world, making)} days</span>{/if}
           {#if world.voyage.at === HOME_LANDMARK}
             <!-- Home: nothing to sail for; the reckoning and the end screen say the rest. -->
