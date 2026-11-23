@@ -656,7 +656,7 @@
           {#if world.hands.some((h) => h.dead && h.dead.cause !== 'went down with the ship')}
             <h3>the dead</h3>
             <ul class="plain dead">
-              {#each world.hands.filter((h) => h.dead && h.dead.cause !== 'went down with the ship') as h (h.role)}
+              {#each world.hands.filter((h) => h.dead && h.dead.cause !== 'went down with the ship').sort((a, b) => a.dead!.turn - b.dead!.turn) as h (h.role)}
                 {@const g = buried.find((x) => x.id.endsWith(`:${h.role}:${h.dead!.turn}`))}
                 <li>
                   <strong>{called(h)}</strong>, dead of {h.dead!.cause}, {h.dead!.place}, {dateOf(h.dead!.turn)}.
