@@ -49,7 +49,7 @@ export const LIKE_TITLES: Record<Like, string> = {
 export function score(w: WorldState): Score {
   const c = SHIP_CLASSES[w.ship];
   if (!w.won) {
-    return { treasure: 0, hands: 0, ship: 0, fame: 0, multiplier: c.multiplier, total: 0, like: 'oxenham', title: LIKE_TITLES.oxenham, text: 'lost. Oxenham crossed the isthmus of Panama in 1577, took the silver, and was hanged at Lima.' };
+    return { treasure: 0, hands: 0, ship: 0, fame: 0, multiplier: c.multiplier, total: 0, like: 'oxenham', title: LIKE_TITLES.oxenham, text: 'Oxenham crossed the isthmus of Panama in 1577, took the silver, and was hanged at Lima.' };
   }
   const treasure = w.gold;
   const hands = w.crew * HAND_WORTH;
