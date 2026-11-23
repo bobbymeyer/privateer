@@ -8,6 +8,7 @@ import {
 } from './stores.ts';
 import { lyingAt } from './testing.ts';
 import { advance, createSea, createWorld, type WorldState } from './world.ts';
+import { SHIP_CLASSES } from '../outfit.ts';
 
 const sea = createSea();
 const { map } = sea;
@@ -212,4 +213,10 @@ test('a yard where a chandler deals with you abroad: a point of hull for gold', 
   assert.equal(mended.gold, 20 - YARD_COST);
   assert.throws(() => mend(sea, { ...ternate, hull: 14 }), /sound/);
   assert.throws(() => mend(sea, lyingAt(sea, fresh({ hull: 5 }), 'canaries')), /no yard/);
+});
+
+test('a pinnace stows less for her complement than a bigger ship', () => {
+  const per = (ship: string) => capacity({ ship }).food / SHIP_CLASSES[ship].complement;
+  assert.ok(per('pinnace') < per('sloop'));
+  assert.equal(per('sloop'), per('brigantine'));
 });

@@ -65,7 +65,8 @@ export const complement = (s: { ship: string }) => SHIP_CLASSES[s.ship].compleme
 /** What she can carry, by her complement: food for 180 days, water for 90, a share of spares and powder. */
 export const capacity = (s: { ship: string }): Stores => {
   const c = complement(s);
-  return { food: c * 180, water: c * 90, spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) };
+  const hold = SHIP_CLASSES[s.ship].hold;
+  return { food: Math.round(c * 180 * hold), water: Math.round(c * 90 * hold), spares: 4 + Math.round(c / 10), powder: Math.round(c / 4) };
 };
 
 /** A new voyage's hands: two thirds of her complement. The rest are to hire. */
