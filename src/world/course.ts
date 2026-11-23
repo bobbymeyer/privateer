@@ -53,6 +53,17 @@ function glide(sea: Sea, s: WorldState, dest: NodeId): WorldState {
   return step === null ? s : mourn(sea, s, raise(sea, { ...s, player: step }));
 }
 
+/**
+ * The trade winds of the Pacific: between the tropics and the line's calms,
+ * out of the east all year. The galleon from Acapulco ran down to Guam before
+ * them in under three months; Drake crossed from Nova Albion in sixty-eight
+ * days. In them she makes two days' way every other day.
+ */
+export const inTrades = (sea: Sea, node: NodeId) => {
+  const { lat, lon } = sea.map.nodes[node];
+  return Math.abs(lat) >= 5 && Math.abs(lat) <= 25 && (lon < -100 || lon > 125);
+};
+
 /** A day on toward the landmark you're bound for; says why to stop, if you should. */
 export function continueOn(sea: Sea, s: WorldState): { world: WorldState; halt: Halt | null } {
   const from = bound(s);
@@ -64,6 +75,8 @@ export function continueOn(sea: Sea, s: WorldState): { world: WorldState; halt: 
   let world = advance(sea, from, noWay(from) || (from.pace === 'easy' && from.turn % 3 === 2) ? from.player : step);
   // Cracking on: one day in three, she makes two days' way.
   if (from.pace === 'hard' && from.turn % 3 === 2 && !noWay(from) && !stopped(world) && world.voyage.at === from.voyage.at) world = glide(sea, world, dest);
+  // Before the trades, westward across the Pacific: a day's way more every other day.
+  if (from.turn % 2 === 1 && inTrades(sea, world.player) && !noWay(from) && !stopped(world) && world.voyage.at === from.voyage.at) world = glide(sea, world, dest);
   if (world.won) return { world, halt: 'won' };
   if (world.sunk) return { world, halt: 'sunk' };
   if (world.encounter) return { world, halt: 'fight' };

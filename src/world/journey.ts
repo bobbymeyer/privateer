@@ -14,6 +14,7 @@ import { arriveBrazil } from './brazil.ts';
 import { arriveDetour, followed, hearAt } from './rumors.ts';
 import { comeHome } from './reckoning.ts';
 import { friendly, meetPeople, peopleAt } from './peoples.ts';
+import { inTrades, nextStep } from './course.ts';
 
 export interface Voyage {
   /** The landmark you last raised. */
@@ -62,7 +63,20 @@ export function makeFor(s: WorldState, key: string): WorldState {
 }
 
 /** Days from here to a landmark, sailing the lanes. */
-export const daysTo = (sea: Sea, s: WorldState, key: string) => sea.map.distTo(sea.map.landmarks[key])[s.player];
+export function daysTo(sea: Sea, s: WorldState, key: string): number {
+  const dest = sea.map.landmarks[key];
+  const steps = sea.map.distTo(dest)[s.player];
+  if (!Number.isFinite(steps) || steps <= 0) return steps;
+  // Before the Pacific trades she makes three days' way in two: count the leg as she'll sail it.
+  let inTrade = 0;
+  for (let n = s.player, d = steps; d > 0; d--) {
+    const next = nextStep(sea, { ...s, player: n }, dest);
+    if (next === null) break;
+    if (inTrades(sea, next)) inTrade++;
+    n = next;
+  }
+  return steps - Math.floor(inTrade / 3);
+}
 
 /**
  * After a day's sail: have you raised a landmark? The one you're bound for,

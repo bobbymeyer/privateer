@@ -79,3 +79,16 @@ test('bound for one landmark, passing another on the way is not putting in there
   const unbound: WorldState = { ...bound, voyage: { ...bound.voyage, bound: null } };
   assert.equal(raise(sea2, unbound).voyage.at, 'guanabara');
 });
+
+test('before the Pacific trades the crossing is quicker, and the days say so', async () => {
+  const { inTrades } = await import('./course.ts');
+  const sea2 = createSea();
+  const w = createWorld(sea2, 1);
+  const lanes = sea2.map.distTo(sea2.map.landmarks.ladrones)[sea2.map.landmarks.guatulco];
+  const days = daysTo(sea2, { ...w, player: sea2.map.landmarks.guatulco }, 'ladrones');
+  assert.ok(days < lanes * 0.8, `${days} days against ${lanes} on the lanes`);
+  assert.ok(days > 60, 'still a long crossing');
+  // The Atlantic legs are as they were.
+  assert.equal(daysTo(sea2, { ...w, player: sea2.map.landmarks['cape-verde'] }, 'brazil'), sea2.map.distTo(sea2.map.landmarks.brazil)[sea2.map.landmarks['cape-verde']]);
+  assert.ok(!inTrades(sea2, sea2.map.landmarks.canaries));
+});
