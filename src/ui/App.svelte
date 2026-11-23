@@ -24,7 +24,7 @@
   import { JEWELS, favourOf, setAside, toHerTaste } from '../world/jewels.ts';
   import { BACKERS, BACKER_KEYS, type Backer, courtRisk, grievanceWord, infamyFor, lawfulness, restitutionFor } from '../world/reckoning.ts';
   import { CHRONICLER_COST, advance, createSea, createWorld, dateOf, newLines, type Sea, type WorldState, waiting } from '../world/world.ts';
-  import { ROLE, type Grave, called, gravesOf, placeOf, visitGraves } from '../world/hands.ts';
+  import { ROLE, type Grave, called, gravesOf, howDied, lossWords, placeOf, visitGraves } from '../world/hands.ts';
   import { FIX_WORDS, type Warning, warningKey, warnings } from '../world/warnings.ts';
   import { EPITAPH_LENGTH, loadGraves, saveGraves, withEpitaph, withGraves } from '../graves.ts';
   import { forget, load, store } from '../save.ts';
@@ -457,7 +457,7 @@
           <ul class="plain">
             {#each world.hands as h (h.name)}
               <li class:gone={h.dead || h.ran || h.fate}>
-                <strong>{h.name}</strong>, {ROLE[h.role].title}{h.freed ? ', freed from the Spaniards' : ''}{h.dead ? `: dead of ${h.dead.cause}, ${h.dead.place}, ${dateOf(h.dead.turn)}` : h.ran ? ': ran' : h.fate ? ': sent to the galleys' : ''}
+                <strong>{h.name}</strong>, {ROLE[h.role].title}{h.freed ? ', freed from the Spaniards' : ''}{h.dead ? `: ${howDied(h.dead.cause)}, ${h.dead.place}, ${dateOf(h.dead.turn)}` : h.ran ? ': ran' : h.fate ? ': sent to the galleys' : ''}
                 {#if !h.dead && !h.ran && !h.fate}<span class="faint">{ROLE[h.role].does}.</span>{/if}
               </li>
             {/each}
@@ -787,7 +787,7 @@
           <p class="faint">the way you sailed: {world.voyage.visited.map((k) => landmark(k).name).join(' · ')}</p>
           {#if world.arms.length}<p class="faint">the Queen’s arms set up at: {world.arms.map((k) => landmark(k).name).join(' · ')}</p>{/if}
           {#if Object.keys(world.losses).length}
-            <p class="faint">hands lost on the voyage: {Object.entries(world.losses).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k === 'ran' ? 'ran' : k === 'killed in the fight' ? 'killed fighting' : `to ${k}`}`).join(' · ')}</p>
+            <p class="faint">hands lost on the voyage: {Object.entries(world.losses).sort((a, b) => b[1] - a[1]).map(([k, n]) => lossWords(k, n)).join(' · ')}</p>
           {/if}
           {#if world.hands.some((h) => h.dead && h.dead.cause !== 'went down with the ship')}
             <h3>the dead</h3>
@@ -795,7 +795,7 @@
               {#each world.hands.filter((h) => h.dead && h.dead.cause !== 'went down with the ship').sort((a, b) => a.dead!.turn - b.dead!.turn) as h (h.name)}
                 {@const g = buried.find((x) => x.id.endsWith(`:${h.role}:${h.dead!.turn}`))}
                 <li>
-                  <strong>{called(h)}</strong>, dead of {h.dead!.cause}, {h.dead!.place}, {dateOf(h.dead!.turn)}.
+                  <strong>{called(h)}</strong>, {howDied(h.dead!.cause)}, {h.dead!.place}, {dateOf(h.dead!.turn)}.
                   {#if g}
                     <label><span class="faint">on his board:</span> <input maxlength={EPITAPH_LENGTH} value={g.epitaph} onchange={(e) => epitaph(g.id, (e.currentTarget as HTMLInputElement).value)} /></label>
                   {/if}

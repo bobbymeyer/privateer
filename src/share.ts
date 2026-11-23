@@ -8,7 +8,7 @@
 import { SHIP_CLASSES } from './outfit.ts';
 import { landmark } from './world/landmarks.ts';
 import type { Backer } from './world/reckoning.ts';
-import { ROLE } from './world/hands.ts';
+import { ROLE, howDied } from './world/hands.ts';
 import { score } from './world/score.ts';
 import { dateOf, type WorldState } from './world/world.ts';
 
@@ -29,7 +29,7 @@ export function shareText(w: WorldState, seed: number, daily: string | null): st
       ? `home to Plymouth on ${dateOf(w.turn)}, ${w.turn} days out, ${raised} landmarks raised`
       : `lost on ${dateOf(w.turn)}, ${raised} landmarks out, last raised ${furthest}`,
     w.won ? `${sc.title}: ${sc.total}` : sc.title,
-    ...(dead.length ? [`the dead: ${dead.map((h) => `${h.name}, ${ROLE[h.role].title}, of ${h.dead!.cause}`).join('; ')}`] : []),
+    ...(dead.length ? [`the dead: ${dead.map((h) => `${h.name}, ${ROLE[h.role].title}, ${howDied(h.dead!.cause)}`).join('; ')}`] : []),
     `${w.crew} hands ${w.won ? 'home' : 'left'} of ${c.complement}${w.tally.taken ? ` · ${w.tally.taken} taken` : ''}${w.tally.sacks ? ` · ${w.tally.sacks} sacked` : ''}`,
     `seed ${seed}`,
   ];

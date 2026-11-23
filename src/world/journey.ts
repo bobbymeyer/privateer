@@ -71,7 +71,9 @@ export const daysTo = (sea: Sea, s: WorldState, key: string) => sea.map.distTo(s
  */
 export function raise(sea: Sea, s: WorldState): WorldState {
   const v = s.voyage;
-  const candidates = [...new Set([...(v.bound ? [v.bound] : []), ...choices(v, followed(s))])];
+  // Bound for one landmark, only that one: the lane to the coast of Brazil passes the bay of
+  // Guanabara, and passing it isn't putting in there. Not yet bound, any way on from here.
+  const candidates = v.bound ? [v.bound] : choices(v, followed(s));
   const raised = candidates.find((k) => sea.map.landmarks[k] === s.player);
   if (!raised || raised === v.at) return s;
   const voyage: Voyage = { at: raised, bound: null, visited: [...v.visited, raised] };

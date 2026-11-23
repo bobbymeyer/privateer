@@ -70,3 +70,12 @@ test('the days to a landmark are the lanes’ days', () => {
 test('home, there is nowhere left to make for', () => {
   assert.deepEqual(choices({ at: HOME_LANDMARK, bound: null, visited: ['plymouth', HOME_LANDMARK] }), []);
 });
+
+test('bound for one landmark, passing another on the way is not putting in there', () => {
+  const sea2 = createSea();
+  const w = createWorld(sea2, 1);
+  const bound: WorldState = { ...w, player: sea2.map.landmarks.guanabara, voyage: { at: 'cape-verde', bound: 'brazil', visited: ['plymouth', 'canaries', 'cape-verde'] } };
+  assert.equal(raise(sea2, bound).voyage.at, 'cape-verde');
+  const unbound: WorldState = { ...bound, voyage: { ...bound.voyage, bound: null } };
+  assert.equal(raise(sea2, unbound).voyage.at, 'guanabara');
+});
