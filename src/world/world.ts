@@ -18,6 +18,7 @@ import { type FightRecord, NO_TALLY, type Tally } from './record.ts';
 import { START_VOYAGE, type Voyage, raise } from './journey.ts';
 import type { Rumor } from './rumors.ts';
 import { type Pace, type Rations, type Stores, startCrew, startStores } from './stores.ts';
+import { type Named, mourn, muster } from './hands.ts';
 import { BACKERS, type Backer, NOTHING_SETTLED, type Settled, type Verdict } from './reckoning.ts';
 
 /** The chart: the lanes, and where each landmark lies on them. The same for every run. */
@@ -36,6 +37,10 @@ export interface WorldState {
   maxHull: number;
   /** Hands aboard. Too few and she can't be sailed. */
   crew: number;
+  /** Six of them with names: the hands of note, and what became of them. See hands.ts. */
+  hands: Named[];
+  /** The hands lost on the voyage, by what took them: `scurvy`, `killed in the fight`, `ran`. */
+  losses: Record<string, number>;
   /** Provisions and water in rations, spares in bundles, powder in barrels. See stores.ts. */
   stores: Stores;
   /** Days since fresh food: past six weeks, the scurvy kills. */
@@ -95,6 +100,8 @@ export interface LogEntry {
   turn: number;
   text: string;
   stop?: boolean;
+  /** A running count, folded into one line as it goes on: so many dead of thirst over so many days. See stores.ts. */
+  fold?: { kind: string; dead: number; from: number; to: number };
 }
 
 let built: Sea | null = null;
@@ -132,6 +139,8 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     hull: c.hull,
     maxHull: c.hull,
     crew: startCrew(ship),
+    hands: muster(seed as RngState),
+    losses: {},
     stores: { ...stores, spares: stores.spares + b.spares, powder: stores.powder + b.powder },
     fresh: 0,
     rations: 'full',
@@ -165,6 +174,12 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
   };
 }
 
+/** What the log says now that it didn't before: lines are moved as they fold, so it's by line, not by length. */
+export function newLines(before: { log: LogEntry[] }, after: { log: LogEntry[] }): LogEntry[] {
+  const had = new Set(before.log);
+  return after.log.filter((l) => !had.has(l));
+}
+
 /** Something waiting on you: the voyage doesn't go on until it's answered. */
 export const waiting = (s: WorldState) => !!(s.dilemma || s.hail || s.encounter);
 
@@ -173,6 +188,10 @@ export const waiting = (s: WorldState) => !!(s.dilemma || s.hail || s.encounter)
  * the day happens — the weather, the stores, a landmark raised, a sail.
  */
 export function advance(sea: Sea, s: WorldState, to: NodeId): WorldState {
+  return mourn(sea, s, day(sea, s, to));
+}
+
+function day(sea: Sea, s: WorldState, to: NodeId): WorldState {
   if (s.sunk) throw new Error('the ship is lost; the voyage is over');
   if (s.won) throw new Error('you are home');
   if (s.encounter) throw new Error('there is a fight to finish first');

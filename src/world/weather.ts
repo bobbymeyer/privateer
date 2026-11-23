@@ -8,6 +8,7 @@
 
 import { type Roller, pick, roll } from './random.ts';
 import { capacity, topUp } from './stores.ts';
+import { alive } from './hands.ts';
 import type { Sea, WorldState } from './world.ts';
 
 /** A rain squall, on a day in the tropics: sails spread to catch it. */
@@ -63,9 +64,10 @@ export function weatherDay(sea: Sea, s: WorldState, r: Roller): WorldState {
   }
   // The doldrums: a calm, and the pitch bubbling in the seams.
   if (doldrums(sea, w) && !noWay(w) && roll(r) < CALM_CHANCE) {
-    const days = CALM_DAYS[0] + Math.floor(roll(r) * (CALM_DAYS[1] - CALM_DAYS[0] + 1));
+    // The master, while he lives, finds a breath of wind a day sooner.
+    const days = Math.max(1, CALM_DAYS[0] + Math.floor(roll(r) * (CALM_DAYS[1] - CALM_DAYS[0] + 1)) - (alive(w, 'master') ? 1 : 0));
     w = { ...w, calm: w.turn + days };
-    log(`becalmed in the doldrums: ${days} days without a breath of wind`, true);
+    log(`becalmed in the doldrums: ${days} ${days === 1 ? 'day' : 'days'} without a breath of wind`, true);
   }
   if (tropic(sea, w) && roll(r) < RAIN_CHANCE && w.stores.water < cap.water) {
     w = { ...w, stores: { ...w.stores, water: topUp(w.stores.water, w.crew * 8, cap.water) } };
@@ -105,8 +107,11 @@ export const FOUL_LOST = 0.5;
 export const WEEVIL_SICK = 0.3;
 export const WEEVIL_LOST = 0.25;
 
+/** The surgeon, while he lives, saves one of those the fever and the flux would take, one time in two. */
+const surgeon = (s: WorldState, n: number, r: Roller) => (alive(s, 'surgeon') && roll(r) < 0.5 ? Math.max(0, n - 1) : n);
+
 export function feverDeaths(s: WorldState, how: 'press' | 'nurse', r: Roller) {
   const [lo, hi] = how === 'press' ? FEVER_PRESS : FEVER_NURSE;
-  return deaths(s, lo, hi, r);
+  return surgeon(s, deaths(s, lo, hi, r), r);
 }
-export const fluxDeaths = (s: WorldState, r: Roller) => deaths(s, FLUX[0], FLUX[1], r);
+export const fluxDeaths = (s: WorldState, r: Roller) => surgeon(s, deaths(s, FLUX[0], FLUX[1], r), r);

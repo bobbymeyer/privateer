@@ -62,7 +62,8 @@ test('continue on: the ship is bound for the next landmark where the way is one,
     assert.ok(!w.sunk);
   }
   assert.equal(w.voyage.at, 'canaries');
-  assert.ok(halts.has('landmark'));
+  // Raising her stops the ship: for the landmark, or for what's asked there (your papers, at the Canaries).
+  assert.ok(halts.has('landmark') || halts.has('choice'));
   assert.equal(w.player, map.landmarks.canaries);
 });
 

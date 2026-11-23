@@ -29,6 +29,7 @@ import { plateExtra } from './treasure.ts';
 import { GOA_EXTRA, PRIZES, type Prize, hearFromPrisoners } from './rumors.ts';
 import type { Sea, WorldState } from './world.ts';
 import { infamyFor } from './reckoning.ts';
+import { alive, mourn, nameOf } from './hands.ts';
 
 export interface Meeting {
   kind: TargetKind;
@@ -127,10 +128,12 @@ export function sailSighted(sea: Sea, s: WorldState): WorldState {
   const sail = waters.sails.find((y) => (x -= y.weight) < 0) ?? pick(r, waters.sails);
   const w: WorldState = { ...s, rng: r.rng };
   const what = whatOf(sail.kind, sail.nation, null);
+  // The boy, while he lives, is the one who sees her first.
+  const boy = alive(w, 'boy') ? `${nameOf(w, 'boy')} sings out from the masthead: ` : '';
   if (hostile(sail.kind)) {
-    return startFight({ ...w, log: [...w.log, { turn: w.turn, text: `a sail: ${what}, bearing down on you`, stop: true }] }, { kind: sail.kind, nation: sail.nation, raid: null, plate: false }, true);
+    return startFight({ ...w, log: [...w.log, { turn: w.turn, text: `${boy}a sail: ${what}, bearing down on you`, stop: true }] }, { kind: sail.kind, nation: sail.nation, raid: null, plate: false }, true);
   }
-  return { ...w, hail: { kind: sail.kind, nation: sail.nation, ...(sail.neutral ? { neutral: true as const } : {}) }, log: [...w.log, { turn: w.turn, text: `a sail: ${what}${sail.neutral ? ', a friend’s' : ''}`, stop: true }] };
+  return { ...w, hail: { kind: sail.kind, nation: sail.nation, ...(sail.neutral ? { neutral: true as const } : {}) }, log: [...w.log, { turn: w.turn, text: `${boy}a sail: ${what}${sail.neutral ? ', a friend’s' : ''}`, stop: true }] };
 }
 
 function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean, extra: Extra = {}, noGuns = false): WorldState {
@@ -209,7 +212,7 @@ export function fight(sea: Sea, s: WorldState, action: Action): WorldState {
   if (!m) throw new Error('there is no fight');
   const now = act(m.fight, action);
   if (!now.outcome) return { ...s, encounter: { ...m, fight: now } };
-  return settle(sea, s, { ...m, fight: now });
+  return mourn(sea, s, settle(sea, s, { ...m, fight: now }));
 }
 
 function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {

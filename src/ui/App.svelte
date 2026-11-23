@@ -22,7 +22,10 @@
   } from '../world/stores.ts';
   import { PRIZES, followed } from '../world/rumors.ts';
   import { BACKERS, BACKER_KEYS, type Backer, courtRisk, grievanceWord, infamyFor, lawfulness, restitutionFor } from '../world/reckoning.ts';
-  import { advance, createSea, createWorld, dateOf, type Sea, type WorldState, waiting } from '../world/world.ts';
+  import { advance, createSea, createWorld, dateOf, newLines, type Sea, type WorldState, waiting } from '../world/world.ts';
+  import { ROLE, type Grave, called, gravesOf, placeOf, visitGraves } from '../world/hands.ts';
+  import { FIX_WORDS, type Warning, warningKey, warnings } from '../world/warnings.ts';
+  import { EPITAPH_LENGTH, loadGraves, saveGraves, withEpitaph, withGraves } from '../graves.ts';
   import { forget, load, store } from '../save.ts';
   import { type Entry, best, dailySeed, entryFor, isWin, loadLog, raised, saveLog, scoreOf, today, withEntry } from '../logbook.ts';
   import { ambient, bell, coin, gun, knell, setSound, soundOn, storm } from './sound.ts';
@@ -57,6 +60,8 @@
   function begin(ship: string, backer: Backer) {
     if (!sea) return;
     world = createWorld(sea, seed, ship, backer);
+    buried = [];
+    sailAnywayOn = '';
     choosing = false;
     chosenShip = null;
     logged = false;
@@ -107,6 +112,23 @@
   function logRun(w: WorldState) {
     log = withEntry(log, entryFor(w, seed, daily, new Date()));
     saveLog(log);
+    // The dead of this voyage, where they lie: a later voyage passing finds them.
+    if (sea) {
+      buried = gravesOf(w, seed, dateOf, SHIP_CLASSES[w.ship].name, placeOf(sea, w));
+      graves = withGraves(graves, buried);
+      saveGraves(graves);
+    }
+  }
+
+  // --- Graves --------------------------------------------------------------------
+
+  /** Every grave from voyages before, kept in the browser; and this voyage's, once it ends. */
+  let graves: Grave[] = $state(loadGraves());
+  let buried: Grave[] = $state([]);
+  function epitaph(id: string, text: string) {
+    graves = withEpitaph(graves, id, text);
+    buried = withEpitaph(buried, id, text);
+    saveGraves(graves);
   }
   function downloadLog() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(log, null, 2)], { type: 'application/json' }));
@@ -161,8 +183,16 @@
     }
   }
 
+  /** The master's warning, asked once a departure: the key of the one you've said to sail anyway on. */
+  let sailAnywayOn = $state('');
+  let warning: Warning[] = $state.raw([]);
   function go() {
     if (!sea || !world || waiting(world) || world.sunk || world.won) return;
+    const w = here && !sailing ? warnings(sea, world) : [];
+    if (w.length && sailAnywayOn !== warningKey(world, w)) {
+      warning = w;
+      return;
+    }
     if (timer) clearInterval(timer);
     sailing = true;
     said = '';
@@ -175,14 +205,21 @@
     said = why;
     if (why && world && !world.sunk && !world.won) bell(2);
   }
+  function sailAnyway() {
+    if (!world) return;
+    sailAnywayOn = warningKey(world, warning);
+    warning = [];
+    go();
+  }
   function day() {
     if (!sea || !world) return stop();
     try {
-      const before = world.log.length;
+      const before = world;
       const out = continueOn(sea, world);
-      world = out.world;
+      // Graves from voyages before, found as she passes them.
+      world = out.world.sunk || out.world.won ? out.world : visitGraves(sea, out.world, graves);
       if (!out.halt) return;
-      const news = world.log.slice(before).filter((l) => l.stop).at(-1)?.text ?? '';
+      const news = newLines(before, world).filter((l) => l.stop).at(-1)?.text ?? '';
       stop(out.halt === 'won' || out.halt === 'sunk' ? '' : news);
     } catch (e) {
       stop((e as Error).message);
@@ -283,6 +320,8 @@
   const WARES: Ware[] = ['food', 'water', 'hands', 'spares', 'powder'];
   /** The last things that happened, newest first. */
   const recent = $derived(now()?.log.slice(-6).reverse() ?? []);
+  /** What won't last the leg ahead, said beside the casks and the chandler while you can still put it right. */
+  const short = $derived(sea && now() && here ? warnings(sea, now()!) : []);
   const pct = (v: number, m: number) => `${Math.max(0, Math.min(100, (v / Math.max(1, m)) * 100))}%`;
 </script>
 
@@ -305,7 +344,7 @@
     </header>
 
     {#if world}
-      <RouteChart {sea} {world} />
+      <RouteChart {sea} {world} {graves} />
 
       <!-- Where you stand: the next landmark, and what you've got to get there on. -->
       <section class="status" aria-label="the ship">
@@ -327,6 +366,17 @@
           <div class:low={world.infamy > 0}><span class="label">your name</span>{lawfulness(world)}</div>
           <div><span class="label">Spain's grievance</span>{grievanceWord(world)}</div>
         </div>
+        <details class="of-note">
+          <summary>hands of note: {world.hands.filter((h) => !h.dead && !h.ran).length} of {world.hands.length} aboard</summary>
+          <ul class="plain">
+            {#each world.hands as h (h.role)}
+              <li class:gone={h.dead || h.ran}>
+                <strong>{h.name}</strong>, {ROLE[h.role].title}{h.dead ? `: dead of ${h.dead.cause}, ${h.dead.place}, ${dateOf(h.dead.turn)}` : h.ran ? ': ran' : ''}
+                {#if !h.dead && !h.ran}<span class="faint">{ROLE[h.role].does}.</span>{/if}
+              </li>
+            {/each}
+          </ul>
+        </details>
         <div class="settings">
           <div class="row" role="group" aria-label="rations">
             <span class="faint">rations</span>
@@ -344,6 +394,7 @@
         {#if said && said !== recent[0]?.text}<p class="said">{said}</p>{/if}
         {#if here}
           <p class="landmark">{here.text}</p>
+          {#each short as w (w.kind)}<p class="warn">{w.text}{w.fix ? ` ${FIX_WORDS[w.fix]}.` : ''}</p>{/each}
           {#if shore.length}
             <div class="row">
               {#each shore as work (work)}
@@ -503,6 +554,18 @@
           <p class="faint">today's voyage is the same for everyone who sails it today: seed {dailySeed(today())}.</p>
         </div>
       </div>
+    {:else if world && warning.length}
+      <div class="overlay">
+        <div class="sheet">
+          <h2>before you sail</h2>
+          {#each warning as w (w.kind)}<p>{w.text}</p>{/each}
+          <div class="row">
+            <button onclick={() => (warning = [])}>{warning.some((w) => w.fix) ? `stay and ${[...new Set(warning.map((w) => w.fix).filter(Boolean))].map((f) => FIX_WORDS[f!]).join(', and ')}` : 'stay'}</button>
+            <button onclick={sailAnyway}>sail anyway</button>
+          </div>
+          <p class="faint">put on short rations and the stores go further, at the crew’s cost.</p>
+        </div>
+      </div>
     {:else if world && shown}
       <div class="overlay">
         <div class="sheet wide">
@@ -587,6 +650,24 @@
             {world.tally.fights} {world.tally.fights === 1 ? 'fight' : 'fights'} · {world.tally.taken} taken · {world.tally.sacks} {world.tally.sacks === 1 ? 'town' : 'towns'} sacked{world.tally.best ? ` · best prize: ${world.tally.best.what}, ${world.tally.best.payout}` : ''}
           </p>
           <p class="faint">{world.voyage.visited.map((k) => landmark(k).name).join(' · ')}</p>
+          {#if Object.keys(world.losses).length}
+            <p class="faint">hands lost on the voyage: {Object.entries(world.losses).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k === 'ran' ? 'ran' : k === 'killed in the fight' ? 'killed fighting' : `to ${k}`}`).join(' · ')}</p>
+          {/if}
+          {#if world.hands.some((h) => h.dead && h.dead.cause !== 'went down with the ship')}
+            <h3>the dead</h3>
+            <ul class="plain dead">
+              {#each world.hands.filter((h) => h.dead && h.dead.cause !== 'went down with the ship') as h (h.role)}
+                {@const g = buried.find((x) => x.id.endsWith(`:${h.role}:${h.dead!.turn}`))}
+                <li>
+                  <strong>{called(h)}</strong>, dead of {h.dead!.cause}, {h.dead!.place}, {dateOf(h.dead!.turn)}.
+                  {#if g}
+                    <label><span class="faint">on his board:</span> <input maxlength={EPITAPH_LENGTH} value={g.epitaph} onchange={(e) => epitaph(g.id, (e.currentTarget as HTMLInputElement).value)} /></label>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+            <p class="faint">a voyage that passes where they lie will find them.</p>
+          {/if}
           <div class="row">
             <button onclick={() => newRun()}>a new run</button>
             <button onclick={() => newRun(today())}>today's voyage</button>
@@ -640,6 +721,14 @@
   .ships li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
   .choices { flex-direction: row; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.75rem; }
   .choices li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; flex: 1 1 12rem; max-width: 18rem; }
+  .warn { color: var(--theirs); margin: 0.3rem 0; }
+  .of-note { margin: 0.4rem 0; font-size: 0.9rem; }
+  .of-note summary { cursor: pointer; color: var(--faint); }
+  .of-note li { margin: 0.2rem 0; }
+  .of-note .gone, .of-note .gone strong { color: var(--faint); text-decoration: line-through; }
+  .of-note .faint { display: block; }
+  .dead li { margin: 0.4rem 0; }
+  .dead input { font: inherit; width: 100%; max-width: 32rem; border: 1px solid var(--rule); padding: 0.2rem 0.4rem; }
   .score { border-collapse: collapse; margin: 0.5rem 0; min-width: 16rem; }
   .score td { padding: 0.15rem 1rem 0.15rem 0; text-align: left; }
   .score td.num { text-align: right; font-variant-numeric: tabular-nums; }

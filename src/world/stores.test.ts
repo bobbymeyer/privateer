@@ -134,9 +134,11 @@ test('pace: easy makes less way, hard makes more', () => {
 
 test('a fight spends powder by the shot and hands by the hull lost', () => {
   const w = fresh({ crew: 30, stores: { food: 0, water: 0, spares: 0, powder: 5 } });
+  const noGunner = { ...w, hands: w.hands.filter((h) => h.role !== 'gunner') };
   const r = { rng: 1 };
+  assert.equal(fightCost(noGunner, 7, 0, r).stores.powder, 2, 'three shots a barrel');
+  assert.equal(fightCost(w, 7, 0, r).stores.powder, 3, 'four, with the gunner');
   const after = fightCost(w, 7, 10, r);
-  assert.equal(after.stores.powder, 2);
   assert.ok(after.crew >= 30 - 5 && after.crew <= 30 - 4, `crew ${after.crew}`);
   assert.equal(fightCost(w, 30, 0, r).stores.powder, 0, 'never below none');
   assert.deepEqual(fightCost(w, 0, 0, r), w, 'nothing fired, nothing lost');

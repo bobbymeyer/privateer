@@ -9,7 +9,8 @@ import { FAR, type NodeId } from './map.ts';
 import { makeFor, onward, raise } from './journey.ts';
 import { followed } from './rumors.ts';
 import { noWay } from './weather.ts';
-import { type Sea, type WorldState, advance } from './world.ts';
+import { mourn } from './hands.ts';
+import { type Sea, type WorldState, advance, newLines } from './world.ts';
 
 /** Tomorrow's step toward `dest`: a neighbour a day nearer, or null if you're there or can't get there. */
 export function nextStep(sea: Sea, s: WorldState, dest: NodeId): NodeId | null {
@@ -49,7 +50,7 @@ const stopped = (w: WorldState) => w.won || w.sunk || !!w.encounter || !!w.hail 
 /** A step more, made in the same day: a landmark raised if she reaches one. */
 function glide(sea: Sea, s: WorldState, dest: NodeId): WorldState {
   const step = nextStep(sea, s, dest);
-  return step === null ? s : raise(sea, { ...s, player: step });
+  return step === null ? s : mourn(sea, s, raise(sea, { ...s, player: step }));
 }
 
 /** A day on toward the landmark you're bound for; says why to stop, if you should. */
@@ -69,6 +70,6 @@ export function continueOn(sea: Sea, s: WorldState): { world: WorldState; halt: 
   if (world.hail) return { world, halt: 'sail' };
   if (world.dilemma) return { world, halt: 'choice' };
   if (world.voyage.at !== from.voyage.at) return { world, halt: 'landmark' };
-  if (world.log.slice(s.log.length).some((l) => l.stop)) return { world, halt: 'news' };
+  if (newLines(s, world).some((l) => l.stop)) return { world, halt: 'news' };
   return { world, halt: null };
 }
