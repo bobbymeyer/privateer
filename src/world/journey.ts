@@ -13,6 +13,7 @@ import { SPICE_WORTH, WOOD_WORTH } from './stores.ts';
 import { arriveBrazil } from './brazil.ts';
 import { arriveDetour, followed, hearAt } from './rumors.ts';
 import { comeHome } from './reckoning.ts';
+import { friendly, meetPeople, peopleAt } from './peoples.ts';
 
 export interface Voyage {
   /** The landmark you last raised. */
@@ -90,11 +91,14 @@ export function raise(sea: Sea, s: WorldState): WorldState {
     // Not over yet: the shares, and the reckoning.
     return comeHome({ ...s, voyage, gold, spice: 0, wood: 0, log: [...log, { turn: s.turn, text: `Plymouth: ${said}, with ${gold}`, stop: true }] });
   }
-  let w: WorldState = arriving({ ...s, voyage, landfall: null, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] }, raised);
+  // The people of the coast, as they stand with you; then what happens on arriving.
+  let w: WorldState = meetPeople({ ...s, voyage, landfall: null, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] }, raised);
+  w = arriving(w, raised);
   w = arriveBrazil(w, raised);
   // Off Cape San Francisco, the first time: the treasure ship.
   if (raised === PLATE_LANDMARK && !v.visited.includes(PLATE_LANDMARK)) w = overhaul(sea, w);
   // A detour: whether the rumor was true. Anywhere else: a rumor, maybe.
-  w = l.detour ? arriveDetour(sea, w, raised) : hearAt(w, raised);
+  // Friends tell you what they know.
+  w = l.detour ? arriveDetour(sea, w, raised) : hearAt(w, raised, friendly(w, peopleAt(raised)));
   return w;
 }

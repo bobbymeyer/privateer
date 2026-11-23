@@ -44,7 +44,8 @@ export const inStrait = (sea: Sea, s: WorldState) => {
 };
 
 /** Becalmed or held: no way made today. */
-export const noWay = (s: WorldState) => s.calm > s.turn;
+/** Becalmed, held, or in company with a slower ship: one day in four in company you wait for her. */
+export const noWay = (s: WorldState) => s.calm > s.turn || (s.company > s.turn && s.turn % 4 === 0);
 
 const deaths = (s: WorldState, lo: number, hi: number, r: Roller) => Math.min(s.crew, lo + Math.floor(roll(r) * (hi - lo + 1)));
 

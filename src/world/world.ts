@@ -21,6 +21,7 @@ import { type Pace, type Rations, type Stores, startCrew, startStores } from './
 import { type Named, mourn, muster } from './hands.ts';
 import { BACKERS, type Backer, NOTHING_SETTLED, type Settled, type Verdict } from './reckoning.ts';
 import type { Jewel } from './jewels.ts';
+import { type Memory, type People, startingStanding } from './peoples.ts';
 
 /** The chart: the lanes, and where each landmark lies on them. The same for every run. */
 export interface Sea {
@@ -86,6 +87,16 @@ export interface WorldState {
   fame: number;
   verdict: Verdict | null;
   settled: Settled;
+  /** Where each people of the coasts stand with you: see peoples.ts. */
+  peoples: Partial<Record<People, number>>;
+  /** What the last English ship left behind on each coast, from voyages before. */
+  memory: Memory;
+  /** Chests of truck — knives, beads, cloth — to trade with the people of the coasts. */
+  truck: number;
+  /** Keeping company with Huguenot privateers out of La Rochelle until this day: see huguenots.ts. */
+  company: number;
+  /** Sailing on a French commission from the Huguenot leaders, as well as your own. */
+  french: boolean;
   /** The day of the last prize taken: the hands count from it. */
   lastPrize: number;
   /** Home: the run is won. */
@@ -129,8 +140,12 @@ export function dateOf(turn: number): string {
 /** What a chronicler costs at Plymouth: his books, his ink and his keep, paid in advance. */
 export const CHRONICLER_COST = 10;
 
-/** A new voyage, in the ship you chose, on whose money, at Plymouth with her purse; and a chronicler aboard, if you'll have one. */
-export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Backer = 'own', chronicler = false): WorldState {
+/**
+ * A new voyage, in the ship you chose, on whose money, at Plymouth with her
+ * purse; a chronicler aboard, if you'll have one; and the coasts as the last
+ * English ship left them.
+ */
+export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Backer = 'own', chronicler = false, memory: Memory = {}): WorldState {
   const c = SHIP_CLASSES[ship];
   if (!c) throw new Error(`no such ship: ${ship}`);
   const b = BACKERS[backer];
@@ -174,6 +189,11 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     fame: 0,
     verdict: null,
     settled: NOTHING_SETTLED,
+    peoples: startingStanding(memory),
+    memory,
+    truck: 0,
+    company: 0,
+    french: false,
     lastPrize: 0,
     won: false,
     sunk: false,

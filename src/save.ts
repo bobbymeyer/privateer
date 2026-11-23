@@ -9,8 +9,9 @@
 
 import type { WorldState } from './world/world.ts';
 import { muster } from './world/hands.ts';
+import { startingStanding } from './world/peoples.ts';
 
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 
 /** From each version to the next, since the voyage was simplified (12): a run in progress shouldn't be lost to an update. */
 const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, unknown>> = {
@@ -24,6 +25,8 @@ const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, 
   15: (w) => ({ ...w, hands: muster(w.rng as number), losses: {} }),
   // 16 → 17: jewels and brazilwood in the hold; no chronicler aboard an old voyage.
   16: (w) => ({ ...w, jewels: [], wood: 0 }),
+  // 17 → 18: the peoples of the coasts as they stood, no truck, no company, no French commission.
+  17: (w) => ({ ...w, peoples: startingStanding(), memory: {}, truck: 0, company: 0, french: false }),
 };
 
 export const SAVE_KEY = 'privateer:run';

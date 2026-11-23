@@ -69,6 +69,9 @@ export interface Reckoning {
   said: string[];
 }
 
+/** Under a French commission, what you take from Spain counts this much toward its grievance. */
+export const FRENCH_GRIEVANCE = 0.5;
+
 /** A sail sighted, on any day at sea. */
 export const SIGHT_CHANCE = 1 / 25;
 
@@ -76,7 +79,7 @@ interface Waters {
   name: string;
   box: [number, number, number, number];
   /** Who you meet there, and how often of the sails sighted. */
-  sails: { kind: TargetKind; nation: Nation; weight: number; neutral?: true }[];
+  sails: { kind: TargetKind; nation: Nation; weight: number; neutral?: true; huguenot?: true }[];
 }
 
 /** What a friend's merchant carries over her kind's usual: richer than her guns suggest, which is the temptation. */
@@ -90,15 +93,17 @@ export const WATERS: Waters[] = [
       { kind: 'privateer', nation: 'spain', weight: 1 }, { kind: 'privateer', nation: 'portugal', weight: 1 }, { kind: 'corsair', nation: 'barbary', weight: 1 },
       // Hanseatic hulks with grain for Lisbon, French and Dutch traders: friends, at least on paper.
       { kind: 'merchant', nation: 'hanse', weight: 1, neutral: true }, { kind: 'merchant', nation: 'france', weight: 0.5, neutral: true }, { kind: 'merchant', nation: 'netherlands', weight: 0.5, neutral: true },
+      // Huguenot privateers out of La Rochelle, after Spanish prizes as Coligny sent them: friends.
+      { kind: 'privateer', nation: 'france', weight: 0.4, huguenot: true },
     ],
   },
   {
     name: 'the coast of Brazil', box: [-55, -36, -28, 2],
     // Norman ships still come for the brazilwood, as they did for the French colony at Guanabara.
-    sails: [{ kind: 'merchant', nation: 'portugal', weight: 2 }, { kind: 'merchant', nation: 'france', weight: 1, neutral: true }],
+    sails: [{ kind: 'merchant', nation: 'portugal', weight: 2 }, { kind: 'merchant', nation: 'france', weight: 1, neutral: true }, { kind: 'privateer', nation: 'france', weight: 0.5, huguenot: true }],
   },
   { name: 'the coast of Chile and Peru', box: [-86, -45, -68, 5], sails: [{ kind: 'merchant', nation: 'spain', weight: 1 }] },
-  { name: 'the Guinea coast', box: [-30, -5, 15, 25], sails: [{ kind: 'merchant', nation: 'portugal', weight: 2 }, { kind: 'merchant', nation: 'france', weight: 1, neutral: true }] },
+  { name: 'the Guinea coast', box: [-30, -5, 15, 25], sails: [{ kind: 'merchant', nation: 'portugal', weight: 2 }, { kind: 'merchant', nation: 'france', weight: 1, neutral: true }, { kind: 'privateer', nation: 'france', weight: 0.5, huguenot: true }] },
   {
     name: 'the East', box: [70, -15, 150, 25],
     sails: [{ kind: 'merchant', nation: 'portugal', weight: 3 }, { kind: 'treasure-ship', nation: 'portugal', weight: 1 }],
@@ -132,6 +137,15 @@ export function sailSighted(sea: Sea, s: WorldState): WorldState {
   const what = whatOf(sail.kind, sail.nation, null);
   // The boy, while he lives, is the one who sees her first.
   const boy = alive(w, 'boy') ? `${nameOf(w, 'boy')} sings out from the masthead: ` : '';
+  // Huguenots out of La Rochelle: friends, and they hail you.
+  if (sail.huguenot) {
+    if (w.company > w.turn) return w;
+    return { ...w, dilemma: { kind: 'huguenots' }, log: [...w.log, { turn: w.turn, text: `${boy}a sail: Huguenot privateers out of La Rochelle, and they hail you as a friend`, stop: true }] };
+  }
+  // In company, a privateer or a corsair thinks better of two ships, and stands off.
+  if (hostile(sail.kind) && w.company > w.turn) {
+    return { ...w, log: [...w.log, { turn: w.turn, text: `${boy}a sail: ${what}, who stands off from the two of you` }] };
+  }
   if (hostile(sail.kind)) {
     return startFight({ ...w, log: [...w.log, { turn: w.turn, text: `${boy}a sail: ${what}, bearing down on you`, stop: true }] }, { kind: sail.kind, nation: sail.nation, raid: null, plate: false }, true);
   }
@@ -242,7 +256,8 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   const done: WorldState = {
     ...w,
     rng: r.rng,
-    grievance: w.grievance + (iberian ? won : 0),
+    // Under a French commission too, the ambassador counts it half against England: the Huguenots took it as well.
+    grievance: w.grievance + (iberian ? Math.round(won * (s.french ? FRENCH_GRIEVANCE : 1)) : 0),
     lastPrize: taken && won > 0 ? s.turn : w.lastPrize,
     gold: w.gold + won,
     hull: f.ship.hull,

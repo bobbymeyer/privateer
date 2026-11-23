@@ -25,9 +25,13 @@
  *   unless it means to give a gift;
  * - treats with a Portuguese settlement on the coast of Brazil, and buys
  *   brazilwood at Guanabara with what's over a margin;
- * - takes a chronicler with --chronicler.
+ * - takes a chronicler with --chronicler;
+ * - buys a little truck at Plymouth and deals fairly with the peoples of the
+ *   coasts: barters truck for fresh food, punishes the hands' misconduct;
+ * - keeps company with Huguenot privateers, and takes their French commission
+ *   only with --french.
  *
- *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--chronicler] [--trace]
+ *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--chronicler] [--french] [--trace]
  */
 
 import { threatened } from '../src/rules.ts';
@@ -38,10 +42,10 @@ import { choices as legsOf, daysTo, howHome, makeFor } from '../src/world/journe
 import { HOME_LANDMARK, landmark } from '../src/world/landmarks.ts';
 import { attack, fight, letPass, raid, raidHere } from '../src/world/meet.ts';
 import { score } from '../src/world/score.ts';
-import { ashore, buy, CHANDLER, daysOf, landmarkHere, marketHere, price, room, shoreHere, trade, type Ware, buySpice, buyWood, spiceHere, spiceRoom, woodHere, woodRoom } from '../src/world/stores.ts';
+import { TRUCK_AT, barter, barterHere, ashore, buy, CHANDLER, daysOf, landmarkHere, marketHere, price, room, shoreHere, trade, type Ware, buySpice, buyWood, spiceHere, spiceRoom, woodHere, woodRoom } from '../src/world/stores.ts';
 import { coastAwake, PACIFIC_TOWNS } from '../src/world/treasure.ts';
 import { followed } from '../src/world/rumors.ts';
-import { BACKER_KEYS, type Backer, GIFT_PARDON, courtRisk, outlawed } from '../src/world/reckoning.ts';
+import { BACKER_KEYS, type Backer, courtRisk, outlawed, pardonOf } from '../src/world/reckoning.ts';
 import { LANDFALL_WATERS } from '../src/world/landfalls.ts';
 const LANDFALL_KEYS = Object.keys(LANDFALL_WATERS);
 import { advance, createSea, createWorld, type WorldState } from '../src/world/world.ts';
@@ -62,6 +66,9 @@ const RUMORS = !flag('no-rumors');
 const PIRATE = flag('pirate');
 const BACKER = arg('backer', 'own');
 const CHRONICLER = flag('chronicler');
+const FRENCH = flag('french');
+/** Chests of truck to carry out from Plymouth. */
+const TRUCK = flag('no-truck') ? 0 : 3;
 /** Jewels brought home, a voyage at a time; and the chronicler's fate. */
 const JEWELS_HOME: number[] = [];
 const CHRONICLE = { home: 0, dead: 0, sum: 0 };
@@ -93,8 +100,9 @@ function shop(w: WorldState): WorldState {
     hands: (x) => !room(x, 'hands'),
     spares: (x) => x.stores.spares >= 4,
     powder: (x) => x.stores.powder >= 6,
+    truck: (x) => x.truck >= TRUCK,
   };
-  for (const ware of ['hands', 'water', 'food', 'spares', 'powder'] as Ware[]) {
+  for (const ware of (w.voyage.at === TRUCK_AT ? ['hands', 'water', 'food', 'spares', 'powder', 'truck'] : ['hands', 'water', 'food', 'spares', 'powder']) as Ware[]) {
     for (let i = 0; i < 60 && room(w, ware) && !enough[ware](w) && w.gold - price(w, ware) >= keep; i++) w = buy(sea, w, ware);
   }
   // Spice in the Moluccas and Java, from what's left over a margin: it doubles and more at home.
@@ -123,7 +131,7 @@ function answer(w: WorldState): WorldState {
         : w.dilemma.kind === 'weevils' ? (daysOf(w).food > 60 ? 'heave' : 'eat')
         : w.dilemma.kind === 'leak' ? (open.includes('fother') ? 'fother' : 'pump')
         : w.dilemma.kind === 'wreck' ? (w.crew > 15 ? 'board' : 'sail')
-        : w.dilemma.kind === 'canoes' ? (open.includes('trade') ? 'trade' : 'alongside')
+        : w.dilemma.kind === 'canoes' ? (open.includes('truck') ? 'truck' : open.includes('trade') ? 'trade' : 'alongside')
         : w.dilemma.kind === 'reef' ? (w.spice > 0 && w.hull > 6 ? 'wait' : 'lighten')
         : w.dilemma.kind === 'gentleman' ? 'try'
         : w.dilemma.kind === 'deserters' ? 'watch'
@@ -135,7 +143,9 @@ function answer(w: WorldState): WorldState {
         : w.dilemma.kind === 'jailed' ? (open.includes('pay') && w.gold > 40 ? 'pay' : 'leave')
         : w.dilemma.kind === 'papers' ? (open.includes('bribe') ? 'bribe' : 'hand')
         : w.dilemma.kind === 'ore' ? 'leave'
-        : w.dilemma.kind === 'reckoning' ? (outlawed(w) ? (open.includes('gift') && !outlawed({ ...w, infamy: w.infamy - GIFT_PARDON }) ? 'gift' : 'low') : courtRisk(w) < 0.3 ? 'court' : w.gold > 100 ? 'gift' : 'low')
+        : w.dilemma.kind === 'misconduct' ? 'punish'
+        : w.dilemma.kind === 'huguenots' ? (FRENCH && open.includes('commission') ? 'commission' : 'company')
+        : w.dilemma.kind === 'reckoning' ? (outlawed(w) ? (open.includes('gift') && !outlawed({ ...w, infamy: w.infamy - pardonOf(w) }) ? 'gift' : 'low') : courtRisk(w) < 0.3 ? 'court' : w.gold > 100 ? 'gift' : 'low')
         : w.dilemma.kind === 'settlement' ? (w.gold >= 5 ? 'treat' : 'clear')
         : w.dilemma.kind === 'normans' ? (open.includes('buy') && w.gold > 40 ? 'buy' : RUMORS ? 'news' : 'leave')
         : open[0];
@@ -165,6 +175,8 @@ function answer(w: WorldState): WorldState {
 /** At a landmark: the shore, the market, a raid. */
 function atLandmark(w: WorldState): WorldState {
   w = cutWood(shop(w));
+  // Truck for fresh food where there's a people and no market, while it lasts.
+  if (barterHere(sea, w) && w.truck > 0 && (w.fresh > 10 || daysOf(w).water < 80)) w = barter(sea, w);
   const shore = shoreHere(sea, w);
   if (shore.includes('water') && daysOf(w).water < 80) w = answer(ashore(sea, w, 'water', advance));
   if (!w.sunk && shore.includes('forage') && (w.fresh > 15 || daysOf(w).food < 150)) w = answer(ashore(sea, w, 'forage', advance));
