@@ -32,6 +32,7 @@ import { infamyFor } from './reckoning.ts';
 import { alive, mourn, nameOf } from './hands.ts';
 import { plunderJewels } from './jewels.ts';
 import { freed } from './captives.ts';
+import { read } from './reading.ts';
 
 export interface Meeting {
   kind: TargetKind;
@@ -74,8 +75,46 @@ export interface Reckoning {
 /** Under a French commission, what you take from Spain counts this much toward its grievance. */
 export const FRENCH_GRIEVANCE = 0.5;
 
-/** A sail sighted, on any day at sea. */
+/** A sail sighted, on any day at sea, in waters where nobody has seen you yet. */
 export const SIGHT_CHANCE = 1 / 25;
+
+/**
+ * What the lookout calls you up for. `every`: every sail. `worth`: those
+ * that come at you, the Huguenots, the treasure ship and the prizes at the
+ * end of a rumor, and a Spanish or Portuguese ship you could take as you
+ * are; the rest he lets go by with a line in the log.
+ */
+export type Lookout = 'every' | 'worth';
+
+/** In waters where you've been seen, the next sail is less likely: word goes round, and they keep their distance. */
+export const sightChance = (s: WorldState, waters: string) => SIGHT_CHANCE / (1 + (s.sightings[waters] ?? 0) / 2);
+
+/** How a fight with the sail in sight looks, her hull and guns against yours as you are: told before you choose. */
+export type Odds = 'fair' | 'hard' | 'hopeless';
+export function oddsOf(s: WorldState, h: Hail): Odds {
+  const her = read(h.kind, hailExtra(h));
+  const deadly = her.traits.includes('deadly alongside') || her.traits.includes('her guns reach you far off');
+  const ratio = her.hull / Math.max(1, s.hull);
+  if (s.hull <= 2 || ratio >= 2.2 || (deadly && ratio >= 1.6)) return 'hopeless';
+  if (ratio >= 1.2 || (deadly && ratio >= 0.9) || s.stores.powder <= 0) return 'hard';
+  return 'fair';
+}
+/** The odds in a line, and the master's word on them while he lives. */
+export function oddsSaid(s: WorldState, h: Hail): string {
+  const odds = oddsOf(s, h);
+  if (odds === 'fair') return '';
+  const plain = odds === 'hopeless' ? 'she would likely sink you as you are' : s.stores.powder <= 0 ? 'with no powder aboard, a hard fight' : 'she outguns you: a hard fight';
+  if (!alive(s, 'master')) return plain;
+  return `${plain}. ${nameOf(s, 'master')}, the master: “${odds === 'hopeless' ? 'she’ll sink us as we are, captain. let her go.' : 'she’s more than we are, captain.'}”`;
+}
+
+/** Whether the quieter lookout calls you up for this sail. */
+export function worthStopping(s: WorldState, h: Hail): boolean {
+  if (h.plate || h.prize) return true;
+  // A friend's merchant: you'd have to turn pirate to take her.
+  if (h.neutral) return false;
+  return oddsOf(s, h) === 'fair' && s.hull >= s.maxHull / 2;
+}
 
 interface Waters {
   name: string;
@@ -129,13 +168,13 @@ export const hostile = (kind: TargetKind) => kind === 'privateer' || kind === 'c
 export function sailSighted(sea: Sea, s: WorldState): WorldState {
   if (s.encounter || s.hail || s.dilemma || s.sunk || s.won || sea.map.nodes[s.player].port || landmarkHere(sea, s)) return s;
   const r: Roller = { rng: s.rng };
-  if (roll(r) >= SIGHT_CHANCE) return { ...s, rng: r.rng };
   const waters = watersAt(sea, s);
   if (!waters) return { ...s, rng: r.rng };
+  if (roll(r) >= sightChance(s, waters.name)) return { ...s, rng: r.rng };
   const total = waters.sails.reduce((t, x) => t + x.weight, 0);
   let x = roll(r) * total;
   const sail = waters.sails.find((y) => (x -= y.weight) < 0) ?? pick(r, waters.sails);
-  const w: WorldState = { ...s, rng: r.rng };
+  const w: WorldState = { ...s, rng: r.rng, sightings: { ...s.sightings, [waters.name]: (s.sightings[waters.name] ?? 0) + 1 } };
   const what = whatOf(sail.kind, sail.nation, null);
   // The boy, while he lives, is the one who sees her first.
   const boy = alive(w, 'boy') ? `${nameOf(w, 'boy')} sings out from the masthead: ` : '';
@@ -151,7 +190,12 @@ export function sailSighted(sea: Sea, s: WorldState): WorldState {
   if (hostile(sail.kind)) {
     return startFight({ ...w, log: [...w.log, { turn: w.turn, text: `${boy}a sail: ${what}, bearing down on you`, stop: true }] }, { kind: sail.kind, nation: sail.nation, raid: null, plate: false }, true);
   }
-  return { ...w, hail: { kind: sail.kind, nation: sail.nation, ...(sail.neutral ? { neutral: true as const } : {}) }, log: [...w.log, { turn: w.turn, text: `${boy}a sail: ${what}${sail.neutral ? ', a friend’s' : ''}`, stop: true }] };
+  const hail: Hail = { kind: sail.kind, nation: sail.nation, ...(sail.neutral ? { neutral: true as const } : {}) };
+  // The quieter lookout lets a sail go by that isn't worth heaving to for, with a line.
+  if (w.lookout === 'worth' && !worthStopping(w, hail)) {
+    return { ...w, log: [...w.log, { turn: w.turn, text: `${boy}a sail: ${what}${sail.neutral ? ', a friend’s' : ''}, let go by` }] };
+  }
+  return { ...w, hail, log: [...w.log, { turn: w.turn, text: `${boy}a sail: ${what}${sail.neutral ? ', a friend’s' : ''}`, stop: true }] };
 }
 
 function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, forced: boolean, extra: Extra = {}, noGuns = false): WorldState {

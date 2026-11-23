@@ -103,6 +103,7 @@ const PRIZE_PAY: number[] = [];
 const PRIZE_FOUGHT: Record<string, number> = {};
 /** A voyage that hasn't ended in this many days is called off. */
 const DAYS = 1500;
+const HULLBY: Record<string, number> = {};
 const DEAD: Record<string, number> = {};
 const NOTED = { dead: 0, ran: 0 };
 
@@ -249,11 +250,15 @@ interface Result {
   landfalls: number;
   /** Places the Queen's arms were set up. */
   arms: number;
+  /** Her hull at home, as a share of her best; and the sails that stopped her. */
+  hullHome: number;
+  stops: number;
 }
 
 function sail(ship: string, seed: number, backer: Backer): Result {
   let w = createWorld(sea, seed, ship, backer, CHRONICLER);
   let lastAt = '';
+  let stops = 0;
   while (!w.sunk && !w.won && w.turn < DAYS) {
     // A landmark newly raised, or an island a storm put her on.
     const here = `${w.voyage.at}|${landmarkHere(sea, w)?.landfall ? w.landfall : ''}`;
@@ -271,7 +276,15 @@ function sail(ship: string, seed: number, backer: Backer): Result {
       }
     }
     w = ration(w);
-    w = answer(continueOn(sea, w).world);
+    const h0 = w.hull, n0 = w.log.length, f0 = w.tally.fights;
+    const out = continueOn(sea, w);
+    if (out.world.hail) stops++;
+    w = answer(out.world);
+    if (w.hull !== h0) {
+      const said = w.log.slice(n0).map((l) => l.text).join(' | ');
+      const k = w.tally.fights > f0 ? 'fight' : /weed and worm/.test(said) ? 'weed' : /storm/.test(said) ? 'storm' : /pumping|leak/.test(said) ? 'leak' : /reef/.test(said) ? 'reef' : /lightning|fire|worm in her/.test(said) ? 'mishap' : /eve|raid|sack/.test(said) ? 'raid' : 'other:' + said.slice(0, 60);
+      HULLBY[k] = (HULLBY[k] ?? 0) + (w.hull - h0);
+    }
   }
   const why = w.won ? '' : w.sunk ? (w.log.some((l) => l.text.includes('too few hands')) ? 'too few hands' : 'in a fight') : 'out of time';
   const took = w.log.some((l) => /^\d+ gold into the strongroom/.test(l.text) && w.tally.best?.what === 'the treasure ship from Callao');
@@ -284,7 +297,7 @@ function sail(ship: string, seed: number, backer: Backer): Result {
   NOTED.ran += w.hands.filter((h) => h.ran).length;
   if (TRACE) console.log(seed, ship, w.won ? 'HOME' : why, 'day', w.turn, 'gold', w.gold, 'crew', w.crew, took ? 'took her' : '', w.voyage.visited.join('>'));
   const heard = w.rumors.filter((r) => r.followed && w.voyage.visited.includes(r.key));
-  return { ship, score: score(w).total, verdict: w.verdict ?? '', won: w.won, day: w.turn, like: score(w).like, at: w.voyage.at, why, gold: w.gold, crew: w.crew, took, followedTrue: heard.filter((r) => r.truth).length, followedFalse: heard.filter((r) => !r.truth).length, heard: w.rumors.length, landfalls: w.seen.filter((k) => LANDFALL_KEYS.includes(k)).length, arms: w.arms.length };
+  return { ship, score: score(w).total, verdict: w.verdict ?? '', won: w.won, day: w.turn, like: score(w).like, at: w.voyage.at, why, gold: w.gold, crew: w.crew, took, followedTrue: heard.filter((r) => r.truth).length, followedFalse: heard.filter((r) => !r.truth).length, heard: w.rumors.length, landfalls: w.seen.filter((k) => LANDFALL_KEYS.includes(k)).length, arms: w.arms.length, hullHome: w.hull / w.maxHull, stops };
 }
 
 const count = <T>(xs: T[], key: (x: T) => string) => JSON.stringify(xs.reduce((t, x) => ((t[key(x)] = (t[key(x)] ?? 0) + 1), t), {} as Record<string, number>));
@@ -297,6 +310,8 @@ for (const ship of SHIP === 'all' ? SHIPS : [SHIP]) for (const backer of (BACKER
   const won = results.filter((r) => r.won);
   const lost = results.filter((r) => !r.won);
   console.log(`${ship}, ${backer}: home ${won.length} of ${RUNS} (${Math.round((100 * won.length) / RUNS)}%), on day ${mean(won.map((r) => r.day))}, with ${mean(won.map((r) => r.gold))} gold and ${mean(won.map((r) => r.crew))} hands · mean score ${mean(results.map((r) => r.score))}`);
+  const third = (x: number) => (x < 1 / 3 ? 'battered' : x < 2 / 3 ? 'worn' : 'sound');
+  console.log(`  SUMMARY home ${Math.round((100 * won.length) / RUNS)}% drake ${won.filter((r) => r.like === 'drake').length} score ${mean(results.map((r) => r.score))} hull home ${mean(won.map((r) => 100 * r.hullHome))}% ${count(won, (r) => third(r.hullHome))} sails a voyage ${(results.reduce((t, r) => t + r.stops, 0) / RUNS).toFixed(1)}`);
   console.log('  like', count(won, (r) => r.like), '· at court', count(won, (r) => r.verdict), '· took the treasure ship', results.filter((r) => r.took).length);
   console.log('  lost', count(lost, (r) => r.why), '· last landmark', count(lost, (r) => r.at));
   console.log('  lost to', JSON.stringify(DEAD), `· hands of note dead ${NOTED.dead}, ran ${NOTED.ran}`);
@@ -309,6 +324,8 @@ for (const ship of SHIP === 'all' ? SHIPS : [SHIP]) for (const backer of (BACKER
   for (const k of Object.keys(PRIZE_FOUGHT)) delete PRIZE_FOUGHT[k];
   for (const k of Object.keys(DEAD)) delete DEAD[k];
   NOTED.dead = NOTED.ran = 0;
+  console.log('  HULLBY', JSON.stringify(HULLBY));
+  for (const k of Object.keys(HULLBY)) delete HULLBY[k];
   void howHome;
   void coastAwake;
 }

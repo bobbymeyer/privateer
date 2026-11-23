@@ -190,3 +190,26 @@ test('a bigger ship wants more hands to work her: a third of her complement', ()
   assert.equal(minHands({ ship: 'brigantine' }), 24);
   assert.ok(minHands({ ship: 'pinnace' }) >= MIN_HANDS);
 });
+
+test('careening scrapes and caulks without spares, and mends more with them', async () => {
+  const { CAREEN_FREE } = await import('./stores.ts');
+  const { lyingAt } = await import('./testing.ts');
+  const { advance } = await import('./world.ts');
+  const base = lyingAt(sea, fresh({ hull: 4, maxHull: 14, stores: { food: 1e6, water: 1e6, spares: 0, powder: 0 } }), 'san-julian');
+  const bare = ashore(sea, { ...base, hands: base.hands.map((h) => (h.role === 'carpenter' ? { ...h, dead: { cause: 'test', day: 0, at: '' } } : h)) }, 'careen', advance);
+  assert.equal(bare.hull, 4 + CAREEN_FREE);
+  const spared = ashore(sea, { ...base, stores: { ...base.stores, spares: 3 } }, 'careen', advance);
+  assert.ok(spared.hull > bare.hull + 2);
+});
+
+test('a yard where a chandler deals with you abroad: a point of hull for gold', async () => {
+  const { YARD_COST, mend, yardHere } = await import('./stores.ts');
+  const { lyingAt } = await import('./testing.ts');
+  const ternate = lyingAt(sea, fresh({ hull: 5, maxHull: 14, gold: 20 }), 'ternate');
+  assert.ok(yardHere(sea, ternate));
+  const mended = mend(sea, ternate);
+  assert.equal(mended.hull, 6);
+  assert.equal(mended.gold, 20 - YARD_COST);
+  assert.throws(() => mend(sea, { ...ternate, hull: 14 }), /sound/);
+  assert.throws(() => mend(sea, lyingAt(sea, fresh({ hull: 5 }), 'canaries')), /no yard/);
+});

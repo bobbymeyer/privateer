@@ -7,7 +7,7 @@
  */
 
 import { type Roller, pick, roll } from './random.ts';
-import { capacity, topUp } from './stores.ts';
+import { capacity, shoreHere, topUp } from './stores.ts';
 import { alive } from './hands.ts';
 import type { Sea, WorldState } from './world.ts';
 import { asksAgain } from './happenings.ts';
@@ -87,7 +87,8 @@ export function weatherDay(sea: Sea, s: WorldState, r: Roller): WorldState {
     w = { ...w, crew: w.crew - 1 };
     log('a hand lost over the side in the night');
   }
-  if (!w.dilemma && w.stores.water > 0 && roll(r) < FOUL_CHANCE && asksAgain(w, 'foul')) {
+  // Foul water where you could simply fill the casks afresh isn't a question; at sea it is.
+  if (!w.dilemma && w.stores.water > 0 && roll(r) < FOUL_CHANCE && asksAgain(w, 'foul') && !shoreHere(sea, w).includes('water')) {
     w = { ...w, dilemma: { kind: 'foul' } };
     log('the water has gone foul in the casks', true);
   }

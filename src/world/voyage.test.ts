@@ -5,7 +5,7 @@ import { legalActions } from '../rules.ts';
 import { SHIP_CLASSES, SHIPS, deckSize } from '../outfit.ts';
 import { continueOn } from './course.ts';
 import { HOME_LANDMARK, LANDMARKS } from './landmarks.ts';
-import { attack, fight, hostile, letPass, raid, raidHere, SIGHT_CHANCE, sailSighted, watersAt } from './meet.ts';
+import { attack, fight, hostile, letPass, oddsOf, oddsSaid, raid, raidHere, SIGHT_CHANCE, sailSighted, sightChance, watersAt, worthStopping } from './meet.ts';
 import { capacity, marketHere, shoreHere } from './stores.ts';
 import { lyingAt, victualled } from './testing.ts';
 import { createSea, createWorld, dateOf, type WorldState, waiting } from './world.ts';
@@ -77,7 +77,7 @@ test('waiting on something, the voyage does not go on', () => {
 test('a sail sighted, by the waters you are in', () => {
   const sights = (lon: number, lat: number) => {
     const seen: Record<string, number> = {};
-    const w = { ...createWorld(sea, 1), player: node(lon, lat) };
+    const w = { ...createWorld(sea, 1), player: node(lon, lat), lookout: 'every' as const };
     for (let rng = 0; rng < 3000; rng++) {
       const s = sailSighted(sea, { ...w, rng });
       const h = s.hail ?? s.encounter;
@@ -100,7 +100,7 @@ test('a sail sighted, by the waters you are in', () => {
 });
 
 test('a privateer comes at you; a merchant is yours to attack or let pass', () => {
-  const w = { ...createWorld(sea, 1), player: node(-12, 38) };
+  const w = { ...createWorld(sea, 1), player: node(-12, 38), lookout: 'every' as const };
   let fought: WorldState | null = null;
   for (let rng = 0; rng < 3000 && !fought; rng++) {
     const s = sailSighted(sea, { ...w, rng });
@@ -160,4 +160,49 @@ test('raising Plymouth again brings the reckoning, and that ends the run', () =>
   s = choose(sea, s, 'low');
   assert.ok(s.won);
   assert.equal(s.ending, 'home');
+});
+
+test('the quieter lookout lets a sail go by that is not worth heaving to for; the hostile still come', () => {
+  const w = { ...createWorld(sea, 1), player: node(110, 0) };
+  let stopped = 0, passed = 0, fights = 0;
+  for (let rng = 0; rng < 3000; rng++) {
+    const s = sailSighted(sea, { ...w, rng });
+    if (s.hail) stopped++;
+    if (s.log.some((l) => /let go by/.test(l.text))) passed++;
+  }
+  assert.ok(stopped > 0, 'a Portuguese merchant you could take still calls you up');
+  // Battered, nothing is worth it but what comes at you.
+  for (let rng = 0; rng < 3000; rng++) {
+    const s = sailSighted(sea, { ...w, rng, hull: 3 });
+    assert.equal(s.hail, null);
+  }
+  const iberia = { ...createWorld(sea, 1), player: node(-12, 38), hull: 3 };
+  for (let rng = 0; rng < 3000; rng++) if (sailSighted(sea, { ...iberia, rng }).encounter) fights++;
+  assert.ok(fights > 0, 'privateers and corsairs come at you whatever the lookout');
+  void passed;
+});
+
+test('a friend’s merchant never calls up the quieter lookout', () => {
+  const w = { ...createWorld(sea, 1), player: node(-12, 38) };
+  assert.equal(worthStopping(w, { kind: 'merchant', nation: 'hanse', neutral: true }), false);
+  assert.equal(worthStopping(w, { kind: 'merchant', nation: 'portugal' }), true);
+  assert.equal(worthStopping({ ...w, hull: 2 }, { kind: 'treasure-ship', nation: 'spain', plate: 'asleep' }), true, 'the treasure ship always');
+});
+
+test('sails are seen less often in waters where you have been seen', () => {
+  const w = { ...createWorld(sea, 1), lookout: 'every' as const };
+  assert.ok(sightChance({ ...w, sightings: { 'the East': 4 } }, 'the East') < sightChance(w, 'the East') / 2);
+  assert.equal(sightChance(w, 'the East'), SIGHT_CHANCE);
+  const s = sailSighted(sea, { ...w, player: node(110, 0), rng: [...Array(3000).keys()].find((rng) => sailSighted(sea, { ...w, player: node(110, 0), rng }).hail)! });
+  assert.equal(s.sightings['the East'], 1);
+});
+
+test('the odds told before you attack: hopeless on a broken hull, and the master says so', () => {
+  const w = createWorld(sea, 1, 'pinnace');
+  const plate = { kind: 'treasure-ship' as const, nation: 'spain' as const, plate: 'warned' as const };
+  assert.equal(oddsOf({ ...w, hull: 1 }, plate), 'hopeless');
+  assert.equal(oddsOf(w, { kind: 'merchant', nation: 'portugal' }), 'fair');
+  assert.match(oddsSaid({ ...w, hull: 1 }, plate), /sink you/);
+  assert.match(oddsSaid({ ...w, hull: 1 }, plate), /the master/);
+  assert.equal(oddsSaid(w, { kind: 'merchant', nation: 'portugal' }), '');
 });

@@ -22,6 +22,7 @@ import { type Named, mourn, muster } from './hands.ts';
 import { BACKERS, type Backer, NOTHING_SETTLED, type Settled, type Verdict } from './reckoning.ts';
 import type { Jewel } from './jewels.ts';
 import { type Memory, type People, startingStanding } from './peoples.ts';
+import type { Lookout } from './meet.ts';
 
 /** The chart: the lanes, and where each landmark lies on them. The same for every run. */
 export interface Sea {
@@ -101,6 +102,10 @@ export interface WorldState {
   company: number;
   /** Sailing on a French commission from the Huguenot leaders, as well as your own. */
   french: boolean;
+  /** What the lookout calls you up for: every sail, or only those worth heaving to for. See meet.ts. */
+  lookout: Lookout;
+  /** Sails seen in each waters this voyage: word of you goes round, and the next keep their distance. */
+  sightings: Record<string, number>;
   /** The day of the last prize taken: the hands count from it. */
   lastPrize: number;
   /** Home: the run is won. */
@@ -200,6 +205,8 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     truck: 0,
     company: 0,
     french: false,
+    lookout: 'worth',
+    sightings: {},
     lastPrize: 0,
     won: false,
     sunk: false,
