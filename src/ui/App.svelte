@@ -32,7 +32,7 @@
   import { loadPeoples, savePeoples } from '../peoples.ts';
   import { shareText } from '../share.ts';
   import { type Entry, best, dailySeed, entryFor, isWin, loadLog, raised, saveLog, scoreOf, today, withEntry } from '../logbook.ts';
-  import { ambient, bell, coin, gun, knell, setSound, soundOn, storm } from './sound.ts';
+  import { ambient, bell, coin, gun, knell, pipe, setSound, soundOn, storm, toll } from './sound.ts';
   import { allTaught, loadTaught } from '../lessons.ts';
   import Fight from './Fight.svelte';
   import RouteChart from './RouteChart.svelte';
@@ -172,8 +172,21 @@
   let lastDilemma: string | null = null;
   $effect(() => {
     const k = world?.dilemma?.kind ?? null;
-    if (k === 'storm' && lastDilemma !== 'storm') storm();
+    // A storm roars; the reckoning at home rings three bells; anything else that asks, the boatswain's pipe.
+    if (k && k !== lastDilemma) {
+      if (k === 'storm') storm();
+      else if (k === 'reckoning') bell(3);
+      else pipe();
+    }
     lastDilemma = k;
+  });
+  // A hand of note dead: one slow stroke.
+  let lastDead = -1;
+  $effect(() => {
+    const dead = world ? world.hands.filter((h) => h.dead).length : 0;
+    // Not on loading a voyage with its dead already counted: only as it happens.
+    if (lastDead >= 0 && dead > lastDead && world && !world.sunk) toll();
+    lastDead = dead;
   });
 
   // --- Continuing on -----------------------------------------------------------

@@ -12,6 +12,7 @@
   import type { Sea, WorldState } from '../world/world.ts';
   import { SHIP } from './woodcut.ts';
   import type { Grave } from '../world/hands.ts';
+  import { LABEL_FONT, layoutLabels, shortName } from '../world/labels.ts';
 
   let { sea, world, graves = [] }: { sea: Sea; world: WorldState; graves?: Grave[] } = $props();
 
@@ -92,6 +93,27 @@
   /** Lying at an island a storm put you on: the way from it to where you're bound. */
   const fromIsland = $derived(world.landfall && sea.map.landmarks[world.landfall] === world.player && world.voyage.bound ? legPath(world.player, sea.map.landmarks[world.voyage.bound]) : '');
   const ship = $derived(sea.map.nodes[world.player]);
+
+  /** The names, set where none falls on another: where you are and might go next first, then where you've been, latest first. See labels.ts. */
+  const names = $derived(
+    layoutLabels(
+      shown
+        .filter((l) => world.voyage.visited.includes(l.key) || ahead.has(l.key) || width > 700)
+        .map((l) => {
+          const n = sea.map.nodes[sea.map.landmarks[l.key]];
+          const been = world.voyage.visited.indexOf(l.key);
+          const priority = l.key === world.voyage.at || ahead.has(l.key) ? 3 : been >= 0 ? 2 + been / 100 : l.detour || l.landfall ? 1 : 0;
+          return { key: l.key, x: X(n.lon), y: Y(n.lat), name: l.name, short: shortName(l.name), priority };
+        }),
+      px,
+      [W, -N, E, -S],
+      LABEL_FONT,
+      shown.map((l) => {
+        const n = sea.map.nodes[sea.map.landmarks[l.key]];
+        return { key: l.key, x: X(n.lon), y: Y(n.lat) };
+      }),
+    ),
+  );
 </script>
 
 <div class="chart" bind:clientWidth={width}>
@@ -124,10 +146,11 @@
       {@const n = sea.map.nodes[sea.map.landmarks[l.key]]}
       {@const been = world.voyage.visited.includes(l.key)}
       {@const next = ahead.has(l.key)}
-      <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * (next ? 4.5 : 3)} fill={been ? 'var(--ink)' : 'var(--paper)'} stroke="var(--ink)" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-      {#if been || next || width > 700}
-        <text x={X(n.lon) + px * 6} y={Y(n.lat) + px * 4} font-size={px * 11} font-style="italic" fill="var(--ink)" fill-opacity={been || next ? 1 : 0.6}>{l.name}</text>
-      {/if}
+      <circle cx={X(n.lon)} cy={Y(n.lat)} r={px * (next ? 4.5 : 3)} fill={been ? 'var(--ink)' : 'var(--paper)'} stroke="var(--ink)" stroke-width="1.2" vector-effect="non-scaling-stroke"><title>{l.name}</title></circle>
+    {/each}
+    {#each names as t (t.key)}
+      {@const strong = world.voyage.visited.includes(t.key) || ahead.has(t.key)}
+      <text x={t.x} y={t.y} text-anchor={t.anchor} font-size={px * LABEL_FONT} font-style="italic" fill="var(--ink)" fill-opacity={strong ? 1 : 0.6}>{t.text}</text>
     {/each}
 
     <!-- Graves from voyages before: a small cross where each lies. -->
