@@ -29,6 +29,8 @@ export interface Score {
   ship: number;
   /** Shown at court, and not disowned: see reckoning.ts. */
   fame: number;
+  /** His account of the voyage, if the chronicler came home alive and it may be printed. */
+  chronicle: number;
   /** What the ship you chose counts for. */
   multiplier: number;
   total: number;
@@ -46,16 +48,30 @@ export const LIKE_TITLES: Record<Like, string> = {
   oxenham: 'a voyage like Oxenham’s',
 };
 
+/** A chronicler's account, printed: so much for the book, and half the fame of the voyage again. */
+export const CHRONICLE_BASE = 30;
+/**
+ * His account of the voyage: if he came home alive, and you weren't named a
+ * pirate, in which case the Queen forbids it printing (as she kept Drake's
+ * voyage a secret for years, to spare Spain's feelings and her own).
+ */
+export function chronicleOf(w: WorldState): number {
+  const him = w.hands.find((h) => h.role === 'chronicler');
+  if (!w.won || !him || him.dead || him.ran || him.fate || w.verdict === 'pirate') return 0;
+  return CHRONICLE_BASE + Math.round(w.fame / 2);
+}
+
 export function score(w: WorldState): Score {
   const c = SHIP_CLASSES[w.ship];
   if (!w.won) {
-    return { treasure: 0, hands: 0, ship: 0, fame: 0, multiplier: c.multiplier, total: 0, like: 'oxenham', title: LIKE_TITLES.oxenham, text: 'Oxenham crossed the isthmus of Panama in 1577, took the silver, and was hanged at Lima.' };
+    return { treasure: 0, hands: 0, ship: 0, fame: 0, chronicle: 0, multiplier: c.multiplier, total: 0, like: 'oxenham', title: LIKE_TITLES.oxenham, text: 'Oxenham crossed the isthmus of Panama in 1577, took the silver, and was hanged at Lima.' };
   }
   const treasure = w.gold;
   const hands = w.crew * HAND_WORTH;
   const ship = Math.round((w.hull / w.maxHull) * SHIP_WORTH);
   const fame = w.fame;
-  const parts = { treasure, hands, ship, fame, multiplier: c.multiplier, total: Math.round((treasure + hands + ship + fame) * c.multiplier) };
+  const chronicle = chronicleOf(w);
+  const parts = { treasure, hands, ship, fame, chronicle, multiplier: c.multiplier, total: Math.round((treasure + hands + ship + fame + chronicle) * c.multiplier) };
   const how = howHome(w.voyage);
   const rich = w.gold >= RICH;
   const mostHome = w.crew >= c.complement / 2;

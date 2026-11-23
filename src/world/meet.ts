@@ -30,6 +30,8 @@ import { GOA_EXTRA, PRIZES, type Prize, hearFromPrisoners } from './rumors.ts';
 import type { Sea, WorldState } from './world.ts';
 import { infamyFor } from './reckoning.ts';
 import { alive, mourn, nameOf } from './hands.ts';
+import { plunderJewels } from './jewels.ts';
+import { freed } from './captives.ts';
 
 export interface Meeting {
   kind: TargetKind;
@@ -216,7 +218,6 @@ export function fight(sea: Sea, s: WorldState, action: Action): WorldState {
 }
 
 function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
-  void sea;
   const f = m.fight;
   const outcome = f.outcome!;
   const r: Roller = { rng: s.rng };
@@ -249,6 +250,14 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
     encounter: null,
     reckoning: { kind: m.kind, nation: m.nation, outcome, payout: f.payout, raid: m.raid, said: w.log.slice(before).map((l) => l.text) },
   };
-  // Prisoners taken, and they talk: a rumor, sometimes.
-  return taken && (m.nation === 'spain' || m.nation === 'portugal') ? hearFromPrisoners(done, m.nation) : done;
+  if (!taken) return done;
+  // The great cabin, or the church plate: a jewel, sometimes, and her captain's ring if he fell.
+  const r2: Roller = { rng: done.rng };
+  let after = plunderJewels(done, m.kind, m.nation, sea.map.nodes[s.player].lon > 60, r2);
+  if (!iberian) return { ...after, rng: r2.rng };
+  // An Englishman at her oars, or in the town's jail, freed; and he knows the coast.
+  const f2 = freed(after, m.raid, r2);
+  after = { ...f2.world, rng: r2.rng };
+  // Prisoners taken, and they talk: a rumor, sometimes; surely, if one of ours was among them.
+  return hearFromPrisoners(after, m.nation, f2.freed ? 1 : undefined);
 }

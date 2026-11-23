@@ -20,9 +20,14 @@
  * - sails on whose money --backer says (crown, gentlemen, own, or all of them in turn);
  * - never fires on a friend's merchant unless --pirate;
  * - at the reckoning, goes to court when the risk is small, gives the Queen a
- *   gift when it isn't and there's the treasure for it, and lies low otherwise.
+ *   gift when it isn't and there's the treasure for it, and lies low otherwise;
+ *   sets the dead commander's ring aside for her, and sells the other jewels
+ *   unless it means to give a gift;
+ * - treats with a Portuguese settlement on the coast of Brazil, and buys
+ *   brazilwood at Guanabara with what's over a margin;
+ * - takes a chronicler with --chronicler.
  *
- *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--trace]
+ *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--chronicler] [--trace]
  */
 
 import { threatened } from '../src/rules.ts';
@@ -33,7 +38,7 @@ import { choices as legsOf, daysTo, howHome, makeFor } from '../src/world/journe
 import { HOME_LANDMARK, landmark } from '../src/world/landmarks.ts';
 import { attack, fight, letPass, raid, raidHere } from '../src/world/meet.ts';
 import { score } from '../src/world/score.ts';
-import { ashore, buy, CHANDLER, daysOf, landmarkHere, marketHere, price, room, shoreHere, trade, type Ware, buySpice, spiceHere, spiceRoom } from '../src/world/stores.ts';
+import { ashore, buy, CHANDLER, daysOf, landmarkHere, marketHere, price, room, shoreHere, trade, type Ware, buySpice, buyWood, spiceHere, spiceRoom, woodHere, woodRoom } from '../src/world/stores.ts';
 import { coastAwake, PACIFIC_TOWNS } from '../src/world/treasure.ts';
 import { followed } from '../src/world/rumors.ts';
 import { BACKER_KEYS, type Backer, GIFT_PARDON, courtRisk, outlawed } from '../src/world/reckoning.ts';
@@ -56,6 +61,10 @@ const TRACE = flag('trace');
 const RUMORS = !flag('no-rumors');
 const PIRATE = flag('pirate');
 const BACKER = arg('backer', 'own');
+const CHRONICLER = flag('chronicler');
+/** Jewels brought home, a voyage at a time; and the chronicler's fate. */
+const JEWELS_HOME: number[] = [];
+const CHRONICLE = { home: 0, dead: 0, sum: 0 };
 /** What rumored prizes paid this ship's runs: payouts, and how many fought. */
 const PRIZE_PAY: number[] = [];
 const PRIZE_FOUGHT: Record<string, number> = {};
@@ -91,6 +100,13 @@ function shop(w: WorldState): WorldState {
   // Spice in the Moluccas and Java, from what's left over a margin: it doubles and more at home.
   const spice = spiceHere(sea, w);
   while (spice && w.spice < spiceRoom(w) && w.gold - spice.cost >= 30) w = buySpice(sea, w);
+  return w;
+}
+
+/** Brazilwood at Guanabara, from what's over a margin: it trebles at home. */
+function cutWood(w: WorldState): WorldState {
+  const wood = woodHere(sea, w);
+  while (wood && w.wood < woodRoom(w) && w.gold - wood.cost >= 30) w = buyWood(sea, w);
   void CHANDLER;
   return w;
 }
@@ -120,7 +136,14 @@ function answer(w: WorldState): WorldState {
         : w.dilemma.kind === 'papers' ? (open.includes('bribe') ? 'bribe' : 'hand')
         : w.dilemma.kind === 'ore' ? 'leave'
         : w.dilemma.kind === 'reckoning' ? (outlawed(w) ? (open.includes('gift') && !outlawed({ ...w, infamy: w.infamy - GIFT_PARDON }) ? 'gift' : 'low') : courtRisk(w) < 0.3 ? 'court' : w.gold > 100 ? 'gift' : 'low')
+        : w.dilemma.kind === 'settlement' ? (w.gold >= 5 ? 'treat' : 'clear')
+        : w.dilemma.kind === 'normans' ? (open.includes('buy') && w.gold > 40 ? 'buy' : RUMORS ? 'news' : 'leave')
         : open[0];
+      // At the reckoning, the dead commander's ring set aside for the Queen; the rest too, if it means to give a gift.
+      if (w.dilemma.kind === 'reckoning') {
+        JEWELS_HOME.push(w.jewels.length);
+        w = { ...w, jewels: w.jewels.map((j) => ({ ...j, forQueen: j.kind === 'commander' || want === 'gift' })) };
+      }
       w = choose(sea, w, want);
     } else if (w.hail) {
       // The treasure ship asleep, or a rumored prize come all this way for: worth it on a hull still a quarter sound. Anything else wants more.
@@ -141,7 +164,7 @@ function answer(w: WorldState): WorldState {
 
 /** At a landmark: the shore, the market, a raid. */
 function atLandmark(w: WorldState): WorldState {
-  w = shop(w);
+  w = cutWood(shop(w));
   const shore = shoreHere(sea, w);
   if (shore.includes('water') && daysOf(w).water < 80) w = answer(ashore(sea, w, 'water', advance));
   if (!w.sunk && shore.includes('forage') && (w.fresh > 15 || daysOf(w).food < 150)) w = answer(ashore(sea, w, 'forage', advance));
@@ -184,7 +207,7 @@ interface Result {
 }
 
 function sail(ship: string, seed: number, backer: Backer): Result {
-  let w = createWorld(sea, seed, ship, backer);
+  let w = createWorld(sea, seed, ship, backer, CHRONICLER);
   let lastAt = '';
   while (!w.sunk && !w.won && w.turn < DAYS) {
     // A landmark newly raised, or an island a storm put her on.
@@ -210,6 +233,9 @@ function sail(ship: string, seed: number, backer: Backer): Result {
   // The voyage keeps its own count of the dead, by what took them; and of the hands of note.
   for (const [k, n] of Object.entries(w.losses)) DEAD[k] = (DEAD[k] ?? 0) + n;
   NOTED.dead += w.hands.filter((h) => h.dead).length;
+  const poet = w.hands.find((h) => h.role === 'chronicler');
+  if (poet && w.won && !poet.dead) (CHRONICLE.home++, (CHRONICLE.sum += score(w).chronicle));
+  if (poet?.dead) CHRONICLE.dead++;
   NOTED.ran += w.hands.filter((h) => h.ran).length;
   if (TRACE) console.log(seed, ship, w.won ? 'HOME' : why, 'day', w.turn, 'gold', w.gold, 'crew', w.crew, took ? 'took her' : '', w.voyage.visited.join('>'));
   const heard = w.rumors.filter((r) => r.followed && w.voyage.visited.includes(r.key));
@@ -231,6 +257,9 @@ for (const ship of SHIP === 'all' ? SHIPS : [SHIP]) for (const backer of (BACKER
   console.log('  lost to', JSON.stringify(DEAD), `· hands of note dead ${NOTED.dead}, ran ${NOTED.ran}`);
   const sum = (f: (r: Result) => number) => results.reduce((t, r) => t + f(r), 0);
   console.log(`  rumors heard ${sum((r) => r.heard)}, detours sailed ${sum((r) => r.followedTrue + r.followedFalse)} (${sum((r) => r.followedTrue)} true, ${sum((r) => r.followedFalse)} false) · rumored prizes ${JSON.stringify(PRIZE_FOUGHT)}, paying ${mean(PRIZE_PAY.filter((x) => x > 0))} when they paid · storm landfalls ${sum((r) => r.landfalls)}`);
+  console.log(`  jewels home ${JEWELS_HOME.reduce((a, b) => a + b, 0)} on ${JEWELS_HOME.length} voyages${CHRONICLER ? ` · the chronicler home ${CHRONICLE.home}, dead ${CHRONICLE.dead}, his account worth ${CHRONICLE.home ? Math.round(CHRONICLE.sum / CHRONICLE.home) : 0}` : ''}`);
+  JEWELS_HOME.length = 0;
+  CHRONICLE.home = CHRONICLE.dead = CHRONICLE.sum = 0;
   PRIZE_PAY.length = 0;
   for (const k of Object.keys(PRIZE_FOUGHT)) delete PRIZE_FOUGHT[k];
   for (const k of Object.keys(DEAD)) delete DEAD[k];

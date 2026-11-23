@@ -142,12 +142,19 @@ export function hearAt(s: WorldState, at: string): WorldState {
   return { ...offer(s, key, d.heardAt[at]!, r), rng: r.rng };
 }
 
+/** A rumor told outright, by someone with news: the Normans at Guanabara. Nothing to tell if it's heard already, or out of reach. */
+export function tellOf(s: WorldState, key: string, source: Source): WorldState {
+  if (!open(s, key)) return { ...s, log: [...s.log, { turn: s.turn, text: 'nothing in their news you can use' }] };
+  const r: Roller = { rng: s.rng };
+  return { ...offer(s, key, source, r), rng: r.rng };
+}
+
 /** After a prize taken: her people talk, sometimes. */
-export function hearFromPrisoners(s: WorldState, nation: Nation): WorldState {
+export function hearFromPrisoners(s: WorldState, nation: Nation, chance = PRISONERS_TALK): WorldState {
   if (s.dilemma || s.hail || s.encounter) return s;
   const r: Roller = { rng: s.rng };
   const here = Object.entries(DETOURS).filter(([k, d]) => d.prisoners?.nations.includes(nation) && d.prisoners.after.includes(s.voyage.at) && open(s, k));
-  if (!here.length || roll(r) >= PRISONERS_TALK) return { ...s, rng: r.rng };
+  if (!here.length || roll(r) >= chance) return { ...s, rng: r.rng };
   const [key] = pick(r, here);
   return { ...offer(s, key, 'prisoner', r), rng: r.rng };
 }

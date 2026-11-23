@@ -20,6 +20,7 @@ import type { Rumor } from './rumors.ts';
 import { type Pace, type Rations, type Stores, startCrew, startStores } from './stores.ts';
 import { type Named, mourn, muster } from './hands.ts';
 import { BACKERS, type Backer, NOTHING_SETTLED, type Settled, type Verdict } from './reckoning.ts';
+import type { Jewel } from './jewels.ts';
 
 /** The chart: the lanes, and where each landmark lies on them. The same for every run. */
 export interface Sea {
@@ -64,6 +65,10 @@ export interface WorldState {
   raided: string[];
   /** Tons of spice in the hold, cloves or pepper, to sell on the quay at home. */
   spice: number;
+  /** Tons of brazilwood in the hold, for the red dye, to sell at home. */
+  wood: number;
+  /** Jewels from prizes and towns: to sell, or to set aside for the Queen. See jewels.ts. */
+  jewels: Jewel[];
   /** What has happened that happens once a voyage, and grievances carried to the next landmark. See happenings.ts. */
   seen: string[];
   /** Rumors heard: of what, from whom, true or not, and whether you mean to follow. See rumors.ts. */
@@ -121,8 +126,11 @@ export function dateOf(turn: number): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-/** A new voyage, in the ship you chose, on whose money, at Plymouth with her purse. */
-export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Backer = 'own'): WorldState {
+/** What a chronicler costs at Plymouth: his books, his ink and his keep, paid in advance. */
+export const CHRONICLER_COST = 10;
+
+/** A new voyage, in the ship you chose, on whose money, at Plymouth with her purse; and a chronicler aboard, if you'll have one. */
+export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Backer = 'own', chronicler = false): WorldState {
   const c = SHIP_CLASSES[ship];
   if (!c) throw new Error(`no such ship: ${ship}`);
   const b = BACKERS[backer];
@@ -131,7 +139,7 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
   const stores = startStores(ship);
   const r: Roller = { rng: (seed ^ 0x0ce4) >>> 0 };
   roll(r);
-  return {
+  const world: WorldState = {
     rng: r.rng,
     turn: 0,
     player: portNamed(sea.map, 'Plymouth'),
@@ -154,6 +162,8 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     reckoning: null,
     raided: [],
     spice: 0,
+    wood: 0,
+    jewels: [],
     seen: [],
     rumors: [],
     landfall: null,
@@ -172,6 +182,16 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     lastFight: null,
     log: [],
   };
+  return chronicler ? signChronicler(world, seed) : world;
+}
+
+// A gentleman-poet of the Inns of Court, as the promoters of the time hired them: Gascoigne for Gilbert, Churchyard for Frobisher, Parmenius, who drowned with Gilbert in 1583.
+const POETS = ['Anthony Ashley', 'Thomas Churche', 'Laurence Kemys', 'Francis Rowley', 'Edmund Hatch', 'Richard Madox', 'Walter Payne', 'John Ashton'];
+
+/** A chronicler signs on: a berth and his keep, and no seamanship. See hands.ts and score.ts. */
+export function signChronicler(s: WorldState, seed: number): WorldState {
+  const name = POETS[(seed >>> 0) % POETS.length];
+  return { ...s, gold: s.gold - CHRONICLER_COST, crew: s.crew + 1, hands: [...s.hands, { role: 'chronicler', name }] };
 }
 
 /** What the log says now that it didn't before: lines are moved as they fold, so it's by line, not by length. */

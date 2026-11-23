@@ -42,7 +42,7 @@ export const SHIP_CLASSES: Record<string, ShipClass> = {
     text: 'between the two: a gun more than a pinnace, a bigger hold, half again the score',
   },
   brigantine: {
-    name: 'brigantine', hull: 17, complement: 70, cards: { broadside: 1, 'raking-fire': 1 }, purse: 30, multiplier: 1,
+    name: 'brigantine', hull: 17, complement: 70, cards: { broadside: 1, 'raking-fire': 1 }, purse: 20, multiplier: 1,
     text: 'stout, well gunned, a deep hold, and a big crew to feed: little left in the purse, the score as it stands',
   },
 };

@@ -10,7 +10,7 @@
 import type { WorldState } from './world/world.ts';
 import { muster } from './world/hands.ts';
 
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 
 /** From each version to the next, since the voyage was simplified (12): a run in progress shouldn't be lost to an update. */
 const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, unknown>> = {
@@ -22,6 +22,8 @@ const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, 
   14: (w) => ({ ...w, backer: 'own', stake: 0, infamy: 0, grievance: 0, fame: 0, verdict: null, settled: { queen: 0, gentlemen: 0, gift: 0, restitution: 0, seized: 0 }, lastPrize: 0 }),
   // 15 → 16: the hands of note, mustered from the voyage's own dice, and the count of the dead.
   15: (w) => ({ ...w, hands: muster(w.rng as number), losses: {} }),
+  // 16 → 17: jewels and brazilwood in the hold; no chronicler aboard an old voyage.
+  16: (w) => ({ ...w, jewels: [], wood: 0 }),
 };
 
 export const SAVE_KEY = 'privateer:run';
