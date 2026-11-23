@@ -436,7 +436,9 @@
           {/if}
         {/if}
         <div class="row primary">
-          {#if atFork}
+          {#if world.voyage.at === HOME_LANDMARK}
+            <!-- Home: nothing to sail for; the reckoning and the end screen say the rest. -->
+          {:else if atFork}
             <span class="faint">the way divides:</span>
             {#each legsFrom(world.voyage, followed(world)) as k (k)}
               <button onclick={() => setFor(k)}>{k === HOME_LANDMARK ? 'turn for home' : landmark(k).name}{landmark(k).detour ? ' (rumored)' : ''}, {daysTo(sea, world, k)} days</button>
@@ -450,7 +452,7 @@
             {/if}
           {/if}
         </div>
-        {#if atFork}
+        {#if atFork && world.voyage.at !== HOME_LANDMARK}
           <ul class="plain legs">
             {#each legsFrom(world.voyage, followed(world)).filter((k) => k !== HOME_LANDMARK) as k (k)}<li><em>{landmark(k).name}{landmark(k).detour ? ', by rumor' : ''}.</em> <span class="faint">{landmark(k).text}</span></li>{/each}
           </ul>

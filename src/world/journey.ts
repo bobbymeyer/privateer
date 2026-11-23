@@ -41,6 +41,8 @@ function nextFrom(v: Voyage, detours: string[]): string[] {
 
 /** Where you can make for from here: the next landmarks, any detour you're following, and, once you've left Plymouth, home. */
 export function choices(v: Voyage, detours: string[] = []): string[] {
+  // Home: the voyage is over, and there's nowhere left to make for.
+  if (v.at === HOME_LANDMARK) return [];
   const next = nextFrom(v, detours);
   if (v.at === START_LANDMARK || next.includes(HOME_LANDMARK)) return next;
   return [...next, HOME_LANDMARK];

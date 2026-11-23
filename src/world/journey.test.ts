@@ -66,3 +66,7 @@ test('the days to a landmark are the lanes’ days', () => {
   const d = daysTo(sea, w, 'canaries');
   assert.ok(d > 10 && d < 60, `${d} days to the Canaries`);
 });
+
+test('home, there is nowhere left to make for', () => {
+  assert.deepEqual(choices({ at: HOME_LANDMARK, bound: null, visited: ['plymouth', HOME_LANDMARK] }), []);
+});
