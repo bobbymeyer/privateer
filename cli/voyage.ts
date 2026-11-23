@@ -186,8 +186,8 @@ function atLandmark(w: WorldState): WorldState {
   if (!w.sunk && shore.includes('forage') && (w.fresh > 15 || daysOf(w).food < 150)) w = answer(ashore(sea, w, 'forage', advance));
   if (!w.sunk && shore.includes('forage') && daysOf(w).food < 100) w = answer(ashore(sea, w, 'forage', advance));
   for (let i = 0; i < 3 && !w.sunk && shore.includes('careen') && w.hull < w.maxHull - 2; i++) w = answer(ashore(sea, w, 'careen', advance));
-  // The Queen's arms, where nobody holds the land, when there's a bundle to spare or a chest of truck.
-  if (!w.sunk && !waiting(w) && armsHere(sea, w) && (w.stores.spares > 2 || w.truck > 0)) w = answer(plantArms(sea, w, advance));
+  // The Queen's arms, where nobody holds the land, when there's a bundle of the spares to spare: never the truck, which is fresh food.
+  if (!w.sunk && !waiting(w) && armsHere(sea, w) && w.stores.spares > 2) w = answer(plantArms(sea, w, advance));
   const town = raidHere(sea, w);
   // The coast of Chile and Peru left asleep for the treasure ship, unless told to wake it.
   const sleeping = !WAKE && PACIFIC_TOWNS.includes(town?.key ?? '') && !w.voyage.visited.includes('cacafuego');
