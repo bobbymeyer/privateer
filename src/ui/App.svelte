@@ -810,7 +810,7 @@
   .low { color: var(--theirs); }
   .low .bar { border-color: currentColor; }
   .low .bar span { background: currentColor; }
-  .settings { display: flex; flex-wrap: wrap; gap: 0 1.5rem; }
+  .settings { display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; }
   .settings .row { margin: 0; }
   .act { border-top: 1.5px solid var(--ink); padding-top: 0.75rem; }
   .landmark { border-left: 3px solid var(--ink); padding-left: 0.75rem; }

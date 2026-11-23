@@ -25,7 +25,7 @@ better gunned and the deeper the hold.
 | --- | --- | --- | --- | --- | --- |
 | pinnace | 120 | 12 | 20 of 30 | 15 cards | ×2 |
 | sloop | 70 | 14 | 30 of 45 | 16, a raking fire more | ×1.5 |
-| brigantine | 20 | 17 | 47 of 70 | 17, a broadside and a raking fire more | ×1 |
+| brigantine | 10 | 17 | 47 of 70 | 17, a broadside and a raking fire more | ×1 |
 
 **Choose whose money you sail on** (`BACKERS` in `src/world/reckoning.ts`).
 Most voyages were paid for privately; the Crown put in ships and money when
@@ -33,8 +33,8 @@ it suited it, as Elizabeth did in Drake's.
 
 | backer | fits you out with | at home |
 | --- | --- | --- |
-| the Crown | 40% of the ship's purse and 10 more, 2 spares and 2 powder | the Queen's third of what you bring home; she wants a clean commission (infamy counts double), and her favour shields you at court |
-| gentlemen adventurers | 60% of the ship's purse and 25 more | half of what comes home over your own purse, nothing if you come home poorer; their friends aboard bring the San Julián grumbling to a head |
+| the Crown | half the ship's purse, a spare and a barrel of powder | the Queen's third of what you bring home; she wants a clean commission (infamy counts double), and her favour shields you at court |
+| gentlemen adventurers | four fifths of the ship's purse | half of what comes home over your own purse, nothing if you come home poorer; their friends aboard bring the San Julián grumbling to a head |
 | your own stake | nothing more | nothing shared |
 
 The gentlemen suit a pinnace best, the Crown a sloop or a brigantine (see
@@ -48,12 +48,43 @@ does no seamanship. Bring him home alive and his account of the voyage adds
 pirate, it's forbidden printing.
 
 **Fit out** at Plymouth's chandler: food at 4 for 300 rations, water at 1
-for 300, five hands for 4, a bundle of spares or a barrel of powder for 3.
+for 300, five hands for 4, a bundle of spares or a barrel of powder for 3,
+and a chest of truck (knives, beads and cloth, as the 1564 relief voyage to
+Florida packed "to trade with" the people of the coast) for 3, up to five
+chests; truck is English goods, and only Plymouth sells it.
 Abroad, a chandler is half as dear again. You start with two months' food
 and a month's water for the hands aboard.
 
+**The peoples of the coasts** (`src/world/peoples.ts`): the Tupinambá of
+Brazil, the Patagonians at San Julián, the Mapuche at Mocha, the Miwok at
+Nova Albion, the Chamorro at the Ladrones, the islanders of the Solomons,
+the Khoikhoi at Table Bay and the Temne at Sierra Leone. Each is friendly,
+wary or hostile, and starts where history left the English: the Miwok
+crowned Drake, the Mapuche shot at him. Deal fairly (trade, pay in truck, a
+chest of it for 8 days of fresh food and the casks filled where there's no
+market, flog the hands who wrong them) and they come round: friendly, they
+bring fresh food down to the beach the first time, their guides make the
+work ashore a day quicker and the foraging a quarter better, and they tell
+you what they know (a rumor, if there's one to hear there). Deal harshly
+(take what you need by force, 21 days of fresh food and the casks filled at
+once; fire a gun over their canoes; let misconduct pass) and they turn:
+hostile, no trade, and arrows from the trees at the work ashore four times
+in ten (one in eight while they're wary). What a voyage leaves on each coast
+is remembered by the next English ship, in the browser (`src/peoples.ts`):
+hostile stays hostile, friendly friendlier, wary is forgotten.
+
+**Huguenot privateers out of La Rochelle** hail you off Spain, Guinea and
+Brazil: keep company six days (privateers and corsairs stand off from two
+ships, and you wait a day in four for the slower one), trade news (a
+rumor), or take a French commission. Under one, what you take from Spain
+counts half toward its grievance, but the Queen likes a captain with two
+masters less: three in twenty more risk at court, and a gift forgives one
+question, not two. Under the Crown's commission it's refused.
+
 **Continue on.** The screen is the chart of the whole voyage, what you've
-got, and one button. The ship sails the lanes a day at a time to the next
+got, and one button. On a phone the status folds to a line (hands, food,
+water, hull; the rest a tap away) and continue on stays at the bottom of
+the screen. The ship sails the lanes a day at a time to the next
 landmark and stops when something happens: a landmark raised, an event, a
 sail, a storm, the end. Where the way divides you choose the leg; you can
 turn for home whenever you like. Space continues on, or heaves to.
@@ -251,6 +282,12 @@ and Callao's jail one of Oxenham's company half the time; he joins as a
 hand, takes the place of a hand of note who's gone, and knows the coast (a
 rumor, if there's one to hear).
 
+**Copy the log** on the end screen copies the voyage as a few lines of
+plain text (`src/share.ts`): which voyage (today's, with its date), the
+ship and whose money, how far, the dead of note, the score and the voyage
+it was like, and the seed. Nothing is sent anywhere; where the clipboard
+won't take it, the lines are shown to select.
+
 **Graves** (`src/graves.ts`). When a voyage ends, its dead are written in
 the browser where they fell, with an epitaph you can change on the end
 screen, and the ship too if she was lost. A later voyage passing within a
@@ -388,8 +425,13 @@ silver, follows every rumor (and attacks a rumored prize on a hull still a
 quarter sound), and fights by one-step lookahead.
 
 ```
-npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--chronicler] [--trace]
+npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--chronicler] [--french] [--no-truck] [--trace]
 ```
+
+It carries three chests of truck from Plymouth (none with `--no-truck`) and
+barters them where there's a people and no market, deals fairly (flogs the
+hands who wrong a people, trades truck with canoes), keeps company with the
+Huguenots, and takes their French commission only with `--french`.
 
 It never fires on a friend's merchant unless `--pirate`. At the reckoning it
 goes to court when the risk is under three in ten, gives the Queen a gift
@@ -404,14 +446,18 @@ Over 100 voyages a ship and a backer, mean score counting the lost as 0:
 
 | ship | the Crown | gentlemen adventurers | your own stake |
 | --- | --- | --- | --- |
-| pinnace | 55% home, mean score 208 | 51%, 247 | 45%, 165 |
-| sloop | 56%, 180 | 51%, 161 | 51%, 141 |
-| brigantine | 58%, 186 | 63%, 146 | 53%, 189 |
+| pinnace | 57% home, mean score 256 | 59%, 283 | 58%, 243 |
+| sloop | 59%, 152 | 58%, 141 | 52%, 167 |
+| brigantine | 63%, 201 | 61%, 126 | 51%, 162 |
 
-The brigantine's purse came down from 30 to 20, and the backers' money was
-made more a share of the ship's purse, to bring her back toward the rest;
-backed by gentlemen she still gets home more often than the band the others
-keep to. Jewels: about one voyage home in two brings one, the brigantine
+Truck and the peoples' goodwill lift every ship a few points; the pinnace
+most, since fresh food is what it lacks (44% on its own stake without truck,
+58% with). To hold the line the brigantine's purse came down to 10, the
+backers' money became purely a share of the ship's purse (the Crown half,
+the gentlemen four fifths), and the Crown's stores from Deptford a spare and
+a barrel. The backed brigantine is still a few points over the rest; the
+next seed range (100–199) gives the Crown's pinnace, sloop and brigantine
+50%, 59% and 58%, so some of it is the dice. Jewels: about one voyage home in two brings one, the brigantine
 more. With a chronicler, on its own stake, he came home alive about a
 quarter of the time (26, 26 and 24 of 100), worth 42, 47 and 70 to the
 score when he did; mean scores rose to 190, 158 and 207.
@@ -445,7 +491,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 160 tests
+npm test                     # the rules and the voyage, 175 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
@@ -465,6 +511,8 @@ src/
   save.ts        saving a voyage to the browser
   logbook.ts     the logbook of finished voyages, and today's voyage
   graves.ts      the graves of voyages before, kept in the browser
+  peoples.ts     what the last English ship left on each coast, kept in the browser
+  share.ts       the voyage in a few lines, to copy from the end screen
   ui/            Svelte: App, RouteChart, Fight, CardView, Gauge, Flag; sound.ts
   world/
     data/        world.json and coast.json, from Natural Earth
@@ -480,6 +528,7 @@ src/
     events.ts    a day: storms, the weather, the stores
     weather.ts   rain, fish, calms, williwaws, fever, foul water, weevils
     happenings.ts the rest of what happens on the way, by region, and on arriving
+    peoples.ts   the peoples of the coasts: how you treat them, and what they remember
     hands.ts     the hands of note, who of them died and of what, and the graves they leave
     captives.ts  men left ashore who talk, a crew taken on a Spanish coast, Englishmen freed
     jewels.ts    jewels from prizes and towns, and what the Queen makes of them
