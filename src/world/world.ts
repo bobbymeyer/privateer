@@ -9,7 +9,7 @@
 
 import type { RngState } from '../rng.ts';
 import { SHIP_CLASSES } from '../outfit.ts';
-import { buildMap, type NodeId, portNamed, type SeaMap } from './map.ts';
+import { loadMap, type NodeId, portNamed, type SeaMap } from './map.ts';
 import { type Roller, roll } from './random.ts';
 import type { Dilemma } from './dilemmas.ts';
 import { aDay } from './events.ts';
@@ -73,6 +73,9 @@ export interface WorldState {
   spice: number;
   /** Tons of brazilwood in the hold, for the red dye, to sell at home. */
   wood: number;
+  /** Monkeys and parrots in a corner of the hold, for London's fashionable houses. See pets.ts. */
+  monkeys: number;
+  parrots: number;
   /** Jewels from prizes and towns: to sell, or to set aside for the Queen. See jewels.ts. */
   jewels: Jewel[];
   /** What has happened that happens once a voyage, and grievances carried to the next landmark. See happenings.ts. */
@@ -133,7 +136,7 @@ let built: Sea | null = null;
 
 /** The chart is the same every run: built once, then shared. */
 export function createSea(): Sea {
-  if (!built) built = { map: buildMap() };
+  if (!built) built = { map: loadMap() };
   return built;
 }
 
@@ -189,6 +192,8 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     asked: {},
     spice: 0,
     wood: 0,
+    monkeys: 0,
+    parrots: 0,
     jewels: [],
     seen: [],
     rumors: [],

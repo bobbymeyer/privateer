@@ -2,4 +2,7 @@ import { mount } from 'svelte';
 import App from './App.svelte';
 import './app.css';
 
-export default mount(App, { target: document.getElementById('app')! });
+const target = document.getElementById('app')!;
+// The page's own "charting the seas…" has done its job.
+target.replaceChildren();
+export default mount(App, { target });

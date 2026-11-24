@@ -4,9 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>privateer</title>
+    <!-- Painted before the script arrives, so a slow phone never shows a blank page. -->
+    <style>
+      body { margin: 0; font-family: ui-serif, Georgia, 'Times New Roman', serif; color: #141414; background: #fff; }
+      .boot { max-width: 72rem; margin: 0 auto; padding: 1.25rem 16px; }
+      .boot h1 { margin: 0 0 1rem; font-size: 1.8rem; font-weight: 400; letter-spacing: -0.025em; }
+      .boot p { color: #6b6b6b; margin: 0; }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app"><div class="boot"><h1>privateer</h1><p>charting the seas…</p></div></div>
     <script type="module" src="/src/ui/main.ts"></script>
   </body>
 </html>

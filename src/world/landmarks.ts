@@ -48,6 +48,8 @@ export interface Offers {
   spice?: { name: string; cost: number };
   /** Brazilwood to buy by the ton from the Tupinambá who cut it, for the red dye: it sells at home for WOOD_WORTH. */
   wood?: { cost: number };
+  /** Monkeys and parrots to buy, for London: see pets.ts. */
+  pets?: true;
 }
 
 export const LANDMARKS: Landmark[] = [
@@ -64,11 +66,11 @@ export const LANDMARKS: Landmark[] = [
     text: 'Portuguese, and so the King of Spain’s since this year. Drake took a Portuguese ship here, and her pilot, who knew the coast of Brazil, and watered at Brava before the long crossing.',
   },
   {
-    key: 'brazil', name: 'the coast of Brazil', kind: 'anchorage', at: [-48.5, -27.5], next: ['plate'], offers: { shore: ['water', 'forage', 'careen'] },
+    key: 'brazil', name: 'the coast of Brazil', kind: 'anchorage', at: [-48.5, -27.5], next: ['plate'], offers: { shore: ['water', 'forage', 'careen'], pets: true },
     text: 'Landfall after the long crossing. Water, wood, and fresh food ashore, if the Portuguese settlements are kept clear of.',
   },
   {
-    key: 'guanabara', name: 'the bay of Guanabara', kind: 'anchorage', at: [-43.1, -23.05], next: ['plate'], offers: { shore: ['water', 'forage', 'careen'], wood: { cost: 3 } },
+    key: 'guanabara', name: 'the bay of Guanabara', kind: 'anchorage', at: [-43.1, -23.05], next: ['plate'], offers: { shore: ['water', 'forage', 'careen'], wood: { cost: 3 }, pets: true },
     text: 'Where Villegagnon planted France Antarctique in 1555, six hundred French and Swiss, and lost it to quarrels over the Eucharist and then to the Portuguese in 1560. The ruins of his fort on the island, the Tupinambá who cut brazilwood for the French, and Norman ships that still come for it. The Portuguese town is across the bay.',
   },
   {
@@ -132,7 +134,7 @@ export const LANDMARKS: Landmark[] = [
     text: '“The fairest cape we saw in the whole circumference of the earth,” Drake’s chaplain wrote. Water in Table Bay, if the weather lets you in.',
   },
   {
-    key: 'sierra-leone', name: 'Sierra Leone', kind: 'anchorage', at: [-13.4, 8.4], next: ['plymouth-home'], offers: { shore: ['water', 'forage', 'careen'] },
+    key: 'sierra-leone', name: 'Sierra Leone', kind: 'anchorage', at: [-13.4, 8.4], next: ['plymouth-home'], offers: { shore: ['water', 'forage', 'careen'], pets: true },
     text: 'Water, lemons and oysters on the coast of Guinea, and the last landfall before home.',
   },
   {
@@ -140,7 +142,7 @@ export const LANDMARKS: Landmark[] = [
     text: 'Back through the Strait while the Spanish are still looking for you on the coast of Peru. They will be waiting at the other end before long.',
   },
   {
-    key: 'brazil-home', name: 'the coast of Brazil, homeward', kind: 'anchorage', at: [-38.0, -9.5], next: ['plymouth-home'], offers: { shore: ['water', 'forage', 'careen'] },
+    key: 'brazil-home', name: 'the coast of Brazil, homeward', kind: 'anchorage', at: [-38.0, -9.5], next: ['plymouth-home'], offers: { shore: ['water', 'forage', 'careen'], pets: true },
     text: 'Water and wood for the last crossing. The Portuguese know what you’ve done by now.',
   },
   // --- Detours, known only by a rumor -------------------------------------------

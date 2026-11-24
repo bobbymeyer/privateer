@@ -4,8 +4,8 @@
    * landmark to landmark along the lanes, where you've been, and the ship.
    * Nothing to pan or zoom; everything that matters is always in view.
    */
-  import coast from '../world/data/coast.json';
-  import { FAR, type NodeId } from '../world/map.ts';
+  import type { NodeId } from '../world/map.ts';
+  import { BOUNDS, X, Y, coastPath, legPath as chartLeg } from './chart.ts';
   import { HOME_LANDMARK, LANDMARKS } from '../world/landmarks.ts';
   import { choices } from '../world/journey.ts';
   import { DETOUR_KEYS, followed } from '../world/rumors.ts';
@@ -13,53 +13,17 @@
   import { SHIP } from './woodcut.ts';
   import type { Grave } from '../world/hands.ts';
   import { LABEL_FONT, layoutLabels, shortName } from '../world/labels.ts';
+  import { chartSummary } from './access.ts';
 
   let { sea, world, graves = [] }: { sea: Sea; world: WorldState; graves?: Grave[] } = $props();
 
-  // The world from 180°W to 180°E, and from the Arctic to below the Horn.
-  const [W, E, N, S] = [-180, 180, 72, -60];
-  const X = (lon: number) => lon;
-  const Y = (lat: number) => -lat;
+  const { W, E, N, S } = BOUNDS;
 
   let width = $state(900);
   /** Degrees a screen pixel covers: glyphs and type are sized by it. */
   const px = $derived((E - W) / Math.max(320, width));
 
-  // The coast, drawn once, coarse enough for a chart of the world.
-  const coastPath = (() => {
-    let d = '';
-    for (const r of coast.rings as number[][]) {
-      let [w, s, e, n] = [Infinity, Infinity, -Infinity, -Infinity];
-      for (let i = 0; i < r.length; i += 2) [w, s, e, n] = [Math.min(w, r[i]), Math.min(s, r[i + 1]), Math.max(e, r[i]), Math.max(n, r[i + 1])];
-      if (e - w < 0.8 && n - s < 0.8) continue;
-      let [lx, ly] = [r[0], r[1]];
-      d += `M${lx.toFixed(1)},${(-ly).toFixed(1)}`;
-      for (let i = 2; i < r.length; i += 2) {
-        if (Math.abs(r[i] - lx) < 0.35 && Math.abs(r[i + 1] - ly) < 0.35) continue;
-        [lx, ly] = [r[i], r[i + 1]];
-        d += `L${lx.toFixed(1)},${(-ly).toFixed(1)}`;
-      }
-      d += 'Z';
-    }
-    return d;
-  })();
-
-  /** A leg's way along the lanes, as a path broken where it crosses the edge of the chart. */
-  function legPath(a: NodeId, b: NodeId): string {
-    const map = sea.map;
-    const d = map.distTo(b);
-    if (d[a] >= FAR) return '';
-    let at = a;
-    let path = `M${X(map.nodes[at].lon)},${Y(map.nodes[at].lat)}`;
-    for (let guard = 0; at !== b && guard < 2000; guard++) {
-      const next = map.adj[at].find((m) => d[m] === d[at] - 1);
-      if (next === undefined) break;
-      const [p, q] = [map.nodes[at], map.nodes[next]];
-      path += `${Math.abs(q.lon - p.lon) > 180 ? 'M' : 'L'}${X(q.lon)},${Y(q.lat)}`;
-      at = next;
-    }
-    return path;
-  }
+  const legPath = (a: NodeId, b: NodeId) => chartLeg(sea.map, a, b);
 
   /** Every leg of the voyage, from each landmark to each that follows it; and each detour's ways in and out, marked with it. */
   const legs = (() => {
@@ -117,7 +81,7 @@
 </script>
 
 <div class="chart" bind:clientWidth={width}>
-  <svg viewBox="{W} {-N} {E - W} {N - S}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="the chart of the voyage">
+  <svg viewBox="{W} {-N} {E - W} {N - S}" preserveAspectRatio="xMidYMid meet" role="img" aria-label={chartSummary(sea, world)}>
     <rect x={W} y={-N} width={E - W} height={N - S} fill="var(--sea)" />
     <path d={coastPath} fill="var(--land)" stroke="var(--sepia)" stroke-width="0.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
 

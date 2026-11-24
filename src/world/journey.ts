@@ -10,6 +10,7 @@ import type { Sea, WorldState } from './world.ts';
 import { PLATE_LANDMARK, overhaul } from './treasure.ts';
 import { arriving } from './happenings.ts';
 import { SPICE_WORTH, WOOD_WORTH } from './stores.ts';
+import { petsWorth } from './pets.ts';
 import { arriveBrazil } from './brazil.ts';
 import { arriveDetour, followed, hearAt } from './rumors.ts';
 import { comeHome } from './reckoning.ts';
@@ -98,14 +99,16 @@ export function raise(sea: Sea, s: WorldState): WorldState {
     // The spice and the brazilwood sold on the quay.
     const sold = s.spice * SPICE_WORTH;
     const dye = s.wood * WOOD_WORTH;
+    const pets = petsWorth(s);
     const log = [
       ...s.log,
       ...(sold ? [{ turn: s.turn, text: `${s.spice} tons of spice sold on the quay for ${sold}` }] : []),
       ...(dye ? [{ turn: s.turn, text: `${s.wood} tons of brazilwood sold to the dyers for ${dye}` }] : []),
+      ...(pets ? [{ turn: s.turn, text: `${[s.monkeys && `${s.monkeys} ${s.monkeys === 1 ? 'monkey' : 'monkeys'}`, s.parrots && `${s.parrots} ${s.parrots === 1 ? 'parrot' : 'parrots'}`].filter(Boolean).join(' and ')} sold in London for ${pets}` }] : []),
     ];
-    const gold = s.gold + sold + dye;
+    const gold = s.gold + sold + dye + pets;
     // Not over yet: the shares, and the reckoning.
-    return comeHome({ ...s, voyage, gold, spice: 0, wood: 0, log: [...log, { turn: s.turn, text: `Plymouth: ${said}, with ${gold}`, stop: true }] });
+    return comeHome({ ...s, voyage, gold, spice: 0, wood: 0, monkeys: 0, parrots: 0, log: [...log, { turn: s.turn, text: `Plymouth: ${said}, with ${gold}`, stop: true }] });
   }
   // The people of the coast, as they stand with you; then what happens on arriving.
   let w: WorldState = meetPeople({ ...s, voyage, landfall: null, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] }, raised);

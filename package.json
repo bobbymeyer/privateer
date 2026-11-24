@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "bake": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/bake-sea.ts",
     "test": "node --test --experimental-strip-types --disable-warning=ExperimentalWarning src/*.test.ts src/world/*.test.ts src/ui/*.test.ts",
     "sim": "node --experimental-strip-types --disable-warning=ExperimentalWarning cli/sim.ts",
     "world": "node --max-old-space-size=4096 --experimental-strip-types --disable-warning=ExperimentalWarning scripts/build-world.ts",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/node": "^22.20.5",
+    "axe-core": "^4.10.2",
     "d3-geo-voronoi": "^2.1.0",
     "svelte": "^5.57.3",
     "svelte-check": "^4.7.7",
