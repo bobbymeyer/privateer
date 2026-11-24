@@ -336,10 +336,33 @@ for forty days.
 river after dark: two days, the casks filled, seen three times in ten
 (before the treasure ship, word goes up the coast; after, Spain's grievance).
 
-The voyage saves as you go (`src/save.ts`, version 20; a run from before
+The voyage saves as you go (`src/save.ts`, version 22; a run from before
 the simplification is dropped). Every voyage that ends goes in the
-logbook, with its score. *Today's voyage* is the same seed for everyone
-that day.
+logbook, with its score and its track. *Today's voyage* is the same seed
+for everyone that day.
+
+**The logbook as a chart** (`src/logchart.ts`, `src/ui/LogbookChart.svelte`).
+Above the logbook's table, every voyage you've sailed drawn along the lanes:
+home in ink, lost dashed, named a pirate in red. Your graves are crosses,
+the Queen's arms posts with a plate, and the coasts that remember an English
+ship are ringed, friendly in ink and hostile in red. Choose a row to pick
+out its voyage. Voyages from before the tracks were kept aren't drawn.
+
+**The days of the year** (`src/world/calendar.ts`), by the Julian calendar
+England keeps: Christmas asks (a double ration, a day's food, and any
+grumbling settled; or plain, and one time in three the hands grumble);
+the Queen's Accession Day, 17 November, asks (a salute for a barrel of
+powder, or her health drunk); New Year's Day, Lady Day (when the year
+turns for the law), Easter by the old reckoning, Midsummer, and 5 October
+1582, when Spain and Portugal drop ten days and England doesn't, are a
+line each; and some Sundays at sea, one in five, prayers.
+
+**Monkeys and parrots** (`src/world/pets.ts`), for London's fine houses: on
+the coast of Brazil, at Guanabara and Sierra Leone, a monkey for 3 or a
+parrot for 2, or either for a chest of truck, six aboard at most. Each day
+at sea one may die: one in 200 in the tropics, one in 90 in the middle
+latitudes, and past 40° one in 18 for a monkey, one in 30 for a parrot.
+Sold in London with the spice: 15 a monkey, 10 a parrot.
 
 ## the voyage
 
@@ -515,7 +538,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 212 tests
+npm test                     # the rules and the voyage, 225 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
@@ -534,6 +557,7 @@ src/
   outfit.ts      the three ships you can choose, and the deck each fights with
   save.ts        saving a voyage to the browser
   logbook.ts     the logbook of finished voyages, and today's voyage
+  logchart.ts    the logbook as a chart: tracks, graves, arms, the coasts that remember
   graves.ts      the graves of voyages before, kept in the browser
   lessons.ts     the fight's hints, and which have been read, kept in the browser
   peoples.ts     what the last English ship left on each coast, kept in the browser
@@ -553,6 +577,8 @@ src/
     events.ts    a day: storms, the weather, the stores
     weather.ts   rain, fish, calms, williwaws, fever, foul water, weevils
     happenings.ts the rest of what happens on the way, by region, and on arriving
+    calendar.ts  the days of the year a ship of 1580 kept, Julian
+    pets.ts      monkeys and parrots for London
     peoples.ts   the peoples of the coasts: how you treat them, and what they remember
     hands.ts     the hands of note, who of them died and of what, and the graves they leave
     captives.ts  men left ashore who talk, a crew taken on a Spanish coast, Englishmen freed
