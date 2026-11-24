@@ -11,6 +11,8 @@ import { type Roller, roll } from './random.ts';
 import { provisionDay } from './stores.ts';
 import { weatherDay } from './weather.ts';
 import { happeningsDay } from './happenings.ts';
+import { petsDay } from './pets.ts';
+import { calendarDay } from './calendar.ts';
 import type { Sea, WorldState } from './world.ts';
 
 /** A storm, on any day at sea, outside its seasons and its latitudes. */
@@ -49,7 +51,10 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
     }
     w = weatherDay(sea, w, r);
     w = happeningsDay(sea, w, r);
+    w = petsDay(sea, w, r);
   }
+  // The days of the year, at sea or not.
+  w = calendarDay(w, r, atSea);
   w = provisionDay(sea, w, r);
   return { ...w, rng: r.rng };
 }

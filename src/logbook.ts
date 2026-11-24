@@ -37,7 +37,16 @@ export interface Entry {
   /** Treasure, hands and ship, all told; and the voyage of the time it was like. A run from before the score reads as its gold. */
   score?: number;
   like?: Like;
+  /** The landmarks raised, in order, from Plymouth: the voyage's track for the logbook's chart. Older entries have none. */
+  track?: string[];
+  /** Where the Queen's arms were set up. */
+  claims?: string[];
+  /** Named a pirate at the reckoning: drawn apart from an honest homecoming. */
+  pirate?: boolean;
 }
+
+/** A track kept no longer than this: a voyage raises twenty-odd landmarks at most. */
+export const TRACK_KEPT = 40;
 
 export function entryFor(w: WorldState, seed: number, daily: string | null, when: Date): Entry {
   const ending: Ending = w.sunk ? 'sunk' : w.won ? 'home' : 'abandoned';
@@ -55,6 +64,9 @@ export function entryFor(w: WorldState, seed: number, daily: string | null, when
     sacks: w.tally.sacks,
     score: score(w).total,
     like: score(w).like,
+    track: w.voyage.visited.slice(0, TRACK_KEPT),
+    claims: [...w.arms],
+    ...(w.verdict === 'pirate' ? { pirate: true } : {}),
   };
 }
 

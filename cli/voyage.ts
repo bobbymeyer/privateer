@@ -47,6 +47,7 @@ import { choices as legsOf, daysTo, howHome, makeFor } from '../src/world/journe
 import { HOME_LANDMARK, landmark } from '../src/world/landmarks.ts';
 import { attack, fight, letPass, raid, raidHere, oddsOf } from '../src/world/meet.ts';
 import { score } from '../src/world/score.ts';
+import { PET_COST, PET_ROOM, buyPet, petsAboard, petsHere } from '../src/world/pets.ts';
 import { TRUCK_AT, barter, barterHere, ashore, buy, CHANDLER, daysOf, landmarkHere, marketHere, price, room, shoreHere, trade, type Ware, buySpice, buyWood, spiceHere, spiceRoom, woodHere, woodRoom, mend, yardHere, YARD_COST } from '../src/world/stores.ts';
 import { coastAwake, PACIFIC_TOWNS } from '../src/world/treasure.ts';
 import { followed } from '../src/world/rumors.ts';
@@ -143,6 +144,10 @@ function shop(w: WorldState): WorldState {
 function cutWood(w: WorldState): WorldState {
   const wood = woodHere(sea, w);
   while (wood && w.wood < woodRoom(w) && w.gold - wood.cost >= 30) w = buyWood(sea, w);
+  // A few parrots and a monkey if they're cheap: parrots live through the cold better.
+  if (petsHere(sea, w)) {
+    for (const pet of ['parrot', 'parrot', 'parrot', 'monkey'] as const) if (petsAboard(w) < PET_ROOM && w.gold - PET_COST[pet] >= 30) w = buyPet(sea, w, pet);
+  }
   void CHANDLER;
   return w;
 }
@@ -176,6 +181,8 @@ function answer(w: WorldState): WorldState {
         : w.dilemma.kind === 'huguenots' ? (FRENCH && open.includes('commission') ? 'commission' : 'company')
         : w.dilemma.kind === 'reckoning' ? (outlawed(w) ? (open.includes('gift') && !outlawed({ ...w, infamy: w.infamy - pardonOf(w) }) ? 'gift' : 'low') : courtRisk(w) < 0.3 ? 'court' : w.gold > 100 ? 'gift' : 'low')
         : w.dilemma.kind === 'settlement' ? (w.gold >= 5 ? 'treat' : 'clear')
+        : w.dilemma.kind === 'christmas' ? (daysOf(w).food > 40 ? 'keep' : 'plain')
+        : w.dilemma.kind === 'accession' ? (w.stores.powder > 3 ? 'salute' : 'toast')
         : w.dilemma.kind === 'normans' ? (open.includes('buy') && w.gold > 40 ? 'buy' : RUMORS ? 'news' : 'leave')
         : open[0];
       // At the reckoning, the dead commander's ring set aside for the Queen; the rest too, if it means to give a gift.

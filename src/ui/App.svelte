@@ -31,6 +31,9 @@
   import { forget, load, store } from '../save.ts';
   import { PEOPLES, TAKEN_DAYS, peopleHere, standingWord, takeWhatYouNeed, remember } from '../world/peoples.ts';
   import { loadPeoples, savePeoples } from '../peoples.ts';
+  import { logChart } from '../logchart.ts';
+  import LogbookChart from './LogbookChart.svelte';
+  import { PET_COST, PET_ROOM, PET_WORTH, buyPet, petsAboard, petsHere } from '../world/pets.ts';
   import { shareText } from '../share.ts';
   import { type Entry, best, dailySeed, entryFor, isWin, loadLog, raised, saveLog, scoreOf, today, withEntry } from '../logbook.ts';
   import { ambient, bell, coin, gun, knell, pipe, setSound, soundOn, storm, toll } from './sound.ts';
@@ -116,6 +119,8 @@
   // --- The logbook -------------------------------------------------------------
 
   let logOpen = $state(false);
+  /** The voyage picked out in the logbook's chart, by its row. */
+  let picked: number | null = $state(null);
   let log: Entry[] = $state(loadLog());
   let logged = false;
   function logRun(w: WorldState) {
@@ -336,6 +341,7 @@
   const town = $derived(sea && now() ? raidHere(sea, now()!) : null);
   const spice = $derived(sea && now() ? spiceHere(sea, now()!) : null);
   const wood = $derived(sea && now() ? woodHere(sea, now()!) : null);
+  const pets = $derived(sea && now() ? petsHere(sea, now()!) : false);
   /** At a fork with nothing chosen: the way divides, and you choose. */
   const atFork = $derived.by(() => {
     const w = now();
@@ -416,7 +422,7 @@
     {/snippet}
     {#snippet matters(w: WorldState)}
         <!-- What only matters now and then: said when it does. -->
-        {@const cargo = [w.spice && `${w.spice} ${w.spice === 1 ? 'ton' : 'tons'} of spice`, w.wood && `${w.wood} of brazilwood`, w.jewels.length && `${w.jewels.length} ${w.jewels.length === 1 ? 'jewel' : 'jewels'}`].filter(Boolean)}
+        {@const cargo = [w.spice && `${w.spice} ${w.spice === 1 ? 'ton' : 'tons'} of spice`, w.wood && `${w.wood} of brazilwood`, w.monkeys && `${w.monkeys} ${w.monkeys === 1 ? 'monkey' : 'monkeys'}`, w.parrots && `${w.parrots} ${w.parrots === 1 ? 'parrot' : 'parrots'}`, w.jewels.length && `${w.jewels.length} ${w.jewels.length === 1 ? 'jewel' : 'jewels'}`].filter(Boolean)}
         {@const notes = [
           scurvy(w) === 'killing' ? `${w.fresh} days without fresh food: the scurvy is killing` : scurvy(w) === 'coming' ? `${w.fresh} days without fresh food: the scurvy at ${SCURVY_DAYS}` : '',
           w.crew < minHands(w) + 6 ? `${w.crew} hands, and she needs ${minHands(w)} to work her` : '',
@@ -576,6 +582,15 @@
             <p class="faint">brazilwood, cut by the Tupinambá for trade goods, for the red dye: sold at home for {WOOD_WORTH} a ton. room for {woodRoom(world) - world.wood} more, beside the spice.</p>
             <div class="row"><button disabled={sailing || world.gold < wood.cost || world.wood >= woodRoom(world)} onclick={() => attempt(() => buyWood(sea!, world!))}>a ton of brazilwood ({wood.cost}), {world.wood} aboard</button></div>
           {/if}
+          {#if pets}
+            <p class="faint">monkeys and parrots for London’s fine houses: a monkey fetches {PET_WORTH.monkey} at home, a parrot {PET_WORTH.parrot}, if they live; the cold kills them, the monkeys first. room for {PET_ROOM - petsAboard(world)} more.</p>
+            <div class="row">
+              {#each ['monkey', 'parrot'] as const as pet (pet)}
+                <button disabled={sailing || world.gold < PET_COST[pet] || petsAboard(world) >= PET_ROOM} onclick={() => attempt(() => buyPet(sea!, world!, pet))}>a {pet} ({PET_COST[pet]})</button>
+                {#if world.truck > 0}<button disabled={sailing || petsAboard(world) >= PET_ROOM} onclick={() => attempt(() => buyPet(sea!, world!, pet, 'truck'))}>a {pet} for a chest of truck</button>{/if}
+              {/each}
+            </div>
+          {/if}
           {#if town}
             <div class="row"><button disabled={sailing} onclick={() => attempt(() => raid(sea!, world!))}>raid {here.name}, once</button></div>
             <p class="faint">{town.kind === 'fortress' ? 'walled, and its guns are heavy.' : 'an open town: a battery or two, the walls, and the townsfolk.'} {['valparaiso', 'callao'].includes(town.key) && !world.voyage.visited.includes('cacafuego') ? 'word of a raid here would go north ahead of you.' : ''}</p>
@@ -700,11 +715,18 @@
             <p class="faint">no voyage has ended yet. every one that does is written here.</p>
           {:else}
             <p>your best: {isWin(top!) ? `${scoreOf(top!)}${likeOf(top!) ? `, ${likeOf(top!)}` : ''}, on day ${top!.day}` : `${raised(top!)} landmarks raised, ${top!.gold} gold`}{top!.daily ? `, on the voyage of ${top!.daily}` : ''}</p>
+            {#if sea}
+              {@const lc = logChart(log, graves, loadPeoples())}
+              {#if lc.tracks.length || lc.graves.length || lc.coasts.length}
+                <LogbookChart {sea} chart={lc} selected={picked} />
+                <p class="faint">choose a voyage below to pick out its track.</p>
+              {/if}
+            {/if}
             <table class="logbook">
               <thead><tr><th>ended</th><th>how</th><th class="num">score</th><th class="num">gold</th><th class="num">landmarks</th><th class="num">days</th><th>ship</th></tr></thead>
               <tbody>
                 {#each log as e, i (i)}
-                  <tr class:lost={e.ending === 'sunk'}>
+                  <tr class:lost={e.ending === 'sunk'} class:picked={picked === i} onclick={() => (picked = picked === i ? null : i)} onkeydown={(k) => (k.key === 'Enter' || k.key === ' ') && (picked = picked === i ? null : i)} tabindex="0" aria-selected={picked === i}>
                     <td>{e.when}{e.daily ? ' · today’s voyage' : ''}</td>
                     <td>{e.ending === 'sunk' ? `lost${e.sunkBy ? `: ${e.sunkBy}` : ''}` : e.ending === 'home' ? (likeOf(e)?.replace('a voyage like ', 'like ') ?? 'home') : e.ending === 'retired' ? 'retired' : 'given up'}</td>
                     <td class="num">{scoreOf(e)}</td>
@@ -873,6 +895,8 @@
 {/if}
 
 <style>
+  .logbook tbody tr { cursor: pointer; }
+  .logbook tr.picked td { background: var(--rule); }
   .chronicler { display: block; margin: 0.6rem 0; }
   .jewels li { margin: 0.2rem 0; }
   main { max-width: 72rem; margin: 0 auto; padding: 1.25rem 16px 2rem; display: flex; flex-direction: column; gap: 1rem; }

@@ -23,6 +23,7 @@ import { FAIR, HARSH, PEOPLES, type People, deal } from './peoples.ts';
 import type { Sea, WorldState } from './world.ts';
 import { FEVER_NURSE, FEVER_NURSE_DAYS, FEVER_PRESS, FLUX, FOUL_LOST, WEEVIL_LOST, WEEVIL_SICK, feverDeaths, fluxDeaths } from './weather.ts';
 import { alive, mourn } from './hands.ts';
+import { CHRISTMAS_DAYS, PLAIN_GRUMBLE } from './calendar.ts';
 
 export type Dilemma =
   /** A storm: ride it out, run before it, or lighten ship. */
@@ -72,7 +73,11 @@ export type Dilemma =
   /** Hands who've wronged the people of a coast: punish them, pay amends, or let it pass. See peoples.ts. */
   | { kind: 'misconduct'; people: People }
   /** Huguenot privateers out of La Rochelle: keep company, trade news, take a French commission, or part. See huguenots.ts. */
-  | { kind: 'huguenots' };
+  | { kind: 'huguenots' }
+  /** Christmas Day: keep it with a double ration, or keep it plain. See calendar.ts. */
+  | { kind: 'christmas' }
+  /** The Queen's Accession Day, 17 November: fire a salute, or drink her health. See calendar.ts. */
+  | { kind: 'accession' };
 
 export interface Choice {
   key: string;
@@ -192,6 +197,10 @@ export function describe(d: Dilemma): { title: string; text: string } {
       return { title: 'trouble ashore', text: `some of the hands ashore have taken what wasn't given and laid hands on ${PEOPLES[d.people].name}. their elders have come down to the boats. the Spaniards, the English like to say, sought not the people but their goods; this is how it starts.` };
     case 'huguenots':
       return { title: 'Huguenots', text: 'two ships of La Rochelle, flying the white cross of the Prince of Condé: Huguenot privateers out after Spanish prizes, as Coligny sent them. their captain hails you as a friend and a fellow Protestant.' };
+    case 'christmas':
+      return { title: 'Christmas Day', text: 'Christmas at sea. the hands look for a double ration and a holiday, as on any ship out of a Christian country; the steward looks at the bread room.' };
+    case 'accession':
+      return { title: 'the Queen’s day', text: 'the seventeenth of November, the day the Queen came to the throne, kept at home with bells and bonfires and the tilt at Whitehall. at sea, a gun fired for her if there’s powder to spare.' };
     case 'reckoning':
       return { title: 'the reckoning', text: 'Plymouth, and the voyage is over but for this. your backers have had their shares. now the court will hear of what you did, and so will Spain’s ambassador, who demanded Drake’s head for less.' };
   }
@@ -341,6 +350,16 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
         { key: 'news', label: 'trade news', stakes: 'what they know of the Spanish and Portuguese, for what you know' },
         { key: 'commission', label: 'take a French commission', stakes: 'a letter from the Huguenot leaders as well as your own: what you take from Spain angers its ambassador half as much, but the Queen likes it less at court', ...(s.backer === 'crown' ? { barred: 'the Queen’s commission forbids a second master' } : s.french ? { barred: 'you carry one already' } : {}) },
         { key: 'part', label: 'part company', stakes: 'a salute of guns, and on your way' },
+      ];
+    case 'christmas':
+      return [
+        { key: 'keep', label: 'keep it: a double ration', stakes: `a day's food more eaten, and the hands in better heart${s.seen.includes('discontent') ? ': the grumbling dies down' : ''}` },
+        { key: 'plain', label: 'keep it plain', stakes: `nothing spent; one time in ${Math.round(1 / PLAIN_GRUMBLE)} the hands grumble, and it comes to a head at the next landmark` },
+      ];
+    case 'accession':
+      return [
+        { key: 'salute', label: 'fire a salute', stakes: `a barrel of powder, and the hands cheer${s.seen.includes('discontent') ? ': the grumbling dies down' : ''}`, ...(s.stores.powder <= 0 ? { barred: 'no powder to fire' } : {}) },
+        { key: 'toast', label: 'drink her health', stakes: 'a toast in the great cabin, and nothing spent' },
       ];
     case 'reckoning': {
       const sale = saleValue(s);
@@ -722,6 +741,23 @@ function decide(sea: Sea, s: WorldState, key: string): WorldState {
       break;
     case 'huguenots:part':
       log('a salute of guns, and the Rochellers go their way');
+      break;
+    case 'christmas:keep':
+      w = { ...w, stores: { ...w.stores, food: Math.max(0, w.stores.food - w.crew * CHRISTMAS_DAYS) }, seen: w.seen.filter((x) => x !== 'discontent') };
+      log('Christmas kept with a double ration, a hogshead of wine broached, and no work but the watch');
+      break;
+    case 'christmas:plain':
+      if (roll(r) < PLAIN_GRUMBLE && !w.seen.includes('discontent')) {
+        w = { ...w, seen: [...w.seen, 'discontent'] };
+        log('Christmas kept plain, and the hands grumbling that it was never so on any ship they sailed in');
+      } else log('Christmas kept plain: prayers, and the day’s work');
+      break;
+    case 'accession:salute':
+      w = { ...w, stores: { ...w.stores, powder: w.stores.powder - 1 }, seen: w.seen.filter((x) => x !== 'discontent') };
+      log('a gun fired for the Queen, and the hands cheering her name');
+      break;
+    case 'accession:toast':
+      log('the Queen’s health drunk in the great cabin');
       break;
   }
   // A storm in the right waters may drive you onto an island: likelier running before it.
