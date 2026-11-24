@@ -2,7 +2,7 @@
 :root {
   --paper: #ffffff;
   --ink: #141414;
-  --faint: #8a8a8a;
+  --faint: #6b6b6b;
   --rule: #d6d6d6;
   --theirs: #b3261e;
   /* The chart is parchment: a game's own stage, not the page's chrome. */
@@ -33,4 +33,30 @@ button {
 
 button:disabled { color: var(--faint); border-color: var(--rule); cursor: default; }
 
-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* Where the keyboard is: an ink outline, as everywhere else on the page drawn in ink. */
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+/* Said to a screen reader, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Gauges that flash and numbers that float: still, for those who'd rather. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

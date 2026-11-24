@@ -21,6 +21,7 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/node": "^22.20.5",
+    "axe-core": "^4.10.2",
     "d3-geo-voronoi": "^2.1.0",
     "svelte": "^5.57.3",
     "svelte-check": "^4.7.7",

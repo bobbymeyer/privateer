@@ -13,6 +13,7 @@
   import { SHIP } from './woodcut.ts';
   import type { Grave } from '../world/hands.ts';
   import { LABEL_FONT, layoutLabels, shortName } from '../world/labels.ts';
+  import { chartSummary } from './access.ts';
 
   let { sea, world, graves = [] }: { sea: Sea; world: WorldState; graves?: Grave[] } = $props();
 
@@ -80,7 +81,7 @@
 </script>
 
 <div class="chart" bind:clientWidth={width}>
-  <svg viewBox="{W} {-N} {E - W} {N - S}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="the chart of the voyage">
+  <svg viewBox="{W} {-N} {E - W} {N - S}" preserveAspectRatio="xMidYMid meet" role="img" aria-label={chartSummary(sea, world)}>
     <rect x={W} y={-N} width={E - W} height={N - S} fill="var(--sea)" />
     <path d={coastPath} fill="var(--land)" stroke="var(--sepia)" stroke-width="0.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
 

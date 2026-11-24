@@ -104,7 +104,12 @@
 
   function onkeydown(e: KeyboardEvent) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    // The fight has the keys: none go through to whatever button is focused behind it.
+    // Enter or space on a focused card or button presses it; the number keys pick cards wherever the focus is.
+    const target = e.target as HTMLElement | null;
+    const onControl = !!target?.closest?.('button, a, input, textarea, select, summary');
+    // With two picked, Enter resolves even from a card, as it always has.
+    const resolving = e.key === 'Enter' && !fight.outcome && picks.length === 2 && !!target?.closest?.('button.card');
+    if ((e.key === 'Enter' || e.key === ' ') && onControl && !resolving) return;
     if (['1', '2', '3', 'Enter', ' '].includes(e.key)) e.preventDefault();
     if (fight.outcome) {
       if (e.key === 'Enter') oncontinue();

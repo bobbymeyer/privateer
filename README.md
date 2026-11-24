@@ -538,12 +538,33 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 225 tests
+npm test                     # the rules and the voyage, 232 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
 npm run coast -- ne.geojson  # rebuild the coastline the browser draws (1:50m)
+npm run bake                 # survey the sea and pack it for the browser (after either of those, or a change to ports, lanes or landmarks)
 ```
+
+**On a phone.** The sea is surveyed once at build time, not in the browser:
+the breadth-first searches that lay the lanes and the waters took over two
+seconds on a phone. `survey.ts` builds it, `npm run bake` packs it into
+`data/sea.json` (the world graph in hundredths of a degree, the lanes in the
+survey's own order, the coastline as one path at the chart's scale), and
+`survey.test.ts` proves the packing is the same sea and not stale. On an
+emulated mid-range phone (1.6 Mbps, 150 ms, CPU 4× slower), served gzipped:
+270 KB → 163 KB, first paint 1.9 s → 0.3 s, ready to play 4.0 s → 1.4 s.
+
+**Accessibility.** Every action works from the keyboard. Each event, sail,
+fight, reckoning and the end are modal dialogs named by their heading: focus
+goes to the first choice and stays inside, Escape closes only how to play and
+the logbook, and focus goes back where it was. Space or Enter on a focused
+button presses that button; in a fight the number keys still pick and Enter
+resolves. The chart, the gauges and the cards are described to a screen
+reader, the newest line of the log is read when the ship stops, "low" is said
+in words as well as red, and motion stops for those who ask for less. axe-core
+finds no violations on the main screen, an event, a sail, the fight or the
+logbook, at desktop or phone width.
 
 ## layout
 
@@ -562,14 +583,15 @@ src/
   lessons.ts     the fight's hints, and which have been read, kept in the browser
   peoples.ts     what the last English ship left on each coast, kept in the browser
   share.ts       the voyage in a few lines, to copy from the end screen
-  ui/            Svelte: App, RouteChart, Fight, CardView, Gauge, Flag; sound.ts
+  ui/            Svelte: App, Dialog, RouteChart, Fight, CardView, Gauge, Flag; sound.ts; access.ts, what a screen reader is told
   world/
-    data/        world.json and coast.json, from Natural Earth
+    data/        world.json and coast.json, from Natural Earth; sea.json, the sea surveyed and packed
     geo.ts       the sphere: distances, great circles, headings
     ports.ts     the ports of 1580, their flags and their names
     ocean.ts     rivers, straits, banks, the great crossings and courses
     passages.ts  the narrow straits, traced by hand
-    map.ts       the world graph split into days, with its lanes and landmarks
+    survey.ts    the world graph split into days, with its lanes and landmarks: run at build time
+    map.ts       the sea the game sails, unpacked from sea.json
     landmarks.ts the voyage's landmarks, forks and what each offers
     journey.ts   where you are on the voyage, where you're bound, coming home
     world.ts     createWorld and a day of the voyage — pure, like rules.ts

@@ -40,6 +40,7 @@
   import { ARMS_DAYS, armsHere, armsPaidWith, plantArms } from '../world/arms.ts';
   import { allTaught, loadTaught } from '../lessons.ts';
   import Fight from './Fight.svelte';
+  import Dialog from './Dialog.svelte';
   import RouteChart from './RouteChart.svelte';
 
   function seedFromUrl(): number | null {
@@ -264,6 +265,8 @@
       return;
     }
     if (e.key !== ' ' || !world || choosing || intro || logOpen || shown || waiting(world) || world.sunk || world.won) return;
+    // Space on a focused button presses that button, not "continue on".
+    if ((e.target as HTMLElement | null)?.closest?.('button, a, input, textarea, select, summary, [role="dialog"]')) return;
     e.preventDefault();
     if (sailing) stop('hove to');
     else if (canContinue) go();
@@ -413,10 +416,10 @@
     {#snippet gauges(w: WorldState)}
         <!-- What you act on every day. -->
         <div class="gauges">
-          <div class:low={w.crew < complement(w) / 2} title="{minHands(w)} needed to work her"><span class="label">hands</span><span class="bar"><span style="width: {pct(w.crew, complement(w))}"></span></span>{w.crew} of {complement(w)}</div>
-          <div class:low={days.food <= 10}><span class="label">food</span><span class="bar"><span style="width: {pct(w.stores.food, capacity(w).food)}"></span></span>{days.food} days</div>
-          <div class:low={days.water <= 10}><span class="label">water</span><span class="bar"><span style="width: {pct(w.stores.water, capacity(w).water)}"></span></span>{days.water} days</div>
-          <div class:low={w.hull <= w.maxHull / 3}><span class="label">hull</span><span class="bar"><span style="width: {pct(w.hull, w.maxHull)}"></span></span>{w.hull} of {w.maxHull}</div>
+          <div class:low={w.crew < complement(w) / 2} title="{minHands(w)} needed to work her"><span class="label">hands</span><span class="bar" aria-hidden="true"><span style="width: {pct(w.crew, complement(w))}"></span></span>{w.crew} of {complement(w)}{w.crew < complement(w) / 2 ? ' · low' : ''}</div>
+          <div class:low={days.food <= 10}><span class="label">food</span><span class="bar" aria-hidden="true"><span style="width: {pct(w.stores.food, capacity(w).food)}"></span></span>{days.food} days{days.food <= 10 ? ' · low' : ''}</div>
+          <div class:low={days.water <= 10}><span class="label">water</span><span class="bar" aria-hidden="true"><span style="width: {pct(w.stores.water, capacity(w).water)}"></span></span>{days.water} days{days.water <= 10 ? ' · low' : ''}</div>
+          <div class:low={w.hull <= w.maxHull / 3}><span class="label">hull</span><span class="bar" aria-hidden="true"><span style="width: {pct(w.hull, w.maxHull)}"></span></span>{w.hull} of {w.maxHull}{w.hull <= w.maxHull / 3 ? ' · low' : ''}</div>
           <div><span class="label">gold</span>{w.gold}</div>
         </div>
     {/snippet}
@@ -491,10 +494,10 @@
         </p>
         {#if phone}
           <p class="fold-line">
-            <span class:low={world.crew < complement(world) / 2}>{world.crew} hands</span> ·
-            <span class:low={days.food <= 10}>food {days.food}d</span> ·
-            <span class:low={days.water <= 10}>water {days.water}d</span> ·
-            <span class:low={world.hull <= world.maxHull / 3}>hull {world.hull}/{world.maxHull}</span> ·
+            <span class:low={world.crew < complement(world) / 2}>{world.crew} hands{world.crew < complement(world) / 2 ? ', low' : ''}</span> ·
+            <span class:low={days.food <= 10}>food {days.food}d{days.food <= 10 ? ', low' : ''}</span> ·
+            <span class:low={days.water <= 10}>water {days.water}d{days.water <= 10 ? ', low' : ''}</span> ·
+            <span class:low={world.hull <= world.maxHull / 3}>hull {world.hull}/{world.maxHull}{world.hull <= world.maxHull / 3 ? ', low' : ''}</span> ·
             <span>{world.gold} gold</span>
           </p>
         {:else}
@@ -625,6 +628,8 @@
         {#if atFork && followed(world).length}
           <p class="faint">you've heard of: {followed(world).map((k) => `${landmark(k).name}, from ${landmark(k).detour!.from.map((f) => landmark(f).name).join(' or ')}`).join('; ')}.</p>
         {/if}
+        <!-- The newest line, said aloud when the ship stops: not every day of a long leg. -->
+        <p class="sr-only" aria-live="polite">{!sailing && recent[0] ? `${dateOf(recent[0].turn)}: ${recent[0].text}` : ''}</p>
         <ul class="plain log">
           {#each recent as l, i (i)}<li class:faint={i > 0}>{dateOf(l.turn)}: {l.text}</li>{/each}
         </ul>
@@ -633,8 +638,7 @@
     {/if}
 
     {#if choosing}
-      <div class="overlay">
-        <div class="sheet intro">
+      <Dialog intro>
           <h2>Plymouth, 1580</h2>
           <p>Drake is home with a hold full of Spanish silver, and everyone with a ship thinks the same thing: I could do that too. Sail round the world his way, or turn back when you must, take what Spain leaves lying about, and come home to Plymouth. The gold you bring home, the hands alive and the ship are your score.</p>
           {#if !chosenShip}
@@ -665,11 +669,9 @@
             <label class="chronicler"><input type="checkbox" bind:checked={takeChronicler} /> take a chronicler: a gentleman-poet who does no seamanship, costs {CHRONICLER_COST} gold and a berth, and if he comes home alive his account of the voyage adds to your fame</label>
             <div class="row"><button onclick={() => (chosenShip = null)}>another ship</button></div>
           {/if}
-        </div>
-      </div>
+      </Dialog>
     {:else if intro}
-      <div class="overlay">
-        <div class="sheet intro">
+      <Dialog intro onclose={() => (intro = false)}>
           <h2>how to play</h2>
           <dl>
             <dt>the voyage</dt>
@@ -704,12 +706,10 @@
           </details>
           <p class="faint">The voyage saves as you go. The seed in the address sails the same voyage again.</p>
           <button onclick={() => (intro = false)}>close</button>
-        </div>
-      </div>
+      </Dialog>
     {:else if logOpen}
       {@const top = best(log)}
-      <div class="overlay">
-        <div class="sheet">
+      <Dialog onclose={() => (logOpen = false)}>
           <h2>logbook</h2>
           {#if !log.length}
             <p class="faint">no voyage has ended yet. every one that does is written here.</p>
@@ -744,11 +744,9 @@
             {#if log.length}<button onclick={downloadLog}>download the logbook</button>{/if}
           </div>
           <p class="faint">today's voyage is the same for everyone who sails it today: seed {dailySeed(today())}.</p>
-        </div>
-      </div>
+      </Dialog>
     {:else if world && warning.length}
-      <div class="overlay">
-        <div class="sheet">
+      <Dialog>
           <h2>before you sail</h2>
           {#each warning as w (w.kind)}<p>{w.text}</p>{/each}
           <div class="row">
@@ -756,20 +754,16 @@
             <button onclick={sailAnyway}>sail anyway</button>
           </div>
           <p class="faint">put on short rations and the stores go further, at the crew’s cost.</p>
-        </div>
-      </div>
+      </Dialog>
     {:else if world && shown}
-      <div class="overlay">
-        <div class="sheet wide">
+      <Dialog wide>
           <Fight fight={shown} {lastRound} {reckoning} {title} {isRaid} {nation} {onact} {oncontinue} teach={teaching} practice={practising} />
-        </div>
-      </div>
+      </Dialog>
     {:else if world?.hail}
       {@const h = world.hail}
       {@const r = read(h.kind, hailExtra(h))}
       {@const flag = adjective(h.nation)}
-      <div class="overlay">
-        <div class="sheet">
+      <Dialog>
           <h2>{h.plate ? 'the treasure ship' : h.prize ? PRIZES[h.prize].name : `a sail: ${article(flag)} ${flag} ${h.kind === 'treasure-ship' ? 'carrack' : TARGETS[h.kind].name}`}</h2>
           {#if h.prize}
             <p>{PRIZES[h.prize].text}</p>
@@ -786,13 +780,11 @@
             <button onclick={() => attempt(() => attack(world!))}>attack</button>
             <button onclick={() => attempt(() => letPass(world!))}>let her pass</button>
           </div>
-        </div>
-      </div>
+      </Dialog>
     {:else if world?.dilemma}
       {@const d = world.dilemma}
       {@const told = describeDilemma(d)}
-      <div class="overlay">
-        <div class="sheet">
+      <Dialog>
           <h2>{told.title}</h2>
           <p>{told.text}</p>
           {#if d.kind === 'reckoning' && world.jewels.length}
@@ -820,12 +812,10 @@
               </li>
             {/each}
           </ul>
-        </div>
-      </div>
+      </Dialog>
     {:else if world && (world.sunk || world.won)}
       {@const sc = score(world)}
-      <div class="overlay">
-        <div class="sheet">
+      <Dialog>
           <h2>{sc.title}</h2>
           <p>{world.won ? `you came home to Plymouth on ${dateOf(world.turn)}, ${world.turn} days out.` : `lost on ${dateOf(world.turn)}, ${world.voyage.visited.length - 1} landmarks out.`} {sc.text}</p>
           {#if world.won}
@@ -888,8 +878,7 @@
             <p class="faint">the clipboard won't take it here; select it and copy:</p>
             <textarea class="share" readonly rows={shareShown.split('\n').length} value={shareShown} onfocus={(e) => (e.currentTarget as HTMLTextAreaElement).select()}></textarea>
           {/if}
-        </div>
-      </div>
+      </Dialog>
     {/if}
   </main>
 {/if}
@@ -930,12 +919,9 @@
   .legs { margin: 0.5rem 0; font-size: 0.95rem; }
   .log { margin-top: 0.75rem; font-size: 0.95rem; }
   .keys { font-size: 0.8rem; margin-top: 0.75rem; }
-  .overlay { position: fixed; inset: 0; background: rgba(255, 255, 255, 0.92); display: grid; place-items: start center; overflow: auto; padding: 2rem 16px; }
-  .sheet { width: min(44rem, 100%); background: var(--paper); border: 1.5px solid var(--ink); padding: 1.25rem; }
-  .sheet.wide { width: min(60rem, 100%); }
-  .intro dl { margin: 1rem 0; }
-  .intro dt { margin-top: 0.75rem; }
-  .intro dd { margin: 0.2rem 0 0; }
+  :global(.intro) dl { margin: 1rem 0; }
+  :global(.intro) dt { margin-top: 0.75rem; }
+  :global(.intro) dd { margin: 0.2rem 0 0; }
   .more-play summary { cursor: pointer; color: var(--faint); margin-top: 0.5rem; }
   .ships { gap: 1rem; margin-top: 0.5rem; }
   .ships li { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
@@ -976,8 +962,6 @@
     .dock { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 0.5rem 16px calc(0.5rem + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1.5px solid var(--ink); z-index: 1; }
     .dock button { font-size: 0.95rem; }
     .primary.dock .go { padding: 0.5rem 1.2rem; }
-    .overlay { padding: 1rem 8px; z-index: 2; }
-    .sheet { padding: 1rem; }
     .gauges { grid-template-columns: 1fr; }
   }
 </style>
