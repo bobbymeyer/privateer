@@ -1,5 +1,7 @@
 /**
- * The sea as the game sails it: the world graph from data/world.json, with
+ * The sea as the game sails it, as surveyed once at build time (survey.ts,
+ * `npm run bake`) and shipped packed in data/sea.json: the world graph from
+ * data/world.json, with
  * every leg longer than a day's sail split into a day's steps, so one step is
  * one turn everywhere. A coastal leg is a day; an ocean leg of 300 miles is
  * five, and a ship on it is somewhere along it — `underway` nodes.
@@ -8,11 +10,9 @@
  * the guns of forts.
  */
 
-import world from './data/world.json' with { type: 'json' };
-import { type LonLat, along, distanceNm } from './geo.ts';
-import { OCEAN_LANES, RIVERS, ROUTES, SHOALS, STRAITS } from './ocean.ts';
-import { LANDMARKS } from './landmarks.ts';
-import { type Nation, PORTS, WATERS_DAYS } from './ports.ts';
+import { along } from './geo.ts';
+import { type Nation, PORTS } from './ports.ts';
+import sea from './data/sea.json' with { type: 'json' };
 
 export type NodeId = number;
 
@@ -59,171 +59,12 @@ export interface SeaMap extends Graph {
   deep: Graph;
   /** The sea lanes, as legs: what the chart draws. The map's own adjacency is these and nothing else. */
   lanes: [NodeId, NodeId][];
-  /** Every leg of open water, lanes or not: for drawing, never for sailing. */
-  open: NodeId[][];
   /** Where each of the voyage's landmarks lies, by key. */
   landmarks: Record<string, NodeId>;
 }
 
-const at = (n: SeaNode): LonLat => [n.lon, n.lat];
-
-export function buildMap(): SeaMap {
-  const raw = world.nodes as [number, number, number][];
-  const kinds = ['coast', 'ocean', 'passage'] as const;
-  const nodes: SeaNode[] = raw.map(([lon, lat, k], id) => ({ id, lon, lat, kind: kinds[k], port: null, strait: null, shoal: null, river: null, guns: null, waters: null }));
-  const adj: NodeId[][] = nodes.map(() => []);
-  const link = (a: NodeId, b: NodeId) => (adj[a].push(b), adj[b].push(a));
-
-  // Split each leg into days.
-  for (let i = 0; i < world.edges.length; i += 2) {
-    const [a, b] = [world.edges[i], world.edges[i + 1]];
-    const days = Math.max(1, Math.round(distanceNm(at(nodes[a]), at(nodes[b])) / DAY_NM));
-    let prev = a;
-    for (let d = 1; d < days; d++) {
-      const [lon, lat] = along(at(nodes[a]), at(nodes[b]), d / days);
-      const id = nodes.length;
-      nodes.push({ id, lon, lat, kind: 'underway', port: null, strait: null, shoal: null, river: null, guns: null, waters: null });
-      adj.push([]);
-      link(prev, id);
-      prev = id;
-    }
-    link(prev, b);
-  }
-
-  const shore = nodes.filter((n) => n.kind === 'coast' || n.kind === 'passage');
-  const nearest = (p: LonLat, among: SeaNode[], taken?: Set<NodeId>) => {
-    let best: SeaNode | null = null;
-    let bestD = Infinity;
-    for (const n of among) {
-      if (taken?.has(n.id)) continue;
-      const d = distanceNm(p, at(n));
-      if (d < bestD) [best, bestD] = [n, d];
-    }
-    return best!;
-  };
-
-  const taken = new Set<NodeId>();
-  for (const def of PORTS) {
-    const n = nearest(def.at, shore, taken);
-    taken.add(n.id);
-    n.port = { name: def.name, nation: def.nation, fort: def.fort };
-  }
-  for (const [name, ids] of Object.entries(world.passages as Record<string, number[]>)) for (const id of ids) nodes[id].strait = name;
-  for (const s of STRAITS) for (const n of nodes) if (n.kind !== 'underway' && distanceNm(s.at, at(n)) <= DAY_NM) n.strait ??= s.name;
-  for (const r of RIVERS) nearest(r.at, shore).river = r.name;
-  for (const n of nodes) n.shoal = SHOALS.find((s) => inPolygon(at(n), s.outline))?.name ?? null;
-  for (const n of nodes) {
-    if (!n.port?.fort) continue;
-    for (const m of [n.id, ...adj[n.id]]) nodes[m].guns ??= n.port.name;
-  }
-
-  // Protected waters: each node belongs to the nation of its nearest fort,
-  // if that fort is within reach.
-  const distances_ = distances(adj);
-  const nearestFort = new Int32Array(nodes.length).fill(WATERS_DAYS + 1);
-  for (const n of nodes) {
-    if (!n.port?.fort) continue;
-    const d = distances_(n.id);
-    for (let i = 0; i < nodes.length; i++) {
-      if (d[i] < nearestFort[i]) {
-        nearestFort[i] = d[i];
-        nodes[i].waters = n.port.nation;
-      }
-    }
-  }
-
-  const deepAdj = adj.map((out, i) => (nodes[i].shoal && !nodes[i].port ? [] : out.filter((m) => !nodes[m].shoal || nodes[m].port)));
-
-  // The sea lanes. Everyone sails them, you included: the open ocean off
-  // them is water on the chart and nothing more. Ships kept to a few
-  // thousand nodes instead of all of them meet, and a lane is somewhere to
-  // lie in wait.
-  // The voyage's landmarks: on a port, or the nearest water to where they lie. Their legs are lanes too.
-  const marks: Record<string, NodeId> = {};
-  // Open-sea landmarks sit off the ports, not on them: the Canaries aren't Las Palmas harbour.
-  const water = nodes.filter((n) => n.kind !== 'underway' && !n.port);
-  for (const l of LANDMARKS) marks[l.key] = typeof l.at === 'string' ? nodes.find((n) => n.port?.name === l.at)!.id : nearest(l.at, water).id;
-  // Each leg, each way into a rumored detour, and each storm landfall tied to the landmarks near it.
-  const legs: [NodeId, NodeId][] = LANDMARKS.flatMap((l) => [
-    ...l.next.map((k): [NodeId, NodeId] => [marks[l.key], marks[k]]),
-    ...(l.detour?.from ?? []).map((k): [NodeId, NodeId] => [marks[k], marks[l.key]]),
-    ...(l.landfall?.near ?? []).map((k): [NodeId, NodeId] => [marks[l.key], marks[k]]),
-  ]);
-  const laneEdges = buildLanes(nodes, adj, deepAdj, distances_, distances(deepAdj), legs);
-  const laneAdj: NodeId[][] = nodes.map(() => []);
-  for (const key of laneEdges) {
-    const [a, b] = key.split(',').map(Number);
-    laneAdj[a].push(b);
-    laneAdj[b].push(a);
-  }
-  const deepLaneAdj = laneAdj.map((out, i) => (nodes[i].shoal && !nodes[i].port ? [] : out.filter((m) => !nodes[m].shoal || nodes[m].port)));
-  const traffic = new Uint16Array(nodes.length);
-  for (const key of laneEdges) for (const n of key.split(',').map(Number)) traffic[n]++;
-  return { nodes, adj: laneAdj, distTo: distances(laneAdj), deep: { adj: deepLaneAdj, distTo: distances(deepLaneAdj) }, lanes: [...laneEdges].map((k) => k.split(',').map(Number) as [NodeId, NodeId]), open: adj, landmarks: marks };
-}
-
-/** Each port's nearest neighbours that a lane joins it to. */
-export const LANE_NEIGHBOURS = 3;
-
-/**
- * The sea lanes, as a set of edges `a,b` (a < b): the shortest paths
- * between each port and its LANE_NEIGHBOURS nearest; between the pairs of a
- * tree spanning all ports, so no port is cut off; along the great crossings
- * (OCEAN_LANES); and along the great courses (ROUTES), traced through water
- * deep enough for the ships that sail them.
- */
-function buildLanes(nodes: SeaNode[], adj: NodeId[][], deepAdj: NodeId[][], dist: (n: NodeId) => Int32Array, deepDist: (n: NodeId) => Int32Array, extra: [NodeId, NodeId][] = []): Set<string> {
-  const edges = new Set<string>();
-  const harbours = nodes.filter((n) => n.port).map((n) => n.id);
-  const named = (name: string) => nodes.find((n) => n.port?.name === name)?.id;
-  const trace = (from: NodeId, to: NodeId, g: NodeId[][], d: Int32Array) => {
-    if (d[from] >= FAR) return;
-    let at = from;
-    while (at !== to) {
-      const next = g[at].find((m) => d[m] === d[at] - 1);
-      if (next === undefined) return;
-      edges.add(at < next ? `${at},${next}` : `${next},${at}`);
-      at = next;
-    }
-  };
-  const join = (a: NodeId, b: NodeId) => trace(a, b, adj, dist(b));
-
-  // Nearest neighbours, and a spanning tree over all ports by sailing days.
-  const fromPort = new Map(harbours.map((p) => [p, dist(p)]));
-  for (const p of harbours) {
-    const d = fromPort.get(p)!;
-    harbours.filter((q) => q !== p && d[q] < FAR).sort((a, b) => d[a] - d[b]).slice(0, LANE_NEIGHBOURS).forEach((q) => join(p, q));
-  }
-  const inTree = new Set([harbours[0]]);
-  while (inTree.size < harbours.length) {
-    let best: [NodeId, NodeId, number] | null = null;
-    for (const p of inTree) {
-      const d = fromPort.get(p)!;
-      for (const q of harbours) if (!inTree.has(q) && d[q] < FAR && (!best || d[q] < best[2])) best = [p, q, d[q]];
-    }
-    if (!best) break;
-    join(best[0], best[1]);
-    inTree.add(best[1]);
-  }
-
-  for (const [a, b] of OCEAN_LANES) {
-    const [x, y] = [named(a), named(b)];
-    if (x !== undefined && y !== undefined) join(x, y);
-  }
-  // The voyage's legs, landmark to landmark: the Strait and the Horn both.
-  for (const [a, b] of extra) if (a !== b) join(a, b);
-  // The great courses, deep enough for the ships that sail them.
-  for (const stops of Object.values(ROUTES)) {
-    for (let i = 0; i < stops.length; i++) {
-      const [x, y] = [named(stops[i]), named(stops[(i + 1) % stops.length])];
-      if (x !== undefined && y !== undefined && x !== y) trace(x, y, deepAdj, deepDist(y));
-    }
-  }
-  return edges;
-}
-
 /** Breadth-first distances to a node, cached; the oldest are let go past a few hundred. */
-function distances(adj: NodeId[][]): (dest: NodeId) => Int32Array {
+export function distances(adj: NodeId[][]): (dest: NodeId) => Int32Array {
   const cache = new Map<NodeId, Int32Array>();
   return (dest) => {
     const hit = cache.get(dest);
@@ -248,16 +89,6 @@ function distances(adj: NodeId[][]): (dest: NodeId) => Int32Array {
   };
 }
 
-function inPolygon([x, y]: LonLat, poly: LonLat[]): boolean {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i];
-    const [xj, yj] = poly[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
-}
-
 /** Every node exactly `k` turns from `from`. */
 export function ring(map: SeaMap, from: NodeId, k: number): NodeId[] {
   const d = map.distTo(from);
@@ -278,3 +109,82 @@ export const portNamed = (map: SeaMap, name: string): NodeId => {
   if (!n) throw new Error(`no port ${name}`);
   return n.id;
 };
+
+// --- The sea, packed ---------------------------------------------------------
+
+/**
+ * The surveyed sea, packed small for the browser: a few hundred milliseconds
+ * of breadth-first searches on a desktop, and seconds on a phone, done once
+ * at build time instead. Day-steps off the lanes are never sailed, so only
+ * their places in the numbering are kept: their positions are NaN.
+ */
+export interface PackedSea {
+  /** Nodes in all, the world graph's and the day-steps between. */
+  count: number;
+  /** The world graph's nodes, in hundredths of a degree, each the difference from the one before: lon, lat, lon, lat… */
+  base: number[];
+  /** Their kinds, a digit each: 0 coast, 1 ocean, 2 passage. */
+  kinds: string;
+  /** Legs whose day-steps lie on the lanes: from, to, the first step's id, and how many days the leg is. */
+  legs: number[];
+  /** The lanes' edges in the survey's order (the order is the route), each the difference from the one before: a, b-a, a, b-a… */
+  lanes: number[];
+  /** Each port of PORTS, by its node. */
+  ports: number[];
+  strait: Record<string, number[]>;
+  shoal: Record<string, number[]>;
+  river: Record<string, number[]>;
+  guns: Record<string, number[]>;
+  /** Whose waters, run by run over the ids: nation (an index into `nations`, or -1 for nobody's), length. */
+  waters: number[];
+  nations: string[];
+  landmarks: Record<string, number>;
+  /** The world's coasts as one SVG path, at the whole-world chart's scale. */
+  coast: string;
+}
+
+const KINDS = ['coast', 'ocean', 'passage'] as const;
+
+/** The sea from its packing: the same nodes, lanes and landmarks the survey made. */
+export function unpackSea(p: PackedSea): SeaMap {
+  const blank = (id: NodeId, lon: number, lat: number, kind: SeaNode['kind']): SeaNode => ({ id, lon, lat, kind, port: null, strait: null, shoal: null, river: null, guns: null, waters: null });
+  const nodes: SeaNode[] = new Array(p.count);
+  let [x, y] = [0, 0];
+  for (let i = 0; i < p.kinds.length; i++) {
+    x += p.base[2 * i];
+    y += p.base[2 * i + 1];
+    nodes[i] = blank(i, x / 100, y / 100, KINDS[Number(p.kinds[i])]);
+  }
+  for (let i = p.kinds.length; i < p.count; i++) nodes[i] = blank(i, NaN, NaN, 'underway');
+  // Day-steps on the lanes, placed exactly as the survey placed them.
+  for (let i = 0; i < p.legs.length; i += 4) {
+    const [a, b, first, days] = p.legs.slice(i, i + 4);
+    const [pa, pb]: [number, number][] = [[nodes[a].lon, nodes[a].lat], [nodes[b].lon, nodes[b].lat]];
+    for (let d = 1; d < days; d++) {
+      const [lon, lat] = along(pa, pb, d / days);
+      Object.assign(nodes[first + d - 1], { lon, lat });
+    }
+  }
+  PORTS.forEach((def, i) => (nodes[p.ports[i]].port = { name: def.name, nation: def.nation, fort: def.fort }));
+  for (const key of ['strait', 'shoal', 'river', 'guns'] as const) for (const [name, ids] of Object.entries(p[key])) for (const id of ids) nodes[id][key] = name;
+  let id = 0;
+  for (let i = 0; i < p.waters.length; i += 2) {
+    const nation = p.waters[i] < 0 ? null : (p.nations[p.waters[i]] as Nation);
+    for (let k = 0; k < p.waters[i + 1]; k++) nodes[id++].waters = nation;
+  }
+  const adj: NodeId[][] = Array.from({ length: p.count }, () => []);
+  const lanes: [NodeId, NodeId][] = [];
+  let a = 0;
+  for (let i = 0; i < p.lanes.length; i += 2) {
+    a += p.lanes[i];
+    const b = a + p.lanes[i + 1];
+    lanes.push([a, b]);
+    adj[a].push(b);
+    adj[b].push(a);
+  }
+  const deep = adj.map((out, i) => (nodes[i].shoal && !nodes[i].port ? [] : out.filter((m) => !nodes[m].shoal || nodes[m].port)));
+  return { nodes, adj, distTo: distances(adj), deep: { adj: deep, distTo: distances(deep) }, lanes, landmarks: { ...p.landmarks } };
+}
+
+/** The sea the game sails: unpacked once. */
+export const loadMap = (): SeaMap => unpackSea(sea as PackedSea);

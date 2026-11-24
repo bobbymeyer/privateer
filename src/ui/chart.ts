@@ -4,7 +4,7 @@
  * landmark to the next along the lanes.
  */
 
-import coast from '../world/data/coast.json';
+import sea from '../world/data/sea.json';
 import { FAR, type NodeId, type SeaMap } from '../world/map.ts';
 
 /** The world from 180°W to 180°E, and from the Arctic to below the Horn. */
@@ -12,24 +12,8 @@ export const BOUNDS = { W: -180, E: 180, N: 72, S: -60 } as const;
 export const X = (lon: number) => lon;
 export const Y = (lat: number) => -lat;
 
-/** The coast, as one path, drawn once. */
-export const coastPath = (() => {
-  let d = '';
-  for (const r of coast.rings as number[][]) {
-    let [w, s, e, n] = [Infinity, Infinity, -Infinity, -Infinity];
-    for (let i = 0; i < r.length; i += 2) [w, s, e, n] = [Math.min(w, r[i]), Math.min(s, r[i + 1]), Math.max(e, r[i]), Math.max(n, r[i + 1])];
-    if (e - w < 0.8 && n - s < 0.8) continue;
-    let [lx, ly] = [r[0], r[1]];
-    d += `M${lx.toFixed(1)},${(-ly).toFixed(1)}`;
-    for (let i = 2; i < r.length; i += 2) {
-      if (Math.abs(r[i] - lx) < 0.35 && Math.abs(r[i + 1] - ly) < 0.35) continue;
-      [lx, ly] = [r[i], r[i + 1]];
-      d += `L${lx.toFixed(1)},${(-ly).toFixed(1)}`;
-    }
-    d += 'Z';
-  }
-  return d;
-})();
+/** The coast, as one path, packed at build time with the sea (survey.ts `coastPath`). */
+export const coastPath = (sea as { coast: string }).coast;
 
 /** A leg's way along the lanes, as a path broken where it crosses the edge of the chart. */
 export function legPath(map: SeaMap, a: NodeId, b: NodeId): string {
