@@ -47,6 +47,24 @@ does no seamanship. Bring him home alive and his account of the voyage adds
 30 and half your fame to the score; if he dies, it dies with him; named a
 pirate, it's forbidden printing.
 
+**Men who aren't your own** (`src/world/pressed.ts`). After a ship is
+taken, her people are yours to press or let go, as Drake made up his crews
+from his prizes: a merchant's two, a privateer's two, a galleon's three, a
+rumored prize's five, never past her complement nor more than a fifth of
+your hands can keep under guard. They work the ship, but three in ten slip
+away at each landmark (six in ten where their own people are), and after a
+fight they may turn (two in ten, four against their own nation). Fed full
+ninety days, a prize's share bringing it on, they come round and are hands.
+A Portuguese prize off the Atlantic coast gives up her pilot, once, as Nuño
+da Silva was taken in 1578: a day's way more in three down the coast of
+Brazil. At Plymouth, beside the plain hands: five soldiers wanting "noble
+purchase" (6; a card over the side in a fight, the hull wearing a quarter
+sooner, and after three months without a prize they go off to find their
+own), five men out of the jails (1; a fifth run at each landmark), and at
+Plymouth, Ternate or Bantam a renegade interpreter (8; a rumor surely at a
+landmark, a people of the coast smoothed the first time, and one landmark
+in sixteen he sells your plans and goes).
+
 **Fit out** at Plymouth's chandler: food at 4 for 300 rations, water at 1
 for 300, five hands for 4, a bundle of spares or a barrel of powder for 3,
 and a chest of truck (knives, beads and cloth, as the 1564 relief voyage to
@@ -122,7 +140,15 @@ Europe* (Palgrave, 2017), each from something that happened:
 
 **Spice.** Cloves at Ternate, pepper at Bantam, by the ton, a ton for every
 five of her complement; each sells for 20 on the quay at Plymouth. On a reef
-it's the spice you throw over first, as Drake did.
+it's the spice you throw over first, as Drake did. Persian silk, two to four
+tons out of a Goa carrack or Goa itself as the hold allows, sells to the
+mercers for 45 a ton.
+
+**Under false colours** (`src/world/disguise.ts`). At a Spanish or
+Portuguese place on the way you haven't raided, and the River May, come in
+as a merchant: a day, and the chandler deals with you; found out (two in
+ten, more with a name for piracy or once the coast has heard of you), the
+port is shut, and a patrol comes out or Spain has one more complaint.
 
 **Brazil** (`src/world/brazil.ts`). From Cape Verde the way divides: the
 coast of Brazil, or the bay of Guanabara, where Villegagnon's France
@@ -498,28 +524,32 @@ Passage, the River May or Cuzco's gold, not a prize too strong for her,
 not far on a prisoner's word (`--every-rumor` follows them all).
 
 ```
-npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--every-rumor] [--chronicler] [--french] [--no-truck] [--trace] [--hull] [--every-sail]
+npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--every-rumor] [--chronicler] [--french] [--no-truck] [--trace] [--hull] [--every-sail] [--no-press] [--interpreter] [--disguise]
 ```
 
 It carries three chests of truck, deals fairly with the peoples of the
 coasts, keeps company with the Huguenots, never fires on a friend's
 merchant unless `--pirate`, and at the reckoning goes to court when the
-risk is under three in ten, gives the Queen a gift when it isn't.
+risk is under three in ten, gives the Queen a gift when it isn't. It
+presses men from a prize when below 85% of her complement and always takes
+a pilot, hires soldiers when it raids and jail-hands only if broke after
+fitting out.
 
 The aim is that a sensible captain comes home 35–55% of the time with any
 ship and backer, that Drake's voyage is rare but there, and that the ship
 comes home in the state you kept her in. Over 100 voyages each, seeds 0–99
 and 100–199 (home %, voyages like Drake's, hull at home for the voyages
-that got there):
+that got there were last measured at 52–65% before the pressed men; home %
+and voyages like Drake's now):
 
 | ship | the Crown | gentlemen adventurers | your own stake |
 | --- | --- | --- | --- |
-| pinnace | 44 · 53%, 3 · 3, 58 · 55% | 40 · 48%, 6 · 2, 56 · 57% | 43 · 50%, 3 · 4, 56 · 59% |
-| sloop | 46 · 47%, 2 · 4, 65 · 65% | 54 · 47%, 4 · 2, 59 · 52% | 51 · 37%, 5 · 1, 61 · 60% |
-| brigantine | 52 · 43%, 4 · 5, 57 · 56% | 41 · 50%, 1 · 4, 59 · 58% | 52 · 55%, 2 · 1, 54 · 58% |
+| pinnace | 54 · 48%, 3 · 3 | 55 · 47%, 6 · 5 | 43 · 47%, 5 · 2 |
+| sloop | 39 · 54%, 5 · 4 | 50 · 54%, 3 · 3 | 44 · 47%, 5 · 4 |
+| brigantine | 48 · 42%, 8 · 4 | 43 · 43%, 2 · 4 | 46 · 46%, 3 · 3 |
 
 What holds it there: a ship needs a third of her complement to work her;
-the scurvy kills at 0.00035 a hand a day past six weeks; a pinnace stows
+the scurvy kills at 0.0004 a hand a day past six weeks (it was 0.00035 before men could be pressed); a pinnace stows
 three quarters of a bigger ship's hold for her complement. Before hulls
 could be kept every voyage came home at about a fifth of her hull, and the
 lookout stopped her for some nine sails a voyage; now it's 52–65% of her
@@ -538,7 +568,7 @@ npm run dev                  # the browser version, http://localhost:5173
 npm run build                # static build in dist/
 npm run check                # svelte-check and TypeScript
 
-npm test                     # the rules and the voyage, 232 tests
+npm test                     # the rules and the voyage, 244 tests
 npm run sim                  # card bots × 2000 fights (--target privateer, --ship sloop)
 npm run voyage               # whole voyages with a captain bot (see balance)
 npm run world -- ne.geojson  # rebuild the world graph from Natural Earth (1:10m)
@@ -605,6 +635,8 @@ src/
     hands.ts     the hands of note, who of them died and of what, and the graves they leave
     captives.ts  men left ashore who talk, a crew taken on a Spanish coast, Englishmen freed
     jewels.ts    jewels from prizes and towns, and what the Queen makes of them
+    pressed.ts   men pressed from prizes, soldiers, jail-hands and a renegade interpreter
+    disguise.ts  under false colours at a Spanish port; Persian silk
     brazil.ts    the coast of Brazil in 1580: a settlement that may deal, the Normans at Guanabara
     warnings.ts  the master's warning before a leg the stores won't see out
     dilemmas.ts  events that ask you something, and what each choice stakes
