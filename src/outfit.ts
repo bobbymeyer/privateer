@@ -5,12 +5,12 @@
  * ship comes with more money and counts for more; a big one is easier.
  */
 
-import { type Card, type CardDef, SHIP_CARDS, buildDeck, cardText } from './cards.ts';
+import { type Card, type CardDef, HIRED_CARDS, SHIP_CARDS, buildDeck, cardText } from './cards.ts';
 
 type CardFace = Omit<CardDef, 'copies'> & { text: string };
 
 /** Every card a ship of yours can hold, by key, with its words written from its effects. */
-export const PLAYER_CARDS: Record<string, CardFace> = Object.fromEntries(SHIP_CARDS.map(({ copies: _, ...f }) => [f.key, { ...f, text: f.text ?? cardText(f.effects) }]));
+export const PLAYER_CARDS: Record<string, CardFace> = Object.fromEntries([...SHIP_CARDS, ...HIRED_CARDS].map(({ copies: _, ...f }) => [f.key, { ...f, text: f.text ?? cardText(f.effects) }]));
 
 /** Cards by key and count. */
 export type Cards = Record<string, number>;
@@ -60,11 +60,11 @@ export function cardsOf(ship: string): Cards {
   return cards;
 }
 
-/** The deck itself, ready to shuffle into an encounter. */
-export const deckOf = (ship: string): Card[] =>
+/** The deck itself, ready to shuffle into an encounter; with any cards the men aboard bring (`extra`: soldiers). */
+export const deckOf = (ship: string, extra: Cards = {}): Card[] =>
   buildDeck(
     'ship',
-    Object.entries(cardsOf(ship)).map(([key, copies]) => ({ ...PLAYER_CARDS[key], copies })),
+    Object.entries({ ...cardsOf(ship), ...extra }).map(([key, copies]) => ({ ...PLAYER_CARDS[key], copies })),
   );
 
 export const deckSize = (ship: string) => Object.values(cardsOf(ship)).reduce((a, b) => a + b, 0);

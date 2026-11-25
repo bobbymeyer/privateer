@@ -11,7 +11,7 @@ import type { WorldState } from './world/world.ts';
 import { muster } from './world/hands.ts';
 import { startingStanding } from './world/peoples.ts';
 
-export const SAVE_VERSION = 22;
+export const SAVE_VERSION = 23;
 
 /** From each version to the next, since the voyage was simplified (12): a run in progress shouldn't be lost to an update. */
 const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, unknown>> = {
@@ -35,6 +35,8 @@ const MIGRATIONS: Record<number, (w: Record<string, unknown>) => Record<string, 
   20: (w) => ({ ...w, lookout: 'worth', sightings: {} }),
   // 21 → 22: monkeys and parrots.
   21: (w) => ({ ...w, monkeys: 0, parrots: 0 }),
+  // 22 → 23: no pressed men, soldiers or jail-hands, no silk.
+  22: (w) => ({ ...w, silk: 0, pressed: 0, pressedSince: 0, pressedFrom: [], soldiers: 0, jailed: 0 }),
 };
 
 export const SAVE_KEY = 'privateer:run';

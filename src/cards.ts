@@ -200,6 +200,11 @@ export const SHIP_CARDS: readonly CardDef[] = [
   { key: 'give-chase', name: 'give chase', effects: [{ kind: 'chase', amount: 1 }], copies: 2 },
 ];
 
+/** Cards that come with men hired for them: soldiers wanting noble purchase hold her alongside and sweep her decks (pressed.ts). */
+export const HIRED_CARDS: readonly CardDef[] = [
+  { key: 'soldiers', name: 'soldiers over the side', effects: [{ kind: 'hold', amount: 1, at: close }, { kind: 'plunder', amount: 4, at: grappled }], copies: 1 },
+];
+
 /** A merchant: a few guns to make you pay, and every stitch of sail to get away. */
 export const MERCHANT_CARDS: readonly CardDef[] = [
   { key: 'return-fire', name: 'return fire', effects: [{ kind: 'hurt', amount: 2 }], copies: 3 },

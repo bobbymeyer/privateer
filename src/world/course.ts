@@ -11,6 +11,7 @@ import { followed } from './rumors.ts';
 import { noWay } from './weather.ts';
 import { mourn } from './hands.ts';
 import { type Sea, type WorldState, advance, newLines } from './world.ts';
+import { piloted } from './pressed.ts';
 
 /** Tomorrow's step toward `dest`: a neighbour a day nearer, or null if you're there or can't get there. */
 export function nextStep(sea: Sea, s: WorldState, dest: NodeId): NodeId | null {
@@ -75,6 +76,8 @@ export function continueOn(sea: Sea, s: WorldState): { world: WorldState; halt: 
   let world = advance(sea, from, noWay(from) || (from.pace === 'easy' && from.turn % 3 === 2) ? from.player : step);
   // Cracking on: one day in three, she makes two days' way.
   if (from.pace === 'hard' && from.turn % 3 === 2 && !noWay(from) && !stopped(world) && world.voyage.at === from.voyage.at) world = glide(sea, world, dest);
+  // A pilot who knows the coast of Brazil: a day's way more in every three along it (pressed.ts).
+  if (from.turn % 3 === 0 && piloted(from) && !noWay(from) && !stopped(world) && world.voyage.at === from.voyage.at) world = glide(sea, world, dest);
   // Before the trades, westward across the Pacific: a day's way more every other day.
   if (from.turn % 2 === 1 && inTrades(sea, world.player) && !noWay(from) && !stopped(world) && world.voyage.at === from.voyage.at) world = glide(sea, world, dest);
   if (world.won) return { world, halt: 'won' };
