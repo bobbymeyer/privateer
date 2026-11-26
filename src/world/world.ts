@@ -23,6 +23,7 @@ import { BACKERS, type Backer, NOTHING_SETTLED, type Settled, type Verdict } fro
 import type { Jewel } from './jewels.ts';
 import { type Memory, type People, startingStanding } from './peoples.ts';
 import type { Lookout } from './meet.ts';
+import type { Nation } from './ports.ts';
 
 /** The chart: the lanes, and where each landmark lies on them. The same for every run. */
 export interface Sea {
@@ -73,6 +74,15 @@ export interface WorldState {
   spice: number;
   /** Tons of brazilwood in the hold, for the red dye, to sell at home. */
   wood: number;
+  /** Tons of Persian silk, from a Goa carrack or Goa itself. See disguise.ts. */
+  silk: number;
+  /** Of the hands: men pressed from prizes, since when they've served without trouble, and whose they were. See pressed.ts. */
+  pressed: number;
+  pressedSince: number;
+  pressedFrom: Nation[];
+  /** Of the hands: soldiers wanting noble purchase, and men out of the jails. See pressed.ts. */
+  soldiers: number;
+  jailed: number;
   /** Monkeys and parrots in a corner of the hold, for London's fashionable houses. See pets.ts. */
   monkeys: number;
   parrots: number;
@@ -192,6 +202,12 @@ export function createWorld(sea: Sea, seed: number, ship = 'pinnace', backer: Ba
     asked: {},
     spice: 0,
     wood: 0,
+    silk: 0,
+    pressed: 0,
+    pressedSince: 0,
+    pressedFrom: [],
+    soldiers: 0,
+    jailed: 0,
     monkeys: 0,
     parrots: 0,
     jewels: [],

@@ -19,8 +19,9 @@ import type { NodeId } from './map.ts';
 import { type Roller, roll } from './random.ts';
 import { type LogEntry, type Sea, type WorldState, newLines } from './world.ts';
 import { taken, talk } from './captives.ts';
+import { thin } from './pressed.ts';
 
-export type Role = 'master' | 'gunner' | 'carpenter' | 'surgeon' | 'boatswain' | 'boy' | 'chronicler';
+export type Role = 'master' | 'gunner' | 'carpenter' | 'surgeon' | 'boatswain' | 'boy' | 'chronicler' | 'interpreter';
 /** The six every voyage musters. The chronicler is yours to take or not, at Plymouth. */
 export const ROLES: Role[] = ['master', 'gunner', 'carpenter', 'surgeon', 'boatswain', 'boy'];
 
@@ -33,6 +34,7 @@ export const ROLE: Record<Role, { title: string; does: string }> = {
   boatswain: { title: 'the boatswain', does: 'keeps the hands aboard: fewer desert, and a grievance comes to a head less often' },
   boy: { title: 'the ship’s boy', does: 'nothing, which is the point; he sings out when he sights a sail' },
   chronicler: { title: 'the chronicler', does: 'nothing aboard; bring him home alive and his account of the voyage adds to your fame' },
+  interpreter: { title: 'the interpreter', does: 'opens rumors at a landmark and smooths things with the people of a coast; and may sell your plans and go' },
 };
 
 export interface Death {
@@ -103,6 +105,8 @@ export function placeOf(sea: Sea, s: WorldState): string {
 export function causeOf(entries: LogEntry[]): { cause: string; left: boolean; none?: boolean } {
   for (const e of entries) if (e.fold) return { cause: e.fold.kind, left: false };
   const lines = entries.map((e) => e.text);
+  // Men who aren't your own going their own way: none of the hands of note among them (pressed.ts).
+  if (lines.some((l) => /of the pressed men|of the jail-hands|of the soldiers went off|the interpreter, /.test(l))) return { cause: '', left: true, none: true };
   for (const line of lines) {
     if (/beheaded|put ashore with his chest/.test(line)) return { cause: 'the gentleman', left: /ashore/.test(line), none: true };
     if (/dead of it/.test(line)) {
@@ -186,6 +190,8 @@ export function mourn(sea: Sea, before: WorldState, after: WorldState): WorldSta
   const as = left ? 'ran' : cause;
   const losses = lost > 0 ? { ...after.losses, [as]: (after.losses[as] ?? 0) + lost } : after.losses;
   let w: WorldState = { ...after, rng: r.rng, hands, losses, log: [...after.log, ...said] };
+  // The pressed, the soldiers and the jail-hands are among the lost in their share — unless it was them going.
+  if (!none) w = thin(before, w);
   // Men left alive ashore may be taken, and talk; a ship lost on a Spanish coast, her men taken.
   if (left && lost > 0 && !none) {
     const r2: Roller = { rng: w.rng };

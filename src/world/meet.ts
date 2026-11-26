@@ -33,6 +33,8 @@ import { alive, mourn, nameOf } from './hands.ts';
 import { plunderJewels } from './jewels.ts';
 import { freed } from './captives.ts';
 import { read } from './reading.ts';
+import { pressable, rising, shareOut, soldiersCard } from './pressed.ts';
+import { takeSilk } from './disguise.ts';
 
 export interface Meeting {
   kind: TargetKind;
@@ -211,7 +213,9 @@ function startFight(s: WorldState, who: Omit<Meeting, 'fight' | 'forced'>, force
   const seed = Math.floor(roll(r) * 2 ** 31);
   // No powder, no guns: the shot cards stay in the locker. Nor have men landed without the ship.
   // Practice is dry firing: the guns are run out, and no powder spent.
-  const deck = (s.stores.powder > 0 || who.practice) && !noGuns ? deckOf(s.ship) : deckOf(s.ship).filter((c) => cardType(c) !== 'shot');
+  // Soldiers aboard bring their own card: over the side, grappled (pressed.ts).
+  const all = deckOf(s.ship, soldiersCard(s) && !who.practice ? { soldiers: 1 } : {});
+  const deck = (s.stores.powder > 0 || who.practice) && !noGuns ? all : all.filter((c) => cardType(c) !== 'shot');
   // She came at you: she's bearing down from far. You fired first: within hail.
   const fight = encounterWith(who.kind, seed, { hull: s.hull, maxHull: s.maxHull }, deck, extra, forced ? FAR : CLOSE);
   const log = s.stores.powder > 0 || who.practice ? s.log : [...s.log, { turn: s.turn, text: 'no powder aboard: the guns are silent, and it is sails and boarders' }];
@@ -309,7 +313,11 @@ export function fight(sea: Sea, s: WorldState, action: Action): WorldState {
   if (!m) throw new Error('there is no fight');
   const now = act(m.fight, action);
   if (!now.outcome) return { ...s, encounter: { ...m, fight: now } };
-  return mourn(sea, s, settle(sea, s, { ...m, fight: now }));
+  const w = mourn(sea, s, settle(sea, s, { ...m, fight: now }));
+  if (m.practice) return w;
+  // In the smoke, the pressed men may have turned.
+  const r: Roller = { rng: w.rng };
+  return { ...rising(w, m.nation, r), rng: r.rng };
 }
 
 function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
@@ -350,11 +358,18 @@ function settle(sea: Sea, s: WorldState, m: Meeting): WorldState {
   if (!taken) return done;
   // The great cabin, or the church plate: a jewel, sometimes, and her captain's ring if he fell.
   const r2: Roller = { rng: done.rng };
-  let after = plunderJewels(done, m.kind, m.nation, sea.map.nodes[s.player].lon > 60, r2);
-  if (!iberian) return { ...after, rng: r2.rng };
-  // An Englishman at her oars, or in the town's jail, freed; and he knows the coast.
-  const f2 = freed(after, m.raid, r2);
-  after = { ...f2.world, rng: r2.rng };
-  // Prisoners taken, and they talk: a rumor, sometimes; surely, if one of ours was among them.
-  return hearFromPrisoners(after, m.nation, f2.freed ? 1 : undefined);
+  let after = plunderJewels(shareOut(done), m.kind, m.nation, sea.map.nodes[s.player].lon > 60, r2);
+  // A Goa carrack, or Goa itself: Persian silk.
+  if (m.prize === 'carrack' || m.raid === 'goa') after = takeSilk(after, r2);
+  if (iberian) {
+    // An Englishman at her oars, or in the town's jail, freed; and he knows the coast.
+    const f2 = freed(after, m.raid, r2);
+    after = { ...f2.world, rng: r2.rng };
+    // Prisoners taken, and they talk: a rumor, sometimes; surely, if one of ours was among them.
+    after = hearFromPrisoners(after, m.nation, f2.freed ? 1 : undefined);
+  } else after = { ...after, rng: r2.rng };
+  // A ship taken: her people are yours to press, or let go. Whatever else was asked waits behind it.
+  const offer = m.raid ? null : pressable(sea, after, m.kind, m.nation, !!m.prize);
+  if (!offer) return after;
+  return { ...after, dilemma: { kind: 'press', men: offer.men, pilot: offer.pilot, nation: m.nation, then: after.dilemma } };
 }

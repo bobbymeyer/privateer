@@ -21,6 +21,8 @@ import { WOOD_WORTH, woodRoom } from './stores.ts';
 import { newsOf, tellOf } from './rumors.ts';
 import { FAIR, HARSH, PEOPLES, type People, deal } from './peoples.ts';
 import type { Sea, WorldState } from './world.ts';
+import type { Nation } from './ports.ts';
+import { COME_ROUND, press } from './pressed.ts';
 import { FEVER_NURSE, FEVER_NURSE_DAYS, FEVER_PRESS, FLUX, FOUL_LOST, WEEVIL_LOST, WEEVIL_SICK, feverDeaths, fluxDeaths } from './weather.ts';
 import { alive, mourn } from './hands.ts';
 import { CHRISTMAS_DAYS, PLAIN_GRUMBLE } from './calendar.ts';
@@ -77,7 +79,9 @@ export type Dilemma =
   /** Christmas Day: keep it with a double ration, or keep it plain. See calendar.ts. */
   | { kind: 'christmas' }
   /** The Queen's Accession Day, 17 November: fire a salute, or drink her health. See calendar.ts. */
-  | { kind: 'accession' };
+  | { kind: 'accession' }
+  /** A prize taken: press some of her men (and her pilot), or let them go. `then`: what else was asked, waiting behind it. See pressed.ts. */
+  | { kind: 'press'; men: number; pilot: boolean; nation: Nation; then: Dilemma | null };
 
 export interface Choice {
   key: string;
@@ -201,6 +205,11 @@ export function describe(d: Dilemma): { title: string; text: string } {
       return { title: 'Christmas Day', text: 'Christmas at sea. the hands look for a double ration and a holiday, as on any ship out of a Christian country; the steward looks at the bread room.' };
     case 'accession':
       return { title: 'the Queen’s day', text: 'the seventeenth of November, the day the Queen came to the throne, kept at home with bells and bonfires and the tilt at Whitehall. at sea, a gun fired for her if there’s powder to spare.' };
+    case 'press':
+      return {
+        title: 'her people',
+        text: `her crew stand in the waist under guard. ${d.men ? `you could press ${d.men === 1 ? 'one of them' : `${d.men} of them`} to make up your own: they never asked to come` : 'no room aboard for more men'}${d.pilot ? '. her pilot knows the coast of Brazil, as Nuño da Silva did when Drake took him off the Cape Verde islands' : ''}.`,
+      };
     case 'reckoning':
       return { title: 'the reckoning', text: 'Plymouth, and the voyage is over but for this. your backers have had their shares. now the court will hear of what you did, and so will Spain’s ambassador, who demanded Drake’s head for less.' };
   }
@@ -361,6 +370,13 @@ export function choices(s: WorldState, d: Dilemma): Choice[] {
         { key: 'salute', label: 'fire a salute', stakes: `a barrel of powder, and the hands cheer${s.seen.includes('discontent') ? ': the grumbling dies down' : ''}`, ...(s.stores.powder <= 0 ? { barred: 'no powder to fire' } : {}) },
         { key: 'toast', label: 'drink her health', stakes: 'a toast in the great cabin, and nothing spent' },
       ];
+    case 'press': {
+      const out: Choice[] = [];
+      if (d.men) out.push({ key: 'press', label: `press ${d.men === 1 ? 'one man' : `${d.men} men`}${d.pilot ? ' and her pilot' : ''}`, stakes: `they work the ship, but some will slip away at a landmark, more where their own people are, and in a fight they may turn; fed full and shared with, in ${COME_ROUND} days they come round` });
+      if (d.pilot) out.push({ key: 'pilot', label: 'take only her pilot', stakes: 'a day’s way more in every three down the coast of Brazil' });
+      out.push({ key: 'free', label: 'let them go', stakes: 'put them in her boat with their bread and water' });
+      return out;
+    }
     case 'reckoning': {
       const sale = saleValue(s);
       const pleased = pleasure(s);
@@ -397,6 +413,11 @@ function decide(sea: Sea, s: WorldState, key: string): WorldState {
   if (!c) throw new Error(`no choice ${key}`);
   if (c.barred) throw new Error(c.barred);
   if (d.kind === 'rumor') return heed(s, key === 'follow');
+  if (d.kind === 'press') {
+    // Pressed or let go, then whatever else was waiting.
+    const w = key === 'free' ? { ...s, log: [...s.log, { turn: s.turn, text: 'her people put in her boat and let go' }] } : press(s, key === 'press' ? d.men : 0, d.pilot, d.nation);
+    return { ...w, dilemma: d.then };
+  }
   if (d.kind === 'practice' && key === 'practise') return practise(s);
   if (d.kind === 'eve') return goIn(s, d.town, key as 'press' | 'stand' | 'land');
   if (d.kind === 'papers' && key === 'refuse' && !d.at) return patrol({ ...s, dilemma: null, log: [...s.log, { turn: s.turn, text: 'you refuse the patrol your papers' }] });

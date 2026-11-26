@@ -5,6 +5,8 @@
    * At a landmark, what it offers. Everything else is a dialog over it: the
    * ship you choose at the start, the way's events, a sail, a fight, the end.
    */
+  import { COME_ROUND, HIRE, type Hire, canHire, hire, hireHere, strangers } from '../world/pressed.ts';
+  import { SILK_WORTH, disguise, disguiseHere, foundOut } from '../world/disguise.ts';
   import { onDestroy } from 'svelte';
   import { act, type Action, type EncounterState, type GameEvent } from '../rules.ts';
   import { SHIP_CLASSES, SHIPS, cardWords, deckSize } from '../outfit.ts';
@@ -341,6 +343,13 @@
   /** A place nobody holds, where the Queen's arms could be set up. */
   const claim = $derived(sea && now() ? armsHere(sea, now()!) : null);
   const market = $derived(sea && now() ? marketHere(sea, now()!) : null);
+  const canDisguise = $derived(sea && now() ? disguiseHere(sea, now()!) : false);
+  const hires = $derived(now() ? (['soldiers', 'jail', 'interpreter'] as Hire[]).filter((h) => hireHere(now()!, h)) : []);
+  /** Hire men, rolling the interpreter's name from the voyage's own luck. */
+  function hireNow(h: Hire): WorldState {
+    const r = { rng: world!.rng };
+    return { ...hire(world!, h, r), rng: r.rng };
+  }
   const town = $derived(sea && now() ? raidHere(sea, now()!) : null);
   const spice = $derived(sea && now() ? spiceHere(sea, now()!) : null);
   const wood = $derived(sea && now() ? woodHere(sea, now()!) : null);
@@ -416,7 +425,7 @@
     {#snippet gauges(w: WorldState)}
         <!-- What you act on every day. -->
         <div class="gauges">
-          <div class:low={w.crew < complement(w) / 2} title="{minHands(w)} needed to work her"><span class="label">hands</span><span class="bar" aria-hidden="true"><span style="width: {pct(w.crew, complement(w))}"></span></span>{w.crew} of {complement(w)}{w.crew < complement(w) / 2 ? ' · low' : ''}</div>
+          <div class:low={w.crew < complement(w) / 2} title="{minHands(w)} needed to work her"><span class="label">hands</span><span class="bar" aria-hidden="true"><span style="width: {pct(w.crew, complement(w))}"></span></span>{w.crew} of {complement(w)}{strangers(w) ? `, ${strangers(w)}` : ''}{w.crew < complement(w) / 2 ? ' · low' : ''}</div>
           <div class:low={days.food <= 10}><span class="label">food</span><span class="bar" aria-hidden="true"><span style="width: {pct(w.stores.food, capacity(w).food)}"></span></span>{days.food} days{days.food <= 10 ? ' · low' : ''}</div>
           <div class:low={days.water <= 10}><span class="label">water</span><span class="bar" aria-hidden="true"><span style="width: {pct(w.stores.water, capacity(w).water)}"></span></span>{days.water} days{days.water <= 10 ? ' · low' : ''}</div>
           <div class:low={w.hull <= w.maxHull / 3}><span class="label">hull</span><span class="bar" aria-hidden="true"><span style="width: {pct(w.hull, w.maxHull)}"></span></span>{w.hull} of {w.maxHull}{w.hull <= w.maxHull / 3 ? ' · low' : ''}</div>
@@ -425,7 +434,7 @@
     {/snippet}
     {#snippet matters(w: WorldState)}
         <!-- What only matters now and then: said when it does. -->
-        {@const cargo = [w.spice && `${w.spice} ${w.spice === 1 ? 'ton' : 'tons'} of spice`, w.wood && `${w.wood} of brazilwood`, w.monkeys && `${w.monkeys} ${w.monkeys === 1 ? 'monkey' : 'monkeys'}`, w.parrots && `${w.parrots} ${w.parrots === 1 ? 'parrot' : 'parrots'}`, w.jewels.length && `${w.jewels.length} ${w.jewels.length === 1 ? 'jewel' : 'jewels'}`].filter(Boolean)}
+        {@const cargo = [w.spice && `${w.spice} ${w.spice === 1 ? 'ton' : 'tons'} of spice`, w.wood && `${w.wood} of brazilwood`, w.silk && `${w.silk} of Persian silk`, w.monkeys && `${w.monkeys} ${w.monkeys === 1 ? 'monkey' : 'monkeys'}`, w.parrots && `${w.parrots} ${w.parrots === 1 ? 'parrot' : 'parrots'}`, w.jewels.length && `${w.jewels.length} ${w.jewels.length === 1 ? 'jewel' : 'jewels'}`].filter(Boolean)}
         {@const notes = [
           scurvy(w) === 'killing' ? `${w.fresh} days without fresh food: the scurvy is killing` : scurvy(w) === 'coming' ? `${w.fresh} days without fresh food: the scurvy at ${SCURVY_DAYS}` : '',
           w.crew < minHands(w) + 6 ? `${w.crew} hands, and she needs ${minHands(w)} to work her` : '',
@@ -453,6 +462,9 @@
           <div><span class="label">truck</span>{w.truck} {w.truck === 1 ? 'chest' : 'chests'}</div>
           {#if w.spice}<div><span class="label">spice</span>{w.spice} {w.spice === 1 ? 'ton' : 'tons'}, {w.spice * SPICE_WORTH} at home</div>{/if}
           {#if w.wood}<div><span class="label">brazilwood</span>{w.wood} {w.wood === 1 ? 'ton' : 'tons'}, {w.wood * WOOD_WORTH} at home</div>{/if}
+          {#if w.silk}<div><span class="label">silk</span>{w.silk} {w.silk === 1 ? 'ton' : 'tons'}, {w.silk * SILK_WORTH} at home</div>{/if}
+          {#if strangers(w)}<div><span class="label">not your own</span>{strangers(w)}{w.pressed ? `; the pressed come round in ${Math.max(0, COME_ROUND - (w.turn - w.pressedSince))} days, fed full` : ''}</div>{/if}
+          {#if w.seen.includes('pilot')}<div><span class="label">pilot</span>a Portuguese who knows the coast of Brazil</div>{/if}
           {#if w.jewels.length}<div title={w.jewels.map((j) => j.name).join('; ')}><span class="label">jewels</span>{w.jewels.length}, {w.jewels.reduce((t, j) => t + j.value, 0)} to a goldsmith</div>{/if}
           <div><span class="label">backed by</span>{BACKERS[w.backer].name}</div>
           <div class:low={w.infamy > 0}><span class="label">your name</span>{lawfulness(w)}</div>
@@ -494,7 +506,7 @@
         </p>
         {#if phone}
           <p class="fold-line">
-            <span class:low={world.crew < complement(world) / 2}>{world.crew} hands{world.crew < complement(world) / 2 ? ', low' : ''}</span> ·
+            <span class:low={world.crew < complement(world) / 2}>{world.crew} hands{world.pressed ? `, ${world.pressed} pressed` : ''}{world.crew < complement(world) / 2 ? ', low' : ''}</span> ·
             <span class:low={days.food <= 10}>food {days.food}d{days.food <= 10 ? ', low' : ''}</span> ·
             <span class:low={days.water <= 10}>water {days.water}d{days.water <= 10 ? ', low' : ''}</span> ·
             <span class:low={world.hull <= world.maxHull / 3}>hull {world.hull}/{world.maxHull}{world.hull <= world.maxHull / 3 ? ', low' : ''}</span> ·
@@ -559,6 +571,14 @@
                 </button>
               {/each}
             </div>
+            {#if hires.length}
+              <p class="faint">men to be had beside the hands, each with a catch: soldiers fight well over the side and sail like landsmen, and go off after three months without a prize; jail-hands are cheap and run; a renegade interpreter opens doors and may sell you.</p>
+              <div class="row">
+                {#each hires as h (h)}
+                  <button disabled={sailing || !canHire(world, h)} onclick={() => attempt(() => hireNow(h))}>{h === 'interpreter' ? HIRE[h].name : `${HIRE[h].lot} ${HIRE[h].name}`} ({HIRE[h].cost})</button>
+                {/each}
+              </div>
+            {/if}
             {#if yardHere(sea, world)}
               <div class="row">
                 <button disabled={sailing || world.gold < YARD_COST || world.hull >= world.maxHull} onclick={() => attempt(() => mend(sea!, world!))}>the yard: mend a point of hull ({YARD_COST}), {world.hull} of {world.maxHull}</button>
@@ -593,6 +613,10 @@
                 {#if world.truck > 0}<button disabled={sailing || petsAboard(world) >= PET_ROOM} onclick={() => attempt(() => buyPet(sea!, world!, pet, 'truck'))}>a {pet} for a chest of truck</button>{/if}
               {/each}
             </div>
+          {/if}
+          {#if canDisguise}
+            <div class="row"><button disabled={sailing} onclick={() => attempt(() => disguise(sea!, world!, advance))}>go in under false colours, as a merchant: a day</button></div>
+            <p class="faint">taken for a merchant, the chandler deals with you; found out ({Math.round(foundOut(world) * 100)} in 100 as things stand), the port is shut, and a patrol may come out.</p>
           {/if}
           {#if town}
             <div class="row"><button disabled={sailing} onclick={() => attempt(() => raid(sea!, world!))}>raid {here.name}, once</button></div>
@@ -822,7 +846,7 @@
             <table class="score">
               <tbody>
                 <tr><td>treasure home</td><td class="num">{sc.treasure}</td></tr>
-                <tr><td>{world.crew} hands home, {HAND_WORTH} each</td><td class="num">{sc.hands}</td></tr>
+                <tr><td>{world.crew} hands home{world.pressed ? `, ${world.pressed} of them pressed men` : ''}, {HAND_WORTH} each</td><td class="num">{sc.hands}</td></tr>
                 <tr><td>the ship, {world.hull} hull of {world.maxHull}</td><td class="num">{sc.ship}</td></tr>
                 <tr><td>fame at court{world.verdict === 'disowned' ? ': disowned' : world.verdict === 'low' ? ': you lay low' : world.verdict === 'pirate' ? ': named a pirate' : ''}</td><td class="num">{sc.fame}</td></tr>
                 {#if world.hands.some((h) => h.role === 'chronicler')}
@@ -851,6 +875,9 @@
           {#if world.arms.length}<p class="faint">the Queen’s arms set up at: {world.arms.map((k) => landmark(k).name).join(' · ')}</p>{/if}
           {#if Object.keys(world.losses).length}
             <p class="faint">hands lost on the voyage: {Object.entries(world.losses).sort((a, b) => b[1] - a[1]).map(([k, n]) => lossWords(k, n)).join(' · ')}</p>
+          {/if}
+          {#if strangers(world)}
+            <p class="faint">of the hands at the end, not your own: {strangers(world)}.</p>
           {/if}
           {#if world.hands.some((h) => h.dead && h.dead.cause !== 'went down with the ship')}
             <h3>the dead</h3>

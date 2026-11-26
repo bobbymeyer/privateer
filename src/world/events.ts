@@ -14,6 +14,7 @@ import { happeningsDay } from './happenings.ts';
 import { petsDay } from './pets.ts';
 import { calendarDay } from './calendar.ts';
 import type { Sea, WorldState } from './world.ts';
+import { pressedDay } from './pressed.ts';
 
 /** A storm, on any day at sea, outside its seasons and its latitudes. */
 export const STORM_CHANCE = 1 / 120;
@@ -56,5 +57,7 @@ export function aDay(sea: Sea, s: WorldState): WorldState {
   // The days of the year, at sea or not.
   w = calendarDay(w, r, atSea);
   w = provisionDay(sea, w, r);
+  // Pressed men: fed full long enough, they come round.
+  w = pressedDay(w);
   return { ...w, rng: r.rng };
 }

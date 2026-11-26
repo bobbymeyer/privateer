@@ -24,6 +24,7 @@ import { landfallHere } from './landfalls.ts';
 import { trueHere } from './rumors.ts';
 import { alive } from './hands.ts';
 import { FAIR, GUIDED_DAYS, GUIDED_FORAGE, PEOPLES, ambush, deal, friendly, hostileTo, peopleHere } from './peoples.ts';
+import { SOLDIERS_WEAR } from './pressed.ts';
 
 export interface Stores {
   /** Provisions, in rations: one hand for one day at full ration. */
@@ -46,7 +47,7 @@ export const TROPIC_THIRST = 1.5;
 /** Days without fresh food before scurvy kills. */
 export const SCURVY_DAYS = 42;
 /** Hands dead of scurvy a day, per hand, per day past SCURVY_DAYS. */
-export const SCURVY_RATE = 0.00035;
+export const SCURVY_RATE = 0.0004;
 /** And of thirst, and of hunger, a day, per hand, when it's run out. */
 export const THIRST_RATE = 0.08;
 export const HUNGER_RATE = 0.03;
@@ -131,7 +132,9 @@ export function provisionDay(sea: Sea, s: WorldState, r: Roller): WorldState {
   }
 
   // Weed and worm.
-  if (!sea.map.nodes[s.player].port && w.turn % WEAR_DAYS[s.pace] === 0 && w.hull > 1) {
+  // Soldiers at the sheets sail her like landsmen: the wear comes sooner. See pressed.ts.
+  const wear = Math.round(WEAR_DAYS[s.pace] * (s.soldiers > 0 ? SOLDIERS_WEAR : 1));
+  if (!sea.map.nodes[s.player].port && w.turn % wear === 0 && w.hull > 1) {
     w = { ...w, hull: w.hull - 1 };
     log('weed and worm: the hull slower and weaker by a point');
   }
@@ -265,7 +268,13 @@ export const ISLANDERS_COST = 3;
 export const ISLANDERS_DAYS = 21;
 
 /** The market where you're lying, if there is one. */
-export const marketHere = (sea: Sea, s: WorldState) => (s.seen.includes(`shut:${s.voyage.at}`) || (landmarkHere(sea, s) && hostileTo(s, peopleHere(s))) ? null : (landmarkHere(sea, s)?.offers.market ?? null));
+export const marketHere = (sea: Sea, s: WorldState) =>
+  s.seen.includes(`shut:${s.voyage.at}`) || (landmarkHere(sea, s) && hostileTo(s, peopleHere(s)))
+    ? null
+    : // Under false colours, a Spanish chandler deals with you as with anyone (disguise.ts).
+      landmarkHere(sea, s) && s.seen.includes(`disguised:${s.voyage.at}`)
+      ? 'chandler'
+      : (landmarkHere(sea, s)?.offers.market ?? null);
 
 /** Plymouth's prices at home, and wherever a ruler's favour gets you them (the feast ashore, happenings.ts); half as dear again elsewhere. */
 export const price = (s: WorldState, ware: Ware) => Math.ceil(CHANDLER[ware].cost * (s.voyage.at === 'plymouth' || s.seen.includes(`favour:${s.voyage.at}`) ? 1 : ABROAD));
@@ -300,9 +309,9 @@ export const SPICE_WORTH = 20;
 /** Tons of cargo she can stow, spice and brazilwood together: a ton for every five of her complement, less the shining ore if she carries it. */
 export const holdRoom = (s: WorldState) => Math.max(0, Math.floor(complement(s) / 5) - (s.seen.includes('ore') ? 2 : 0));
 /** Tons of spice she can stow, beside the brazilwood. */
-export const spiceRoom = (s: WorldState) => Math.max(0, holdRoom(s) - s.wood);
+export const spiceRoom = (s: WorldState) => Math.max(0, holdRoom(s) - s.wood - (s.silk ?? 0));
 /** Tons of brazilwood she can stow, beside the spice. */
-export const woodRoom = (s: WorldState) => Math.max(0, holdRoom(s) - s.spice);
+export const woodRoom = (s: WorldState) => Math.max(0, holdRoom(s) - s.spice - (s.silk ?? 0));
 
 /** What a ton of brazilwood fetches at home, for the red dye: less than spice, and cheaper to come by. */
 export const WOOD_WORTH = 9;

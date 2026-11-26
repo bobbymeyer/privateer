@@ -34,8 +34,14 @@
  *   arms where nobody holds the land when it has a bundle to spare;
  * - keeps company with Huguenot privateers, and takes their French commission
  *   only with --french.
+ * - presses men from a prize when short of hands, and always takes a pilot
+ *   who knows the coast of Brazil (--no-press: never);
+ * - hires a lot of soldiers when it means to raid, jail-hands only if broke
+ *   after fitting out, an interpreter with --interpreter; comes in under false
+ *   colours where it can't otherwise water or buy only with --disguise.
  *
  *   --hull: what took her hull, by cause; --every-sail: the lookout calls you up for every sail
+ *   --no-press, --interpreter, --disguise: pressed men, the renegade, false colours
  *   npm run voyage -- [--ship pinnace|sloop|brigantine|all] [--backer crown|gentlemen|own|all] [--runs 40] [--from 0] [--raid] [--wake] [--pirate] [--no-rumors] [--every-rumor] [--chronicler] [--french] [--trace]
  */
 
@@ -57,6 +63,9 @@ const LANDFALL_KEYS = Object.keys(LANDFALL_WATERS);
 import { advance, createSea, createWorld, waiting, type WorldState } from '../src/world/world.ts';
 import { lookahead } from './bots.ts';
 import { armsHere, plantArms } from '../src/world/arms.ts';
+import { canHire, hire } from '../src/world/pressed.ts';
+import { disguise, disguiseHere } from '../src/world/disguise.ts';
+import { complement } from '../src/world/stores.ts';
 
 const flag = (name: string) => process.argv.includes(`--${name}`);
 const arg = (name: string, fallback: string) => {
@@ -92,6 +101,11 @@ function worthFollowing(w: WorldState, key: string, source: string): boolean {
   return source !== 'prisoner' || w.hull >= w.maxHull * 0.7;
 }
 const PIRATE = flag('pirate');
+/** Press men from a prize when short of hands: below this share of her complement. */
+const PRESS = !flag('no-press');
+const PRESS_BELOW = 0.85;
+const INTERPRETER = flag('interpreter');
+const DISGUISE = flag('disguise');
 const BACKER = arg('backer', 'own');
 const CHRONICLER = flag('chronicler');
 const FRENCH = flag('french');
@@ -108,6 +122,7 @@ const DAYS = 1500;
 const HULLBY: Record<string, number> = {};
 const DEAD: Record<string, number> = {};
 const NOTED = { dead: 0, ran: 0 };
+const PRESSED = { taken: 0, round: 0 };
 
 const sea = createSea();
 const fightBot = (outgunned: boolean) => lookahead({ hull: 0.6, damage: 0.4, fled: outgunned ? 100 : 0 });
@@ -184,6 +199,7 @@ function answer(w: WorldState): WorldState {
         : w.dilemma.kind === 'christmas' ? (daysOf(w).food > 40 ? 'keep' : 'plain')
         : w.dilemma.kind === 'accession' ? (w.stores.powder > 3 ? 'salute' : 'toast')
         : w.dilemma.kind === 'normans' ? (open.includes('buy') && w.gold > 40 ? 'buy' : RUMORS ? 'news' : 'leave')
+        : w.dilemma.kind === 'press' ? (PRESS && open.includes('press') && w.crew < complement(w) * PRESS_BELOW ? 'press' : PRESS && open.includes('pilot') ? 'pilot' : 'free')
         : open[0];
       // At the reckoning, the dead commander's ring set aside for the Queen; the rest too, if it means to give a gift.
       if (w.dilemma.kind === 'reckoning') {
@@ -211,7 +227,21 @@ function answer(w: WorldState): WorldState {
 
 /** At a landmark: the shore, the market, a raid. */
 function atLandmark(w: WorldState): WorldState {
+  // At Plymouth: soldiers if it means to raid, the interpreter if told to, before the chandler.
+  if (w.voyage.at === 'plymouth' && w.turn === 0) {
+    const r = { rng: w.rng };
+    if (RAID && canHire(w, 'soldiers')) w = { ...hire(w, 'soldiers', r), rng: r.rng };
+    if (INTERPRETER && canHire(w, 'interpreter')) w = { ...hire(w, 'interpreter', r), rng: r.rng };
+  }
+  // Under false colours, where it can't otherwise water or buy and the casks or the bread are low.
+  if (DISGUISE && disguiseHere(sea, w) && !marketHere(sea, w) && (daysOf(w).water < 60 || daysOf(w).food < 60)) w = answer(disguise(sea, w, advance));
+  if (w.sunk || waiting(w)) return w;
   w = cutWood(shop(w));
+  // Broke after fitting out, with room: hands out of the jails, cheap.
+  if (w.voyage.at === 'plymouth' && w.turn === 0 && w.gold < 15) {
+    const r = { rng: w.rng };
+    while (canHire(w, 'jail') && w.crew < complement(w) * 0.8) w = { ...hire(w, 'jail', r), rng: r.rng };
+  }
   // Truck for fresh food where there's a people and no market, while it lasts.
   if (barterHere(sea, w) && w.truck > 0 && (w.fresh > 10 || daysOf(w).water < 80)) w = barter(sea, w);
   const shore = shoreHere(sea, w);
@@ -307,6 +337,11 @@ function sail(ship: string, seed: number, backer: Backer): Result {
   if (poet && w.won && !poet.dead) (CHRONICLE.home++, (CHRONICLE.sum += score(w).chronicle));
   if (poet?.dead) CHRONICLE.dead++;
   NOTED.ran += w.hands.filter((h) => h.ran).length;
+  for (const l of w.log) {
+    const m = l.text.match(/^(\d+|a) m[ae]n pressed/);
+    if (m) PRESSED.taken += m[1] === 'a' ? 1 : Number(m[1]);
+    if (l.text.startsWith('the pressed men have come round')) PRESSED.round++;
+  }
   if (TRACE) console.log(seed, ship, w.won ? 'HOME' : why, 'day', w.turn, 'gold', w.gold, 'crew', w.crew, took ? 'took her' : '', w.voyage.visited.join('>'));
   const heard = w.rumors.filter((r) => r.followed && w.voyage.visited.includes(r.key));
   return { ship, score: score(w).total, verdict: w.verdict ?? '', won: w.won, day: w.turn, like: score(w).like, at: w.voyage.at, why, gold: w.gold, crew: w.crew, took, followedTrue: heard.filter((r) => r.truth).length, followedFalse: heard.filter((r) => !r.truth).length, heard: w.rumors.length, landfalls: w.seen.filter((k) => LANDFALL_KEYS.includes(k)).length, arms: w.arms.length, hullHome: w.hull / w.maxHull, stops };
@@ -327,6 +362,8 @@ for (const ship of SHIP === 'all' ? SHIPS : [SHIP]) for (const backer of (BACKER
   console.log('  like', count(won, (r) => r.like), '· at court', count(won, (r) => r.verdict), '· took the treasure ship', results.filter((r) => r.took).length);
   console.log('  lost', count(lost, (r) => r.why), '· last landmark', count(lost, (r) => r.at));
   console.log('  lost to', JSON.stringify(DEAD), `· hands of note dead ${NOTED.dead}, ran ${NOTED.ran}`);
+  console.log(`  SHORT too few hands ${lost.filter((r) => r.why === 'too few hands').length} of ${lost.length} lost · pressed ${PRESSED.taken}, came round ${PRESSED.round}, ran ${DEAD.ran ?? 0} (all hands who left)`);
+  PRESSED.taken = PRESSED.round = 0;
   const sum = (f: (r: Result) => number) => results.reduce((t, r) => t + f(r), 0);
   console.log(`  rumors heard ${sum((r) => r.heard)}, detours sailed ${sum((r) => r.followedTrue + r.followedFalse)} (${sum((r) => r.followedTrue)} true, ${sum((r) => r.followedFalse)} false) · rumored prizes ${JSON.stringify(PRIZE_FOUGHT)}, paying ${mean(PRIZE_PAY.filter((x) => x > 0))} when they paid · storm landfalls ${sum((r) => r.landfalls)} · the Queen's arms set up ${sum((r) => r.arms)}`);
   console.log(`  jewels home ${JEWELS_HOME.reduce((a, b) => a + b, 0)} on ${JEWELS_HOME.length} voyages${CHRONICLER ? ` · the chronicler home ${CHRONICLE.home}, dead ${CHRONICLE.dead}, his account worth ${CHRONICLE.home ? Math.round(CHRONICLE.sum / CHRONICLE.home) : 0}` : ''}`);

@@ -14,6 +14,9 @@ import { petsWorth } from './pets.ts';
 import { arriveBrazil } from './brazil.ts';
 import { arriveDetour, followed, hearAt } from './rumors.ts';
 import { comeHome } from './reckoning.ts';
+import { strangersArriving } from './pressed.ts';
+import { SILK_WORTH } from './disguise.ts';
+import { alive } from './hands.ts';
 import { friendly, meetPeople, peopleAt } from './peoples.ts';
 import { inTrades, nextStep } from './course.ts';
 
@@ -100,24 +103,29 @@ export function raise(sea: Sea, s: WorldState): WorldState {
     const sold = s.spice * SPICE_WORTH;
     const dye = s.wood * WOOD_WORTH;
     const pets = petsWorth(s);
+    const silk = s.silk * SILK_WORTH;
     const log = [
       ...s.log,
       ...(sold ? [{ turn: s.turn, text: `${s.spice} tons of spice sold on the quay for ${sold}` }] : []),
       ...(dye ? [{ turn: s.turn, text: `${s.wood} tons of brazilwood sold to the dyers for ${dye}` }] : []),
+      ...(silk ? [{ turn: s.turn, text: `${s.silk} tons of Persian silk sold to the mercers for ${silk}` }] : []),
       ...(pets ? [{ turn: s.turn, text: `${[s.monkeys && `${s.monkeys} ${s.monkeys === 1 ? 'monkey' : 'monkeys'}`, s.parrots && `${s.parrots} ${s.parrots === 1 ? 'parrot' : 'parrots'}`].filter(Boolean).join(' and ')} sold in London for ${pets}` }] : []),
     ];
-    const gold = s.gold + sold + dye + pets;
+    const gold = s.gold + sold + dye + pets + silk;
     // Not over yet: the shares, and the reckoning.
-    return comeHome({ ...s, voyage, gold, spice: 0, wood: 0, monkeys: 0, parrots: 0, log: [...log, { turn: s.turn, text: `Plymouth: ${said}, with ${gold}`, stop: true }] });
+    return comeHome({ ...s, voyage, gold, spice: 0, wood: 0, silk: 0, monkeys: 0, parrots: 0, log: [...log, { turn: s.turn, text: `Plymouth: ${said}, with ${gold}`, stop: true }] });
   }
   // The people of the coast, as they stand with you; then what happens on arriving.
   let w: WorldState = meetPeople({ ...s, voyage, landfall: null, log: [...s.log, { turn: s.turn, text: `you raise ${l.name}`, stop: true }] }, raised);
   w = arriving(w, raised);
+  // Men who aren't your own: pressed men slip away, jail-hands run, idle soldiers go, the interpreter may sell you.
+  w = strangersArriving(w, raised);
   w = arriveBrazil(w, raised);
   // Off Cape San Francisco, the first time: the treasure ship.
   if (raised === PLATE_LANDMARK && !v.visited.includes(PLATE_LANDMARK)) w = overhaul(sea, w);
   // A detour: whether the rumor was true. Anywhere else: a rumor, maybe.
   // Friends tell you what they know.
-  w = l.detour ? arriveDetour(sea, w, raised) : hearAt(w, raised, friendly(w, peopleAt(raised)));
+  // Friends tell you what they know, and so does a renegade who has the language.
+  w = l.detour ? arriveDetour(sea, w, raised) : hearAt(w, raised, friendly(w, peopleAt(raised)) || alive(w, 'interpreter'));
   return w;
 }
